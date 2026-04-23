@@ -501,8 +501,8 @@ const CityStyle = {
            </g>
         )}
 
-        {/* Top face with crisp white bevel highlight */}
-        <rect x={E} y={-E} width={w} height={h} rx={R} fill={topFill} stroke={isBoundary ? "#cbd5e1" : "#ffffff"} strokeWidth={isBoundary ? 1 : 1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
+        {/* Top face with crisp geometric boundary (no artificial stroke overhang or radius expansion) */}
+        <rect x={E} y={-E} width={w} height={h} rx={R} fill={topFill} stroke={isBoundary ? "#cbd5e1" : "none"} strokeWidth={isBoundary ? 1 : 0} />
         
         {/* Top face contents SKEWED to the grid */}
         <g transform={`translate(${E} ${-E})`}>
