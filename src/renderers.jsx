@@ -358,44 +358,73 @@ const IsoStyle = {
 // ===========================================================
 const CityStyle = {
   id: "city", name: "City", tagline: "True 3D Map. City blocks, isometric projection.",
-  tokens: { bg: "#f8fafc", ink: "#0f172a", muted: "#64748b", accent: "#f5c518", line: "#cbd5e1" },
+  tokens: { bg: "#F9FAFB", ink: "#0f172a", muted: "#64748b", accent: "#007AFF", line: "#D1D5DB" },
   isometric: true,
   Defs: () => (
     <defs>
+      <radialGradient id="grid-fade" cx="50%" cy="50%" r="60%">
+        <stop offset="0%" stopColor="white" stopOpacity="1" />
+        <stop offset="100%" stopColor="white" stopOpacity="0" />
+      </radialGradient>
+      <mask id="grid-fade-mask">
+        <rect x="-2000" y="-2000" width="6000" height="6000" fill="url(#grid-fade)" />
+      </mask>
       <pattern id="clay-iso-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e2e8f0" strokeWidth="1" vectorEffect="non-scaling-stroke"/>
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#EEEEEE" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>
       </pattern>
+      
+      {/* Complex Studio Shadows */}
       <filter id="clay-ao" x="-30%" y="-30%" width="160%" height="160%">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
-        <feOffset dy="10"/>
-        <feComponentTransfer><feFuncA type="linear" slope=".12"/></feComponentTransfer>
-        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+        {/* Ambient Occlusion */}
+        <feGaussianBlur in="SourceAlpha" stdDeviation="12" result="blur1"/>
+        <feOffset in="blur1" dy="16" result="offset1"/>
+        <feComponentTransfer in="offset1" result="ao">
+           <feFuncA type="linear" slope=".06"/>
+        </feComponentTransfer>
+        {/* Contact Shadow */}
+        <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur2"/>
+        <feOffset in="blur2" dy="2" result="offset2"/>
+        <feComponentTransfer in="offset2" result="contact">
+           <feFuncA type="linear" slope=".15"/>
+        </feComponentTransfer>
+        {/* Merge */}
+        <feMerge><feMergeNode in="ao"/><feMergeNode in="contact"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
+      
       <filter id="clay-ao-sm" x="-30%" y="-30%" width="160%" height="160%">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
-        <feOffset dy="4"/>
+        <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+        <feOffset dy="3"/>
         <feComponentTransfer><feFuncA type="linear" slope=".15"/></feComponentTransfer>
         <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
+
+      {/* Matte White & Cool Grays */}
       <linearGradient id="clay-top" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#ffffff"/><stop offset="1" stopColor="#f8fafc"/>
+        <stop offset="0" stopColor="#ffffff"/><stop offset="1" stopColor="#fdfdfd"/>
       </linearGradient>
       <linearGradient id="clay-right" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stopColor="#f1f5f9"/><stop offset="1" stopColor="#e2e8f0"/>
+        <stop offset="0" stopColor="#f2f2f2"/><stop offset="1" stopColor="#e0e0e0"/>
       </linearGradient>
       <linearGradient id="clay-front" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#e2e8f0"/><stop offset="1" stopColor="#cbd5e1"/>
+        <stop offset="0" stopColor="#e0e0e0"/><stop offset="1" stopColor="#cccccc"/>
       </linearGradient>
-      <linearGradient id="clay-pipe-cool" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#60a5fa"/><stop offset=".5" stopColor="#3b82f6"/><stop offset="1" stopColor="#1d4ed8"/>
+      <linearGradient id="clay-body" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#e0e0e0"/>
+        <stop offset="0.25" stopColor="#e8e8e8"/>
+        <stop offset="1" stopColor="#f2f2f2"/>
       </linearGradient>
-      <linearGradient id="clay-pipe-warm" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#fcd34d"/><stop offset=".5" stopColor="#f59e0b"/><stop offset="1" stopColor="#b45309"/>
+      
+      {/* Vibrant Pipes with bright cores */}
+      <linearGradient id="clay-pipe-cool" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#005bb5"/><stop offset=".5" stopColor="#4da6ff"/><stop offset="1" stopColor="#007AFF"/>
+      </linearGradient>
+      <linearGradient id="clay-pipe-warm" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#cc9300"/><stop offset=".5" stopColor="#ffdb4d"/><stop offset="1" stopColor="#FFB800"/>
       </linearGradient>
     </defs>
   ),
   Background: ({ w, h }) => (
-    <rect width={w} height={h} fill="url(#clay-iso-grid)"/>
+    <rect width={w*2} height={h*2} x={-w/2} y={-h/2} fill="url(#clay-iso-grid)" mask="url(#grid-fade-mask)"/>
   ),
   Node: ({ node, active }) => {
     const w = node.w, h = node.h;
@@ -405,30 +434,62 @@ const CityStyle = {
     const Z = isBoundary ? 6 : (node.kind === 'store' ? 56 : 36);
     const E = 1.225 * Z;
     
-    const topFill = isBoundary ? "#f8fafc" : "url(#clay-top)";
-    const rightFill = isBoundary ? "#f1f5f9" : "url(#clay-right)";
-    const frontFill = isBoundary ? "#e2e8f0" : "url(#clay-front)";
-    const stroke = isBoundary ? "#cbd5e1" : "#94a3b8";
+    const topFill = isBoundary ? "transparent" : "url(#clay-top)";
+    const rightFill = isBoundary ? "transparent" : "url(#clay-right)";
+    const frontFill = isBoundary ? "transparent" : "url(#clay-front)";
+    const wallStroke = isBoundary ? "#cbd5e1" : "none";
     
     const layout = node.layout || "center";
     const icons = node.icons || [node.kind];
+    
+    // Tight corner radius for premium manufactured look
+    const R = isBoundary ? 0 : (node.kind === 'store' ? 10 : 8);
 
     return (
       <g transform={`translate(${node.x} ${node.y})`}>
-        {/* Deep Ground shadow */}
-        <rect width={w} height={h} fill="rgba(0,0,0,0.25)" filter="url(#clay-ao)"/>
+        {/* Deep Ground shadow with perfectly matching rounded footprint */}
+        <rect width={w} height={h} rx={R} fill={isBoundary ? "rgba(0,0,0,0.05)" : "rgba(0,0,0,0.4)"} filter="url(#clay-ao)"/>
         
-        {/* Left wall (front) */}
-        <path d={`M 0 0 L 0 ${h} L ${E} ${h-E} L ${E} ${-E} Z`} fill={frontFill} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
+        {isBoundary ? (
+          <g>
+            <path d={`M 0 0 L 0 ${h} L ${E} ${h-E} L ${E} ${-E} Z`} fill="transparent" stroke={wallStroke} strokeWidth={1} vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
+            <path d={`M 0 ${h} L ${w} ${h} L ${w+E} ${h-E} L ${E} ${h-E} Z`} fill="transparent" stroke={wallStroke} strokeWidth={1} vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
+          </g>
+        ) : (
+          <g>
+            <defs>
+              {/* Mathematically precise local gradient orthogonal to vertical cylinder */}
+              <linearGradient id={`corner-grad-${node.id}`} gradientUnits="userSpaceOnUse" x1={0} y1={h-R} x2={R} y2={h}>
+                <stop offset="0" stopColor="#E0E0E0"/>
+                <stop offset="1" stopColor="#F2F2F2"/>
+              </linearGradient>
+            </defs>
+            {/* Left solid wall (Shadow-tone) */}
+            <path d={`M 0 ${R} L 0 ${h-R} L ${E} ${h-R-E} L ${E} ${R-E} Z`} fill="#E0E0E0" />
+            
+            {/* Front curved corner (Seamless transition) */}
+            <path d={`M 0 ${h-R} A ${R} ${R} 0 0 0 ${R} ${h} L ${R+E} ${h-E} A ${R} ${R} 0 0 1 ${E} ${h-R-E} Z`} fill={`url(#corner-grad-${node.id})`} /> 
+            
+            {/* Right solid wall (Mid-tone) */}
+            <path d={`M ${R} ${h} L ${w-R} ${h} L ${w-R+E} ${h-E} L ${R+E} ${h-E} Z`} fill="#F2F2F2" />
+            
+            {/* Right curved corner (Fades around the back) */}
+            <path d={`M ${w-R} ${h} A ${R} ${R} 0 0 0 ${w} ${h-R} L ${w+E} ${h-R-E} A ${R} ${R} 0 0 1 ${w-R+E} ${h-E} Z`} fill="#F2F2F2" />
+            
+            {/* Left curved corner (Shadow wraps back) */}
+            <path d={`M 0 ${R} A ${R} ${R} 0 0 1 ${R} 0 L ${R+E} ${-E} A ${R} ${R} 0 0 0 ${E} ${R-E} Z`} fill="#E0E0E0" />
+          </g>
+        )}
         
-        {/* Right wall */}
-        <path d={`M 0 ${h} L ${w} ${h} L ${w+E} ${h-E} L ${E} ${h-E} Z`} fill={rightFill} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
-        
-        {/* Recessed Orthogonal Ports (at the base where pipes connect) */}
+        {/* Recessed Orthogonal Ports with inner glow effect */}
         {!isBoundary && (
           <g>
-            <path d={`M 0 ${h/2 - 8} L 0 ${h/2 + 8} L ${E*0.15} ${h/2+8 - E*0.15} L ${E*0.15} ${h/2-8 - E*0.15} Z`} fill="#334155" stroke="#0f172a" strokeWidth=".5"/>
-            <path d={`M ${w/2 - 8} ${h} L ${w/2 + 8} ${h} L ${w/2+8 + E*0.15} ${h - E*0.15} L ${w/2-8 + E*0.15} ${h - E*0.15} Z`} fill="#334155" stroke="#0f172a" strokeWidth=".5"/>
+            {/* Left face port */}
+            <path d={`M 0 ${h/2 - 8} L 0 ${h/2 + 8} L ${E*0.15} ${h/2+8 - E*0.15} L ${E*0.15} ${h/2-8 - E*0.15} Z`} fill="#1e293b" stroke="#007AFF" strokeWidth="1.5" strokeOpacity="0.75" strokeLinejoin="round"/>
+            <path d={`M ${E*0.05} ${h/2 - 6 - E*0.05} L ${E*0.05} ${h/2 + 6 - E*0.05} L ${E*0.15} ${h/2+6 - E*0.15} L ${E*0.15} ${h/2-6 - E*0.15} Z`} fill="#0f172a" />
+            {/* Right face port */}
+            <path d={`M ${w/2 - 8} ${h} L ${w/2 + 8} ${h} L ${w/2+8 + E*0.15} ${h - E*0.15} L ${w/2-8 + E*0.15} ${h - E*0.15} Z`} fill="#1e293b" stroke="#007AFF" strokeWidth="1.5" strokeOpacity="0.75" strokeLinejoin="round"/>
+            <path d={`M ${w/2 - 6 + E*0.05} ${h - E*0.05} L ${w/2 + 6 + E*0.05} ${h - E*0.05} L ${w/2+6 + E*0.15} ${h - E*0.15} L ${w/2-6 + E*0.15} ${h - E*0.15} Z`} fill="#0f172a" />
           </g>
         )}
 
@@ -440,8 +501,8 @@ const CityStyle = {
            </g>
         )}
 
-        {/* Top face with subtle highlight stroke */}
-        <rect x={E} y={-E} width={w} height={h} fill={topFill} stroke={stroke} strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
+        {/* Top face with crisp white bevel highlight */}
+        <rect x={E} y={-E} width={w} height={h} rx={R} fill={topFill} stroke={isBoundary ? "#cbd5e1" : "#ffffff"} strokeWidth={isBoundary ? 1 : 1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
         
         {/* Top face contents SKEWED to the grid */}
         <g transform={`translate(${E} ${-E})`}>
@@ -532,9 +593,9 @@ const CityStyle = {
           </g>
         )}
         
-        {/* Label floating and facing the camera */}
+        {/* Label floating ABOVE the line, facing the camera */}
         {edge.label && (
-          <g transform={`translate(${mid.x} ${mid.y}) translate(0 -16) rotate(45) scale(1, 1.732)`}>
+          <g transform={`translate(${mid.x} ${mid.y}) translate(0 -32) rotate(45) scale(1, 1.732)`}>
             <rect x={-edge.label.length*3.4 - 6} y={-9} width={edge.label.length*6.8 + 12} height={18}
               rx="4" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1" filter="url(#clay-ao-sm)"/>
             <text textAnchor="middle" dominantBaseline="middle" fontFamily="JetBrains Mono" fontSize="9.5" fill={warm ? "#b45309" : "#1d4ed8"}>{edge.label}</text>
@@ -689,18 +750,14 @@ function NodeIcon({ kind, color = "#8f8779", sketchy = false, mono = false }) {
 // ===========================================================
 // Generic <Diagram>
 // ===========================================================
-function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 16, className }) {
+function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 24, className }) {
   const G = React.useMemo(() => resolveGraph(graph), [graph]);
   const Style = STYLES[style] || SleekStyle;
-  const { w, h, grid } = G.canvas;
   
-  let vw = w, vh = h, ox = 0, oy = 0;
-  if (Style.isometric) {
-    vw = (w + h) * 0.707;
-    vh = (w + h) * 0.408;
-    oy = w * 0.408;
-  }
-  const extra = style === "city" ? 80 : 0; // tall buildings
+  // Config
+  const showFullscreen = G.fullScreen !== false;
+  const showZoom = G.zoomControl !== false;
+  const alwaysShowControls = G.alwaysDisplayControls === true;
 
   const sortedNodes = React.useMemo(() => {
     if (!Style.isometric) return G.nodes;
@@ -709,22 +766,228 @@ function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 1
     );
   }, [G.nodes, Style.isometric]);
 
+  // Dynamically compute the tight bounding box
+  const bounds = React.useMemo(() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    if (!Style.isometric) {
+      G.nodes.forEach(n => {
+        minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h);
+      });
+      G.edges.forEach(e => e.points.forEach(p => {
+        minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+      }));
+      return { minX, minY, w: maxX - minX, h: maxY - minY };
+    }
+
+    // Isometric projection mapping: rotate(-45) then scale(1, 0.577)
+    // X' = 0.707 X + 0.707 Y
+    // Y' = -0.408 X + 0.408 Y
+    const iso = (x, y, z=0) => ({
+      x: 0.707 * x + 0.707 * y,
+      y: -0.408 * x + 0.408 * y - z
+    });
+
+    G.nodes.forEach(n => {
+      const isBoundary = n.kind === "boundary";
+      const Z = isBoundary ? 6 : (n.kind === 'store' ? 56 : 36);
+      
+      const pts = [
+        iso(n.x, n.y, 0), iso(n.x+n.w, n.y, 0), iso(n.x, n.y+n.h, 0), iso(n.x+n.w, n.y+n.h, 0),
+        iso(n.x, n.y, Z), iso(n.x+n.w, n.y, Z), iso(n.x, n.y+n.h, Z), iso(n.x+n.w, n.y+n.h, Z)
+      ];
+      pts.forEach(p => {
+        minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+      });
+    });
+
+    G.edges.forEach(e => e.points.forEach(p => {
+      const pIso = iso(p.x, p.y, 0);
+      minX = Math.min(minX, pIso.x); minY = Math.min(minY, pIso.y);
+      maxX = Math.max(maxX, pIso.x); maxY = Math.max(maxY, pIso.y);
+    }));
+    
+    // Add a bit of extra vertical space for shadows/overflow
+    minY -= 10;
+    maxY += 10;
+
+    return { minX, minY, w: maxX - minX, h: maxY - minY };
+  }, [G.nodes, G.edges, Style.isometric]);
+
+  const containerRef = React.useRef(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [zoom, setZoom] = React.useState(1.0);
+  const [pan, setPan] = React.useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
+  const dragStartRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  const handleZoomIn = () => setZoom(z => Math.min(z * 1.25, 4));
+  const handleZoomOut = () => setZoom(z => Math.max(z / 1.25, 0.25));
+  const handleZoomReset = () => {
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // Compute logic dimensions
+  const baseW = bounds.w + padding * 2;
+  const baseH = bounds.h + padding * 2;
+
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return; // Only left click
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging || !dragStartRef.current) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    
+    // Scale screen drag delta to SVG viewBox coordinate system
+    let scale = 1;
+    if (containerRef.current) {
+       const rect = containerRef.current.getBoundingClientRect();
+       const displayedW = baseW / zoom;
+       const displayedH = baseH / zoom;
+       scale = Math.min(rect.width / displayedW, rect.height / displayedH) || 1;
+    }
+    
+    setPan({
+      x: dragStartRef.current.panX - (dx / scale),
+      y: dragStartRef.current.panY - (dy / scale)
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    dragStartRef.current = null;
+  };
+
+  // Compute final viewBox accounting for zoom and pan (centered)
+  const cx = bounds.minX - padding + baseW / 2 + pan.x;
+  const cy = bounds.minY - padding + baseH / 2 + pan.y;
+  const vbW = baseW / zoom;
+  const vbH = baseH / zoom;
+  const vbX = cx - vbW / 2;
+  const vbY = cy - vbH / 2;
+
+  const btnStyle = {
+    background: "transparent", border: "none",
+    padding: "8px", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    color: "var(--ink-600, #475569)", transition: "all 0.2s ease"
+  };
+
+  const showControls = alwaysShowControls || isHovered || isDragging || isFullscreen;
+
   return (
-    <svg className={className}
-      viewBox={`${-padding} ${-padding} ${vw + padding*2} ${vh + padding*2 + extra}`}
-      preserveAspectRatio="xMidYMid meet"
-      style={{ width: "100%", height: "100%", display: "block", background: Style.tokens.bg }}>
-      <Style.Defs/>
-      <g transform={Style.isometric ? `translate(${ox}, ${oy}) scale(1, 0.577) rotate(-45)` : ""}>
-        <Style.Background w={w} h={h} grid={grid}/>
-        {G.edges.map(e => (
-          <Style.Edge key={e.id} edge={e} active={activeEdges.includes(e.id)}/>
-        ))}
-        {sortedNodes.map(n => (
-          <Style.Node key={n.id} node={n} active={activeNodes.includes(n.id)}/>
-        ))}
-      </g>
-    </svg>
+    <div 
+      ref={containerRef} 
+      className={className} 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ width: "100%", height: "100%", position: "relative", background: Style.tokens.bg }}>
+      <svg 
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ 
+          width: "100%", height: "100%", display: "block", 
+          cursor: isDragging ? "grabbing" : "grab",
+          transition: isDragging ? "none" : "all 0.3s ease-out" 
+        }}>
+        <Style.Defs/>
+        <g transform={Style.isometric ? `scale(1, 0.577) rotate(-45)` : ""}>
+          <Style.Background w={G.canvas.w} h={G.canvas.h} grid={G.canvas.grid}/>
+          {G.edges.map(e => (
+            <Style.Edge key={e.id} edge={e} active={activeEdges.includes(e.id)}/>
+          ))}
+          {sortedNodes.map(n => (
+            <Style.Node key={n.id} node={n} active={activeNodes.includes(n.id)}/>
+          ))}
+        </g>
+      </svg>
+      
+      {/* Controls Container */}
+      {(showFullscreen || showZoom) && (
+        <div style={{ 
+          position: "absolute", bottom: "16px", right: "16px", display: "flex", gap: "8px", zIndex: 10,
+          opacity: showControls ? 1 : 0,
+          pointerEvents: showControls ? "auto" : "none",
+          transition: "opacity 0.2s ease"
+        }}>
+          
+          {/* Zoom Controls */}
+          {showZoom && (
+            <div style={{
+              background: "var(--paper, #ffffff)", border: "1px solid var(--line, #e2e8f0)",
+              borderRadius: "8px", display: "flex", overflow: "hidden",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
+            }}>
+              <button onClick={handleZoomOut} style={btnStyle} title="Zoom Out" onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"} onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              </button>
+              <div style={{ width: "1px", background: "var(--line, #e2e8f0)" }} />
+              <button onClick={handleZoomReset} style={{...btnStyle, fontSize: "11px", fontFamily: "var(--font-mono, monospace)", fontWeight: "600", width: "48px"}} title="Reset Zoom" onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"} onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                 {Math.round(zoom * 100)}%
+              </button>
+              <div style={{ width: "1px", background: "var(--line, #e2e8f0)" }} />
+              <button onClick={handleZoomIn} style={btnStyle} title="Zoom In" onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"} onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              </button>
+            </div>
+          )}
+
+          {/* Fullscreen Toggle */}
+          {showFullscreen && (
+            <button 
+              onClick={toggleFullscreen}
+              style={{
+                background: "var(--paper, #ffffff)", border: "1px solid var(--line, #e2e8f0)",
+                borderRadius: "8px", padding: "8px", cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--ink-600, #475569)", transition: "all 0.2s ease"
+              }}
+              title="Toggle Fullscreen"
+              onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"}
+              onMouseOut={e => e.currentTarget.style.background = "var(--paper, #ffffff)"}
+            >
+              {isFullscreen ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

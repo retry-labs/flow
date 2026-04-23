@@ -42,18 +42,18 @@ const EXAMPLE_GRAPH = {
   canvas: { w: 1000, h: 540, grid: 20 },
   nodes: [
     // Background groups
-    { id: "ext",     kind: "boundary", label: "External Layer", x: 20,  y: 190, w: 160, h: 260 },
-    { id: "backend", kind: "boundary", label: "Backend Services", x: 440, y: 80, w: 180, h: 360 },
-    { id: "data",    kind: "boundary", label: "Data Platform", x: 700, y: 40, w: 180, h: 440 },
+    { id: "ext",     kind: "boundary", label: "External Layer", x: 20,  y: 320, w: 160, h: 280 },
+    { id: "backend", kind: "boundary", label: "Backend Services", x: 640, y: 20, w: 220, h: 440 },
+    { id: "data",    kind: "boundary", label: "Data Platform", x: 980, y: 140, w: 220, h: 240 },
     
     // Components
-    { id: "start",   kind: "start",   label: "Start",         x: 40,  y: 220, w: 120, h: 68, layout: "inline" },
-    { id: "auth",    kind: "decision",label: "Auth ok?",      x: 240, y: 220, w: 120, h: 68 },
-    { id: "stop",    kind: "stop",    label: "Stop",          x: 240, y: 340, w: 120, h: 68, layout: "inline" },
-    { id: "user",    kind: "actor",   label: "User",          x: 40,  y: 340, w: 120, h: 68, layout: "multi-row", icons: ["person", "image"], ellipsis: true },
-    { id: "api",     kind: "gateway", label: "API",           x: 460, y: 220, w: 140, h: 72, layout: "center", icons: ["gateway"] },
-    { id: "process", kind: "service", label: "Process",       x: 460, y: 120, w: 140, h: 72, layout: "multi-row", icons: ["cog", "bolt"], ellipsis: true },
-    { id: "db",      kind: "store",   label: "DATABASES",     x: 720, y: 180, w: 140, h: 140, layout: "multi-row", icons: ["cylinder", "disk", "cloud"], ellipsis: true },
+    { id: "start",   kind: "start",   label: "Start",         x: 40,  y: 360, w: 120, h: 68, layout: "inline" },
+    { id: "auth",    kind: "decision",label: "Auth ok?",      x: 360, y: 360, w: 120, h: 68 },
+    { id: "stop",    kind: "stop",    label: "Stop",          x: 360, y: 520, w: 120, h: 68, layout: "inline" },
+    { id: "user",    kind: "actor",   label: "User",          x: 40,  y: 520, w: 120, h: 68, layout: "multi-row", icons: ["person", "image"], ellipsis: true },
+    { id: "api",     kind: "gateway", label: "API",           x: 680, y: 360, w: 140, h: 72, layout: "center", icons: ["gateway"] },
+    { id: "process", kind: "service", label: "Process",       x: 680, y: 80,  w: 140, h: 72, layout: "multi-row", icons: ["cog", "bolt"], ellipsis: true },
+    { id: "db",      kind: "store",   label: "DATABASES",     x: 1020, y: 180, w: 140, h: 140, layout: "multi-row", icons: ["cylinder", "disk", "cloud"], ellipsis: true },
   ],
   edges: [
     { id: "e1", from: "start", to: "auth",  label: "connect", kind: "solid" },
