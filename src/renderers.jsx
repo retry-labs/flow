@@ -894,6 +894,64 @@ const CityStyle = {
       );
     }
 
+    if (kind === "gateway") {
+      const i = Math.min(w * 0.14, 16);
+      const Z = 42;
+      const E = 1.225 * Z;
+      const p0={x:i, y:0}, p1={x:w-i, y:0}, p2={x:w, y:h/2}, p3={x:w-i, y:h}, p4={x:i, y:h}, p5={x:0, y:h/2};
+      const t0={x:i+E, y:-E}, t1={x:w-i+E, y:-E}, t2={x:w+E, y:h/2-E}, t3={x:w-i+E, y:h-E}, t4={x:i+E, y:h-E}, t5={x:E, y:h/2-E};
+
+      const poly = (pts) => pts.map(p => `${p.x},${p.y}`).join(" ");
+
+      return (
+        <g transform={`translate(${node.x} ${node.y})`}>
+          <defs>
+            {/* Custom local gradients for hexagonal facets */}
+            <linearGradient id={`gw-wall-1-${node.id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#cbd5e1"/><stop offset="1" stopColor="#94a3b8"/>
+            </linearGradient>
+            <linearGradient id={`gw-wall-2-${node.id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#e4e4e7"/><stop offset="1" stopColor="#d4d4d8"/>
+            </linearGradient>
+          </defs>
+
+          {/* AO ground shadow */}
+          <path d={`M ${poly([p0, p1, p2, p3, p4, p5])} Z`} fill="rgba(0,0,0,0.35)" filter="url(#clay-ao)"/>
+          
+          {/* Side walls - 3 visible faces with distinct lighting */}
+          <path d={`M ${p0.x},${p0.y} L ${p5.x},${p5.y} L ${t5.x},${t5.y} L ${t0.x},${t0.y} Z`} fill={`url(#gw-wall-1-${node.id})`}/>
+          <path d={`M ${p5.x},${p5.y} L ${p4.x},${p4.y} L ${t4.x},${t4.y} L ${t5.x},${t5.y} Z`} fill={`url(#gw-wall-2-${node.id})`}/>
+          <path d={`M ${p4.x},${p4.y} L ${p3.x},${p3.y} L ${t3.x},${t3.y} L ${t4.x},${t4.y} Z`} fill="url(#clay-wall-right)"/>
+          
+          {/* Status LEDs on front-left wall */}
+          <g transform={`translate(${p5.x*0.7 + p4.x*0.3} ${p5.y*0.7 + p4.y*0.3})`}>
+             <ellipse cx={E*0.2} cy={-E*0.2 - 8} rx="1.5" ry="3.5" fill="#fcd34d" filter="url(#clay-ao-sm)"/>
+             <ellipse cx={E*0.2} cy={-E*0.2 + 8} rx="1.5" ry="3.5" fill="#f59e0b" filter="url(#clay-ao-sm)"/>
+          </g>
+
+          {/* Top face */}
+          <path d={`M ${poly([t0, t1, t2, t3, t4, t5])} Z`} fill="url(#clay-top)" stroke="none"/>
+          
+          {/* Top face recessed lid effect */}
+          <path d={`M ${poly([t0, t1, t2, t3, t4, t5])} Z`} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="2.5" 
+            transform="scale(0.9) translate(4 2)" style={{pointerEvents: 'none'}}/>
+
+          {/* Content on top face */}
+          <g transform={`translate(${w/2 + E} ${h/2 - E})`}>
+             <g transform="translate(-7 -16)"><NodeIcon kind="gateway" color="#007AFF" mono/></g>
+             <text y={12} textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
+             {node.sub && <text y={26} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
+          </g>
+
+          {active && (
+            <path d={`M ${poly([t0, t1, t2, t3, t4, t5])} Z`} fill="none" stroke="#007AFF" strokeWidth="2" transform="scale(1.1) translate(-6 2)">
+              <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
+            </path>
+          )}
+        </g>
+      );
+    }
+
     // Substantial thickness for hardware feel
     const Z = isBoundary ? 6 : (kind === 'client' || kind === 'actor' ? 32 : 42);
     const E = 1.225 * Z;
@@ -961,13 +1019,6 @@ const CityStyle = {
           </g>
         )}
 
-        {/* Status LED Indicators for Gateway/API */}
-        {node.kind === 'gateway' && (
-           <g>
-             <ellipse cx={E*0.3} cy={h/2 - E*0.3 - 12} rx="2.5" ry="5" fill="#fcd34d" filter="url(#clay-ao-sm)"/>
-             <ellipse cx={E*0.3} cy={h/2 - E*0.3 + 12} rx="2.5" ry="5" fill="#f59e0b" filter="url(#clay-ao-sm)"/>
-           </g>
-        )}
 
         {/* Top face with crisp geometric boundary */}
         <rect x={E} y={-E} width={w} height={h} rx={R} fill={topFill} stroke={isBoundary ? "#cbd5e1" : "none"} strokeWidth={isBoundary ? 1 : 0} />
@@ -1059,15 +1110,6 @@ const CityStyle = {
                           </g>
                         );
                       })}
-                    </g>
-                  )}
-                  {kind === "gateway" && (
-                    <g>
-                      {/* Hex badge on top face */}
-                      <path d={`M ${w/2} 6 L ${w/2 + 10} 12 L ${w/2 + 10} 22 L ${w/2} 28 L ${w/2 - 10} 22 L ${w/2 - 10} 12 Z`}
-                        fill="#007AFF" stroke="#005bb5" strokeWidth="1"/>
-                      <path d={`M ${w/2} 12 L ${w/2 + 6} 15 L ${w/2 + 6} 21 L ${w/2} 24 L ${w/2 - 6} 21 L ${w/2 - 6} 15 Z`}
-                        fill="none" stroke="#fff" strokeWidth="1" opacity="0.6"/>
                     </g>
                   )}
                   {(kind === "client" || kind === "actor") && (
