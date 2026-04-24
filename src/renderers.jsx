@@ -829,57 +829,66 @@ const CityStyle = {
     // STORE → proper isometric cylinder (not a stacked-block).
     // -----------------------------------------------------------------
     if (kind === "store") {
-      const rx = Math.min(w, h) / 2;
+      const r = Math.min(w, h) / 2;
       const cx = w / 2;
       const cy = h / 2;
-      const ry = rx * 0.45;          // squash for iso projection
-      const lift = 58;                // cylinder height
+      const Z = 56;                   // Database height
+      const E = 1.225 * Z;            // Vertical offset in grid space
+      
+      // Tangent points for vertical side walls in projected view
+      const tan1 = { x: cx + r / Math.sqrt(2), y: cy + r / Math.sqrt(2) };
+      const tan2 = { x: cx - r / Math.sqrt(2), y: cy - r / Math.sqrt(2) };
+      const pSplit = { x: cx - r / Math.sqrt(2), y: cy + r / Math.sqrt(2) }; // Front peak for lighting split
+
       return (
         <g transform={`translate(${node.x} ${node.y})`}>
           {/* AO ground shadow */}
-          <ellipse cx={cx + 8} cy={cy + 10} rx={rx} ry={ry} fill="rgba(0,0,0,0.35)" filter="url(#clay-ao)"/>
-          {/* Bottom rim (back half, faint) */}
-          <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="#d4d4d8"/>
-          {/* Cylinder side: rect between bottom and top ellipses, with curved caps */}
+          <ellipse cx={cx + 8} cy={cy + 10} rx={r} ry={r * 0.577} fill="rgba(0,0,0,0.35)" filter="url(#clay-ao)"/>
+          
+          {/* Cylinder side - Left Wall (Shadow tone) */}
           <path
-            d={`M ${cx - rx} ${cy}
-                L ${cx - rx} ${cy - lift}
-                A ${rx} ${ry} 0 0 0 ${cx + rx} ${cy - lift}
-                L ${cx + rx} ${cy}
-                A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy} Z`}
+            d={`M ${tan2.x} ${tan2.y}
+                L ${tan2.x + E} ${tan2.y - E}
+                A ${r} ${r} 0 0 0 ${pSplit.x + E} ${pSplit.y - E}
+                L ${pSplit.x} ${pSplit.y}
+                A ${r} ${r} 0 0 1 ${tan2.x} ${tan2.y} Z`}
+            fill="url(#clay-wall-left)"
+          />
+          
+          {/* Cylinder side - Right Wall (Mid tone) */}
+          <path
+            d={`M ${pSplit.x} ${pSplit.y}
+                L ${pSplit.x + E} ${pSplit.y - E}
+                A ${r} ${r} 0 0 0 ${tan1.x + E} ${tan1.y - E}
+                L ${tan1.x} ${tan1.y}
+                A ${r} ${r} 0 0 1 ${pSplit.x} ${pSplit.y} Z`}
             fill="url(#clay-wall-right)"
           />
-          {/* Left-side darker gradient overlay */}
-          <path
-            d={`M ${cx - rx} ${cy}
-                L ${cx - rx} ${cy - lift}
-                A ${rx} ${ry} 0 0 0 ${cx} ${cy - lift - ry}
-                L ${cx} ${cy - ry}
-                A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy} Z`}
-            fill="url(#clay-wall-left)"
-            opacity="0.85"
-          />
+
           {/* Partition bands — the database signature */}
           {[0.33, 0.66].map((f, i) => (
-            <ellipse key={i} cx={cx} cy={cy - lift * f} rx={rx} ry={ry}
+            <path key={i} 
+              d={`M ${tan2.x + E*f} ${tan2.y - E*f} A ${r} ${r} 0 0 0 ${tan1.x + E*f} ${tan1.y - E*f}`}
               fill="none" stroke="#a1a1aa" strokeWidth="1" strokeDasharray="2 2" opacity="0.55"/>
           ))}
+
           {/* Top cap */}
-          <ellipse cx={cx} cy={cy - lift} rx={rx} ry={ry} fill="url(#clay-top)" stroke="#e4e4e7" strokeWidth="1"/>
-          <ellipse cx={cx} cy={cy - lift} rx={rx - 4} ry={ry - 2} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="1"/>
-          {/* DB icon + label on top cap */}
-          <g transform={`translate(${cx} ${cy - lift})`}>
-            <g transform="translate(-7 -8)"><NodeIcon kind="store" color="#475569" mono/></g>
+          <g transform={`translate(${E} ${-E})`}>
+            <circle cx={cx} cy={cy} r={r} fill="url(#clay-top)" stroke="#e4e4e7" strokeWidth="1"/>
+            <circle cx={cx} cy={cy} r={r - 4} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="1"/>
+            
+            {/* DB icon + label on top cap */}
+            <g transform={`translate(${cx} ${cy})`}>
+              <g transform="translate(-7 -16)"><NodeIcon kind="store" color="#475569" mono/></g>
+              <text y={12} textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
+              {node.sub && <text y={26} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
+            </g>
           </g>
-          {/* Floating label below the cylinder */}
-          <g transform={`translate(${cx} ${cy + ry + 14})`}>
-            <text textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
-            {node.sub && <text y={14} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
-          </g>
+
           {active && (
-            <ellipse cx={cx} cy={cy - lift} rx={rx + 6} ry={ry + 3} fill="none" stroke="#007AFF" strokeWidth="2">
+            <circle cx={cx + E} cy={cy - E} r={r + 6} fill="none" stroke="#007AFF" strokeWidth="2">
               <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
-            </ellipse>
+            </circle>
           )}
         </g>
       );
