@@ -5,14 +5,16 @@
 // show the narration.
 // -----------------------------------------------------------
 
-const { EXAMPLE_GRAPH, STYLES, Diagram } = window.Flow;
+const { EXAMPLE_GRAPH, EXAMPLE_GRAPH_FLAT, STYLES, Diagram } = window.Flow;
 
 function Player() {
   const [styleId, setStyleId] = React.useState("sleek");
   const [stepIdx, setStepIdx] = React.useState(0);
   const [playing, setPlaying] = React.useState(false);
   const [autoAdvance] = React.useState(true);
-  const steps = EXAMPLE_GRAPH.steps;
+  
+  const graphToUse = STYLES[styleId].isometric ? EXAMPLE_GRAPH : EXAMPLE_GRAPH_FLAT;
+  const steps = graphToUse.steps;
   const step = steps[stepIdx];
 
   // Playback timer
@@ -34,7 +36,7 @@ function Player() {
     <div className="player">
       <div className="player-canvas" style={{ background: styleTokens.bg }}>
         <Diagram
-          graph={EXAMPLE_GRAPH}
+          graph={graphToUse}
           style={styleId}
           activeNodes={active.nodes}
           activeEdges={active.edges}

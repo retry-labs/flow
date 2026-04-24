@@ -39,21 +39,21 @@ const SHAPES = [
 
 // The canonical example diagram — a request flow through a small system.
 const EXAMPLE_GRAPH = {
-  canvas: { w: 1000, h: 540, grid: 20 },
+  canvas: { w: 1660, h: 900, grid: 20 },
   nodes: [
     // Background groups
-    { id: "ext",     kind: "boundary", label: "External Layer", x: 20,  y: 320, w: 160, h: 280 },
-    { id: "backend", kind: "boundary", label: "Backend Services", x: 640, y: 20, w: 220, h: 440 },
-    { id: "data",    kind: "boundary", label: "Data Platform", x: 980, y: 140, w: 220, h: 240 },
+    { id: "ext",     kind: "boundary", label: "External Layer", x: 30,  y: 450, w: 200, h: 420 },
+    { id: "backend", kind: "boundary", label: "Backend Services", x: 890, y: 30, w: 260, h: 610 },
+    { id: "data",    kind: "boundary", label: "Data Platform", x: 1350, y: 210, w: 260, h: 260 },
     
     // Components
-    { id: "start",   kind: "start",   label: "Start",         x: 40,  y: 360, w: 120, h: 68, layout: "inline" },
-    { id: "auth",    kind: "decision",label: "Auth ok?",      x: 360, y: 360, w: 120, h: 68 },
-    { id: "stop",    kind: "stop",    label: "Stop",          x: 360, y: 520, w: 120, h: 68, layout: "inline" },
-    { id: "user",    kind: "actor",   label: "User",          x: 40,  y: 520, w: 120, h: 68, layout: "multi-row", icons: ["person", "image"], ellipsis: true },
-    { id: "api",     kind: "gateway", label: "API",           x: 680, y: 360, w: 140, h: 72, layout: "center", icons: ["gateway"] },
-    { id: "process", kind: "service", label: "Process",       x: 680, y: 80,  w: 140, h: 72, layout: "multi-row", icons: ["cog", "bolt"], ellipsis: true },
-    { id: "db",      kind: "store",   label: "DATABASES",     x: 1020, y: 180, w: 140, h: 140, layout: "multi-row", icons: ["cylinder", "disk", "cloud"], ellipsis: true },
+    { id: "start",   kind: "start",   label: "Start",         x: 60,  y: 500, w: 140, h: 80, layout: "inline" },
+    { id: "auth",    kind: "decision",label: "Auth ok?",      x: 500, y: 500, w: 140, h: 80 },
+    { id: "stop",    kind: "stop",    label: "Stop",          x: 500, y: 740, w: 140, h: 80, layout: "inline" },
+    { id: "user",    kind: "actor",   label: "User",          x: 60,  y: 740, w: 140, h: 80, layout: "multi-row", icons: ["person", "image"], ellipsis: true },
+    { id: "api",     kind: "gateway", label: "API",           x: 940, y: 500, w: 160, h: 90, layout: "center", icons: ["gateway"] },
+    { id: "process", kind: "service", label: "Process",       x: 940, y: 80,  w: 160, h: 90, layout: "multi-row", icons: ["cog", "bolt"], ellipsis: true },
+    { id: "db",      kind: "store",   label: "DATABASES",     x: 1400, y: 260, w: 160, h: 160, layout: "multi-row", icons: ["cylinder", "disk", "cloud"], ellipsis: true },
   ],
   edges: [
     { id: "e1", from: "start", to: "auth",  label: "connect", kind: "solid" },
@@ -82,6 +82,28 @@ const EXAMPLE_GRAPH = {
       narration: "The audit consumer writes the event to Postgres for replay and analytics.",
       active: { nodes: ["queue", "db"], edges: ["e7"] } },
   ],
+};
+
+// The compact layout for flat styles (Sleek, Sketch, Blueprint)
+const EXAMPLE_GRAPH_FLAT = {
+  canvas: { w: 1000, h: 600, grid: 20 },
+  nodes: [
+    // Background groups
+    { id: "ext",     kind: "boundary", label: "External Layer", x: 20,  y: 300, w: 160, h: 260 },
+    { id: "backend", kind: "boundary", label: "Backend Services", x: 560, y: 20, w: 180, h: 420 },
+    { id: "data",    kind: "boundary", label: "Data Platform", x: 820, y: 160, w: 160, h: 160 },
+    
+    // Components
+    { id: "start",   kind: "start",   label: "Start",         x: 40,  y: 340, w: 120, h: 68, layout: "inline" },
+    { id: "auth",    kind: "decision",label: "Auth ok?",      x: 320, y: 340, w: 120, h: 68 },
+    { id: "stop",    kind: "stop",    label: "Stop",          x: 320, y: 460, w: 120, h: 68, layout: "inline" },
+    { id: "user",    kind: "actor",   label: "User",          x: 40,  y: 460, w: 120, h: 68, layout: "multi-row", icons: ["person", "image"], ellipsis: true },
+    { id: "api",     kind: "gateway", label: "API",           x: 580, y: 340, w: 140, h: 72, layout: "center", icons: ["gateway"] },
+    { id: "process", kind: "service", label: "Process",       x: 580, y: 60,  w: 140, h: 72, layout: "multi-row", icons: ["cog", "bolt"], ellipsis: true },
+    { id: "db",      kind: "store",   label: "DATABASES",     x: 840, y: 200, w: 120, h: 100, layout: "multi-row", icons: ["cylinder", "disk", "cloud"], ellipsis: true },
+  ],
+  edges: EXAMPLE_GRAPH.edges,
+  steps: EXAMPLE_GRAPH.steps,
 };
 
 // A couple of smaller sample graphs for the style showcase.
@@ -311,7 +333,7 @@ function resolveGraph(graph) {
 }
 
 window.Flow = Object.assign(window.Flow || {}, {
-  NODE_KINDS, SHAPES, EXAMPLE_GRAPH, MINI_GRAPH,
+  NODE_KINDS, SHAPES, EXAMPLE_GRAPH, EXAMPLE_GRAPH_FLAT, MINI_GRAPH,
   routeEdge, pathFromPoints, roughPath, resolveGraph, nodeRect, anchorOn,
   shapeOf,
 });

@@ -17,12 +17,14 @@ function edgeMidpoint(pts) {
 function EdgeLabel({ text, x, y, bg = "#faf7ef", fg = "#6b6459", mono = false }) {
   if (!text) return null;
   return (
-    <g transform={`translate(${x} ${y})`}>
-      <rect x={-text.length * 3.6 - 6} y={-9} width={text.length * 7.2 + 12} height={18}
-        rx={4} fill={bg} stroke="none"/>
+    <g transform={`translate(${x} ${y - 12})`}>
+      {/* Halo for readability without blocking the line animation completely */}
       <text textAnchor="middle" dominantBaseline="middle"
         fontFamily={mono ? "JetBrains Mono" : "Inter Tight"}
-        fontSize="10.5" fill={fg}>{text}</text>
+        fontSize="11" fill={bg} stroke={bg} strokeWidth="3.5" strokeLinejoin="round">{text}</text>
+      <text textAnchor="middle" dominantBaseline="middle"
+        fontFamily={mono ? "JetBrains Mono" : "Inter Tight"}
+        fontSize="11" fill={fg} fontWeight="600">{text}</text>
     </g>
   );
 }
@@ -414,12 +416,34 @@ const CityStyle = {
         <stop offset="1" stopColor="#f2f2f2"/>
       </linearGradient>
       
+      {/* Vertical wall gradients for soft lighting falloff */}
+      <linearGradient id="clay-wall-left" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#e4e4e7"/>
+        <stop offset="1" stopColor="#d4d4d8"/>
+      </linearGradient>
+      <linearGradient id="clay-wall-right" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#ffffff"/>
+        <stop offset="1" stopColor="#f4f4f5"/>
+      </linearGradient>
+      
       {/* Vibrant Pipes with bright cores */}
       <linearGradient id="clay-pipe-cool" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0" stopColor="#005bb5"/><stop offset=".5" stopColor="#4da6ff"/><stop offset="1" stopColor="#007AFF"/>
       </linearGradient>
       <linearGradient id="clay-pipe-warm" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0" stopColor="#cc9300"/><stop offset=".5" stopColor="#ffdb4d"/><stop offset="1" stopColor="#FFB800"/>
+      </linearGradient>
+      
+      {/* Path-aligned glowing segments */}
+      <linearGradient id="clay-flow-glow" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="transparent"/>
+        <stop offset="0.5" stopColor="#60a5fa"/>
+        <stop offset="1" stopColor="transparent"/>
+      </linearGradient>
+      <linearGradient id="clay-flow-glow-warm" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="transparent"/>
+        <stop offset="0.5" stopColor="#fcd34d"/>
+        <stop offset="1" stopColor="transparent"/>
       </linearGradient>
     </defs>
   ),
@@ -430,8 +454,8 @@ const CityStyle = {
     const w = node.w, h = node.h;
     const isBoundary = node.kind === "boundary";
     
-    // Substantial thickness
-    const Z = isBoundary ? 6 : (node.kind === 'store' ? 56 : 36);
+    // Substantial thickness for hardware feel
+    const Z = isBoundary ? 6 : (node.kind === 'store' ? 64 : 42);
     const E = 1.225 * Z;
     
     const topFill = isBoundary ? "transparent" : "url(#clay-top)";
@@ -442,13 +466,13 @@ const CityStyle = {
     const layout = node.layout || "center";
     const icons = node.icons || [node.kind];
     
-    // Tight corner radius for premium manufactured look
-    const R = isBoundary ? 0 : (node.kind === 'store' ? 10 : 8);
+    // Large, smooth corner radius
+    const R = isBoundary ? 0 : (node.kind === 'store' ? 18 : 16);
 
     return (
       <g transform={`translate(${node.x} ${node.y})`}>
         {/* Deep Ground shadow with perfectly matching rounded footprint */}
-        <rect width={w} height={h} rx={R} fill={isBoundary ? "rgba(0,0,0,0.05)" : "rgba(0,0,0,0.4)"} filter="url(#clay-ao)"/>
+        <rect width={w} height={h} rx={R} fill={isBoundary ? "rgba(0,0,0,0.05)" : "rgba(0,0,0,0.5)"} filter="url(#clay-ao)"/>
         
         {isBoundary ? (
           <g>
@@ -460,68 +484,77 @@ const CityStyle = {
             <defs>
               {/* Mathematically precise local gradient orthogonal to vertical cylinder */}
               <linearGradient id={`corner-grad-${node.id}`} gradientUnits="userSpaceOnUse" x1={0} y1={h-R} x2={R} y2={h}>
-                <stop offset="0" stopColor="#E0E0E0"/>
-                <stop offset="1" stopColor="#F2F2F2"/>
+                <stop offset="0" stopColor="#d4d4d8"/>
+                <stop offset="1" stopColor="#f4f4f5"/>
               </linearGradient>
             </defs>
             {/* Left solid wall (Shadow-tone) */}
-            <path d={`M 0 ${R} L 0 ${h-R} L ${E} ${h-R-E} L ${E} ${R-E} Z`} fill="#E0E0E0" />
+            <path d={`M 0 ${R} L 0 ${h-R} L ${E} ${h-R-E} L ${E} ${R-E} Z`} fill="url(#clay-wall-left)" />
             
             {/* Front curved corner (Seamless transition) */}
             <path d={`M 0 ${h-R} A ${R} ${R} 0 0 0 ${R} ${h} L ${R+E} ${h-E} A ${R} ${R} 0 0 1 ${E} ${h-R-E} Z`} fill={`url(#corner-grad-${node.id})`} /> 
             
             {/* Right solid wall (Mid-tone) */}
-            <path d={`M ${R} ${h} L ${w-R} ${h} L ${w-R+E} ${h-E} L ${R+E} ${h-E} Z`} fill="#F2F2F2" />
+            <path d={`M ${R} ${h} L ${w-R} ${h} L ${w-R+E} ${h-E} L ${R+E} ${h-E} Z`} fill="url(#clay-wall-right)" />
             
             {/* Right curved corner (Fades around the back) */}
-            <path d={`M ${w-R} ${h} A ${R} ${R} 0 0 0 ${w} ${h-R} L ${w+E} ${h-R-E} A ${R} ${R} 0 0 1 ${w-R+E} ${h-E} Z`} fill="#F2F2F2" />
+            <path d={`M ${w-R} ${h} A ${R} ${R} 0 0 0 ${w} ${h-R} L ${w+E} ${h-R-E} A ${R} ${R} 0 0 1 ${w-R+E} ${h-E} Z`} fill="url(#clay-wall-right)" />
             
             {/* Left curved corner (Shadow wraps back) */}
-            <path d={`M 0 ${R} A ${R} ${R} 0 0 1 ${R} 0 L ${R+E} ${-E} A ${R} ${R} 0 0 0 ${E} ${R-E} Z`} fill="#E0E0E0" />
+            <path d={`M 0 ${R} A ${R} ${R} 0 0 1 ${R} 0 L ${R+E} ${-E} A ${R} ${R} 0 0 0 ${E} ${R-E} Z`} fill="url(#clay-wall-left)" />
           </g>
         )}
         
-        {/* Recessed Orthogonal Ports with inner glow effect */}
+        {/* Localized physical sockets */}
         {!isBoundary && (
           <g>
-            {/* Left face port */}
-            <path d={`M 0 ${h/2 - 8} L 0 ${h/2 + 8} L ${E*0.15} ${h/2+8 - E*0.15} L ${E*0.15} ${h/2-8 - E*0.15} Z`} fill="#1e293b" stroke="#007AFF" strokeWidth="1.5" strokeOpacity="0.75" strokeLinejoin="round"/>
-            <path d={`M ${E*0.05} ${h/2 - 6 - E*0.05} L ${E*0.05} ${h/2 + 6 - E*0.05} L ${E*0.15} ${h/2+6 - E*0.15} L ${E*0.15} ${h/2-6 - E*0.15} Z`} fill="#0f172a" />
-            {/* Right face port */}
-            <path d={`M ${w/2 - 8} ${h} L ${w/2 + 8} ${h} L ${w/2+8 + E*0.15} ${h - E*0.15} L ${w/2-8 + E*0.15} ${h - E*0.15} Z`} fill="#1e293b" stroke="#007AFF" strokeWidth="1.5" strokeOpacity="0.75" strokeLinejoin="round"/>
-            <path d={`M ${w/2 - 6 + E*0.05} ${h - E*0.05} L ${w/2 + 6 + E*0.05} ${h - E*0.05} L ${w/2+6 + E*0.15} ${h - E*0.15} L ${w/2-6 + E*0.15} ${h - E*0.15} Z`} fill="#0f172a" />
+            {/* Left face socket */}
+            <g transform={`translate(${E*0.06} ${h/2 - E*0.06})`}>
+              <rect x="-2" y="-10" width={E*0.08} height="20" rx="3" fill="#1e293b" transform="skewY(-45)"/>
+              <rect x="-1" y="-8" width={E*0.04} height="16" rx="2" fill="#007AFF" filter="url(#clay-ao-sm)" transform="skewY(-45)"/>
+            </g>
+            {/* Right face socket */}
+            <g transform={`translate(${w/2 + 2} ${h - 2})`}>
+              <rect x="-10" y="-2" width="20" height={E*0.08} rx="3" fill="#1e293b" transform="skewX(-45)"/>
+              <rect x="-8" y="-1" width="16" height={E*0.04} rx="2" fill="#007AFF" filter="url(#clay-ao-sm)" transform="skewX(-45)"/>
+            </g>
           </g>
         )}
 
         {/* Status LED Indicators for Gateway/API */}
         {node.kind === 'gateway' && (
            <g>
-             <ellipse cx={E*0.3} cy={h/2 - E*0.3 - 10} rx="2" ry="4" fill="#fcd34d" filter="url(#clay-ao-sm)"/>
-             <ellipse cx={E*0.3} cy={h/2 - E*0.3 + 10} rx="2" ry="4" fill="#f59e0b" filter="url(#clay-ao-sm)"/>
+             <ellipse cx={E*0.3} cy={h/2 - E*0.3 - 12} rx="2.5" ry="5" fill="#fcd34d" filter="url(#clay-ao-sm)"/>
+             <ellipse cx={E*0.3} cy={h/2 - E*0.3 + 12} rx="2.5" ry="5" fill="#f59e0b" filter="url(#clay-ao-sm)"/>
            </g>
         )}
 
-        {/* Top face with crisp geometric boundary (no artificial stroke overhang or radius expansion) */}
+        {/* Top face with crisp geometric boundary */}
         <rect x={E} y={-E} width={w} height={h} rx={R} fill={topFill} stroke={isBoundary ? "#cbd5e1" : "none"} strokeWidth={isBoundary ? 1 : 0} />
         
+        {/* Recessed Bevel Lid Effect (Inner shadow ring) */}
+        {!isBoundary && (
+           <rect x={E + 3} y={-E + 3} width={w - 6} height={h - 6} rx={Math.max(2, R - 3)} fill="transparent" stroke="rgba(0,0,0,0.06)" strokeWidth="2" />
+        )}
+
         {/* Top face contents SKEWED to the grid */}
         <g transform={`translate(${E} ${-E})`}>
           {layout === 'multi-row' && (
             <g>
-              <line x1={0} y1={h/2} x2={w} y2={h/2} stroke="#cbd5e1" strokeWidth={1} vectorEffect="non-scaling-stroke"/>
+              <line x1={0} y1={h/2} x2={w} y2={h/2} stroke="#e2e8f0" strokeWidth={1.5} vectorEffect="non-scaling-stroke"/>
               {icons.map((ic, i) => {
                 const cellW = w / icons.length;
                 const cx = i * cellW + cellW/2;
                 return (
                   <g key={i}>
-                    {i > 0 && <line x1={i * cellW} y1={0} x2={i * cellW} y2={h/2} stroke="#cbd5e1" strokeWidth={1} vectorEffect="non-scaling-stroke"/>}
+                    {i > 0 && <line x1={i * cellW} y1={0} x2={i * cellW} y2={h/2} stroke="#e2e8f0" strokeWidth={1.5} vectorEffect="non-scaling-stroke"/>}
                     <g transform={`translate(${cx} ${h/4})`}><NodeIcon kind={ic} color="#475569" mono/></g>
                   </g>
                 );
               })}
-              <text x={w/2} y={h*0.75 + 4} textAnchor="middle" fill="#334155" fontSize="12" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
-              {node.ellipsis && <circle cx={w - 14} cy={h*0.75} r="1.5" fill="#94a3b8" />}
-              {node.ellipsis && <circle cx={w - 10} cy={h*0.75} r="1.5" fill="#94a3b8" />}
+              <text x={w/2} y={h*0.75 + 4} textAnchor="middle" fill="#334155" fontSize="13" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
+              {node.ellipsis && <circle cx={w - 16} cy={h*0.75} r="1.5" fill="#94a3b8" />}
+              {node.ellipsis && <circle cx={w - 11} cy={h*0.75} r="1.5" fill="#94a3b8" />}
               {node.ellipsis && <circle cx={w - 6} cy={h*0.75} r="1.5" fill="#94a3b8" />}
             </g>
           )}
@@ -533,7 +566,7 @@ const CityStyle = {
                 const cx = i * cellW + cellW/2;
                 return (
                   <g key={i}>
-                    {i > 0 && <line x1={i * cellW} y1={0} x2={i * cellW} y2={h} stroke="#cbd5e1" strokeWidth={1} vectorEffect="non-scaling-stroke"/>}
+                    {i > 0 && <line x1={i * cellW} y1={0} x2={i * cellW} y2={h} stroke="#e2e8f0" strokeWidth={1.5} vectorEffect="non-scaling-stroke"/>}
                     <g transform={`translate(${cx} ${h/2})`}><NodeIcon kind={ic} color="#475569" mono/></g>
                   </g>
                 );
@@ -544,7 +577,7 @@ const CityStyle = {
           {layout === 'center' && (
             <g>
               {isBoundary ? (
-                <text x={14} y={24} fill="#94a3b8" fontSize="16" fontWeight="600" fontFamily="Inter Tight" letterSpacing="0.05em">{node.label.toUpperCase()}</text>
+                <text x={18} y={28} fill="#94a3b8" fontSize="18" fontWeight="600" fontFamily="Inter Tight" letterSpacing="0.05em">{node.label.toUpperCase()}</text>
               ) : (
                 <g transform={`translate(${w/2} ${h/2})`}>
                   {node.kind === "image" && node.src ? (
@@ -552,8 +585,8 @@ const CityStyle = {
                   ) : (
                     <g transform="translate(-7 -16)"><NodeIcon kind={icons[0]} color="#475569" mono/></g>
                   )}
-                  <text y={12} textAnchor="middle" fill="#334155" fontSize="13" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
-                  {node.sub && <text y={24} textAnchor="middle" fill="#64748b" fontSize="10" fontFamily="JetBrains Mono">{node.sub}</text>}
+                  <text y={12} textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
+                  {node.sub && <text y={26} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
                 </g>
               )}
             </g>
@@ -563,7 +596,7 @@ const CityStyle = {
         {/* Unskewed floating text for inline layout */}
         {layout === 'inline' && (
            <g transform={`translate(${w/2 + E/2} ${h - E/2}) rotate(45) scale(1, 1.732)`}>
-              <text textAnchor="middle" dominantBaseline="middle" fill="#64748b" fontSize="11" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
+              <text textAnchor="middle" dominantBaseline="middle" fill="#64748b" fontSize="12" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
            </g>
         )}
       </g>
@@ -572,33 +605,37 @@ const CityStyle = {
   Edge: ({ edge, active }) => {
     const warm = active || edge.warm || edge.kind === "warm";
     const pipeSide = warm ? "url(#clay-pipe-warm)" : "url(#clay-pipe-cool)";
-    const dash = edge.kind === "dashed" ? "14 8" : undefined;
+    const dash = edge.kind === "dashed" ? "16 10" : undefined;
     
     const mid = window.Flow.edgeMidpoint ? window.Flow.edgeMidpoint(edge.points) : edge.points[Math.floor(edge.points.length/2)];
     
     return (
       <g>
-        {/* Ground shadow */}
-        <path d={edge.d} fill="none" stroke="rgba(0,0,0,.15)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" filter="url(#clay-ao-sm)"/>
+        {/* Ground shadow (AO) */}
+        <path d={edge.d} fill="none" stroke="rgba(0,0,0,.15)" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" filter="url(#clay-ao-sm)"/>
         
-        {/* Pipe body on ground plane */}
+        {/* Volumetric Pipe - Base Shadow/Outer Body */}
+        <path d={edge.d} fill="none" stroke="#64748b" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+        
+        {/* Volumetric Pipe - Main Core */}
         <path d={edge.d} fill="none" stroke={pipeSide} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dash} vectorEffect="non-scaling-stroke"/>
         
-        {/* Animated pulse */}
+        {/* Volumetric Pipe - Specular Highlight (shifted up/left) */}
+        <path d={edge.d} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" transform="translate(-1, -1)" vectorEffect="non-scaling-stroke"/>
+        
+        {/* Animated glowing segments inside the pipe */}
         {active && (
-          <g>
-            <circle r="4" fill="#fff" filter="url(#clay-ao-sm)">
-              <animateMotion dur="2.2s" repeatCount="indefinite" path={edge.d} rotate="auto"/>
-            </circle>
-          </g>
+          <path d={edge.d} fill="none" stroke={warm ? "#fde68a" : "#93c5fd"} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="32 128" filter="url(#clay-ao-sm)" vectorEffect="non-scaling-stroke">
+            <animate attributeName="stroke-dashoffset" from="160" to="0" dur="2s" repeatCount="indefinite" />
+          </path>
         )}
         
         {/* Label floating ABOVE the line, facing the camera */}
         {edge.label && (
-          <g transform={`translate(${mid.x} ${mid.y}) translate(0 -32) rotate(45) scale(1, 1.732)`}>
-            <rect x={-edge.label.length*3.4 - 6} y={-9} width={edge.label.length*6.8 + 12} height={18}
-              rx="4" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1" filter="url(#clay-ao-sm)"/>
-            <text textAnchor="middle" dominantBaseline="middle" fontFamily="JetBrains Mono" fontSize="9.5" fill={warm ? "#b45309" : "#1d4ed8"}>{edge.label}</text>
+          <g transform={`translate(${mid.x} ${mid.y}) translate(0 -36) rotate(45) scale(1, 1.732)`}>
+            <rect x={-edge.label.length*3.6 - 8} y={-10} width={edge.label.length*7.2 + 16} height={20}
+              rx="4" fill="#ffffff" stroke="#e2e8f0" strokeWidth="1.5" filter="url(#clay-ao-sm)"/>
+            <text textAnchor="middle" dominantBaseline="middle" fontFamily="JetBrains Mono" fontSize="10.5" fontWeight="600" fill={warm ? "#b45309" : "#1d4ed8"}>{edge.label}</text>
           </g>
         )}
       </g>
@@ -751,8 +788,52 @@ function NodeIcon({ kind, color = "#8f8779", sketchy = false, mono = false }) {
 // Generic <Diagram>
 // ===========================================================
 function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 24, className }) {
-  const G = React.useMemo(() => resolveGraph(graph), [graph]);
   const Style = STYLES[style] || SleekStyle;
+  const [viewAngle, setViewAngle] = React.useState(0);
+
+  const G = React.useMemo(() => {
+    if (!Style.isometric || viewAngle === 0) return resolveGraph(graph);
+
+    const cw = graph.canvas.w;
+    const ch = graph.canvas.h;
+    
+    let newCanvasW = cw;
+    let newCanvasH = ch;
+    
+    if (viewAngle === 90 || viewAngle === 270) {
+       newCanvasW = ch;
+       newCanvasH = cw;
+    }
+
+    const transformedNodes = graph.nodes.map(n => {
+       let { x, y, w, h } = n;
+       let nx = x, ny = y, nw = w, nh = h;
+       
+       if (viewAngle === 90) {
+          nx = ch - y - h;
+          ny = x;
+          nw = h;
+          nh = w;
+       } else if (viewAngle === 180) {
+          nx = cw - x - w;
+          ny = ch - y - h;
+       } else if (viewAngle === 270) {
+          nx = y;
+          ny = cw - x - w;
+          nw = h;
+          nh = w;
+       }
+       return { ...n, x: nx, y: ny, w: nw, h: nh };
+    });
+
+    const transformedGraph = {
+       ...graph,
+       canvas: { ...graph.canvas, w: newCanvasW, h: newCanvasH },
+       nodes: transformedNodes
+    };
+
+    return resolveGraph(transformedGraph);
+  }, [graph, viewAngle, Style.isometric]);
   
   // Config
   const showFullscreen = G.fullScreen !== false;
@@ -961,6 +1042,25 @@ function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 2
                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
               </button>
             </div>
+          )}
+
+          {/* View Rotation Toggle */}
+          {Style.isometric && (
+            <button 
+              onClick={() => setViewAngle(a => (a + 90) % 360)}
+              style={{
+                background: "var(--paper, #ffffff)", border: "1px solid var(--line, #e2e8f0)",
+                borderRadius: "8px", padding: "8px", cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--ink-600, #475569)", transition: "all 0.2s ease"
+              }}
+              title="Rotate View 90°"
+              onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"}
+              onMouseOut={e => e.currentTarget.style.background = "var(--paper, #ffffff)"}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+            </button>
           )}
 
           {/* Fullscreen Toggle */}
