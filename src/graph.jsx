@@ -37,73 +37,99 @@ const SHAPES = [
   "rect", "square", "circle", "oval", "diamond", "hex", "pill", "cylinder", "cloud", "parallelogram",
 ];
 
-// The canonical example diagram — a request flow through a small system.
-const EXAMPLE_GRAPH = {
-  canvas: { w: 1660, h: 900, grid: 20 },
+// -----------------------------------------------------------
+// A tighter, square-ish graph for the hero slot (~16:10). Same
+// visual vocabulary as the Player, but condensed: one clear request
+// fan-out with cache + queue + store visible at a glance.
+const HERO_GRAPH = {
+  canvas: { w: 880, h: 540, grid: 20 },
   nodes: [
-    // Background groups
-    { id: "ext",     kind: "boundary", label: "External Layer", x: 30,  y: 450, w: 200, h: 420 },
-    { id: "backend", kind: "boundary", label: "Backend Services", x: 890, y: 30, w: 260, h: 610 },
-    { id: "data",    kind: "boundary", label: "Data Platform", x: 1350, y: 210, w: 260, h: 260 },
-    
-    // Components
-    { id: "start",   kind: "start",   label: "Start",         x: 60,  y: 500, w: 140, h: 80, layout: "inline" },
-    { id: "auth",    kind: "decision",label: "Auth ok?",      x: 500, y: 500, w: 140, h: 80 },
-    { id: "stop",    kind: "stop",    label: "Stop",          x: 500, y: 740, w: 140, h: 80, layout: "inline" },
-    { id: "user",    kind: "actor",   label: "User",          x: 60,  y: 740, w: 140, h: 80, layout: "multi-row", icons: ["person", "image"], ellipsis: true },
-    { id: "api",     kind: "gateway", label: "API",           x: 940, y: 500, w: 160, h: 90, layout: "center", icons: ["gateway"] },
-    { id: "process", kind: "service", label: "Process",       x: 940, y: 80,  w: 160, h: 90, layout: "multi-row", icons: ["cog", "bolt"], ellipsis: true },
-    { id: "db",      kind: "store",   label: "DATABASES",     x: 1400, y: 260, w: 160, h: 160, layout: "multi-row", icons: ["cylinder", "disk", "cloud"], ellipsis: true },
+    { id: "client",  kind: "actor",   label: "Client",   x: 40,  y: 230, w: 140, h: 78 },
+    { id: "gateway", kind: "gateway", label: "Gateway",  x: 230, y: 230, w: 160, h: 78, sub: "edge" },
+    { id: "orders",  kind: "service", label: "Orders",   x: 450, y: 100, w: 160, h: 80, sub: "v4.2.1" },
+    { id: "redis",   kind: "cache",   label: "Redis",    x: 680, y: 100, w: 160, h: 80 },
+    { id: "kafka",   kind: "queue",   label: "Events",   x: 450, y: 360, w: 160, h: 80, sub: "kafka" },
+    { id: "db",      kind: "store",   label: "Postgres", x: 680, y: 360, w: 160, h: 80 },
   ],
   edges: [
-    { id: "e1", from: "start", to: "auth",  label: "connect", kind: "solid" },
-    { id: "e2", from: "auth",  to: "api",   label: "yes",     kind: "solid" },
-    { id: "e3", from: "auth",  to: "stop",  label: "no",      kind: "solid", warm: true },
-    { id: "e4", from: "user",  to: "api",   label: "req",     kind: "solid" },
-    { id: "e5", from: "api",   to: "process", label: "trigger", kind: "dashed" },
-    { id: "e6", from: "process", to: "db",  label: "write",   kind: "solid" },
-    { id: "e7", from: "api",   to: "db",    label: "query",   kind: "solid" },
+    { id: "e1", from: "client",  to: "gateway", kind: "solid",  label: "HTTPS" },
+    { id: "e2", from: "gateway", to: "orders",  kind: "solid",  label: "POST /order" },
+    { id: "e3", from: "orders",  to: "redis",   kind: "dashed", label: "cache" },
+    { id: "e4", from: "orders",  to: "kafka",   kind: "solid",  label: "publish" },
+    { id: "e5", from: "kafka",   to: "db",      kind: "dashed", label: "persist" },
   ],
-  // Step-by-step narration for the player
   steps: [
-    { id: "s1", title: "Client sends request",
-      narration: "A browser issues an HTTPS request to the gateway.",
-      active: { nodes: ["client", "edge"], edges: ["e1"] } },
-    { id: "s2", title: "Gateway authenticates & fans out",
-      narration: "JWT is verified, rate-limit counter ticks, request is routed to two services.",
-      active: { nodes: ["edge", "svc_a", "svc_b"], edges: ["e2", "e3"] } },
-    { id: "s3", title: "Services read their stores",
-      narration: "Orders checks Redis for the cart; Inventory queries Postgres for stock.",
-      active: { nodes: ["svc_a", "svc_b", "cache", "db"], edges: ["e4", "e6"] } },
-    { id: "s4", title: "Order published to queue",
-      narration: "A domain event is published to Kafka — downstream consumers take it from here.",
-      active: { nodes: ["svc_a", "queue"], edges: ["e5"] } },
-    { id: "s5", title: "Event persisted",
-      narration: "The audit consumer writes the event to Postgres for replay and analytics.",
-      active: { nodes: ["queue", "db"], edges: ["e7"] } },
+    { id: "s1", active: { nodes: ["client", "gateway"], edges: ["e1"] } },
+    { id: "s2", active: { nodes: ["gateway", "orders"], edges: ["e2"] } },
+    { id: "s3", active: { nodes: ["orders", "redis"], edges: ["e3"] } },
+    { id: "s4", active: { nodes: ["orders", "kafka"], edges: ["e4"] } },
+    { id: "s5", active: { nodes: ["kafka", "db"], edges: ["e5"] } },
   ],
 };
 
-// The compact layout for flat styles (Sleek, Sketch, Blueprint)
+// The canonical hero diagram — a checkout request fanning through
+// a small system. Designed tight: short edges, no dead space, every
+// node earns its place. Used by the Hero + Player.
+// Layout (12-col grid, 110px gutter):
+//   col 0:  client
+//   col 2:  gateway
+//   col 4:  orders   (top), inventory (bottom)
+//   col 6:  redis (top),  postgres (mid), kafka (bottom)
+//   col 8:  audit
+// -----------------------------------------------------------
 const EXAMPLE_GRAPH_FLAT = {
-  canvas: { w: 1000, h: 600, grid: 20 },
+  canvas: { w: 1120, h: 520, grid: 20 },
   nodes: [
-    // Background groups
-    { id: "ext",     kind: "boundary", label: "External Layer", x: 20,  y: 300, w: 160, h: 260 },
-    { id: "backend", kind: "boundary", label: "Backend Services", x: 560, y: 20, w: 180, h: 420 },
-    { id: "data",    kind: "boundary", label: "Data Platform", x: 820, y: 160, w: 160, h: 160 },
-    
-    // Components
-    { id: "start",   kind: "start",   label: "Start",         x: 40,  y: 340, w: 120, h: 68, layout: "inline" },
-    { id: "auth",    kind: "decision",label: "Auth ok?",      x: 320, y: 340, w: 120, h: 68 },
-    { id: "stop",    kind: "stop",    label: "Stop",          x: 320, y: 460, w: 120, h: 68, layout: "inline" },
-    { id: "user",    kind: "actor",   label: "User",          x: 40,  y: 460, w: 120, h: 68, layout: "multi-row", icons: ["person", "image"], ellipsis: true },
-    { id: "api",     kind: "gateway", label: "API",           x: 580, y: 340, w: 140, h: 72, layout: "center", icons: ["gateway"] },
-    { id: "process", kind: "service", label: "Process",       x: 580, y: 60,  w: 140, h: 72, layout: "multi-row", icons: ["cog", "bolt"], ellipsis: true },
-    { id: "db",      kind: "store",   label: "DATABASES",     x: 840, y: 200, w: 120, h: 100, layout: "multi-row", icons: ["cylinder", "disk", "cloud"], ellipsis: true },
+    { id: "client",    kind: "actor",   label: "Client",      x: 40,   y: 220, w: 150, h: 80 },
+    { id: "gateway",   kind: "gateway", label: "API Gateway", x: 250,  y: 220, w: 170, h: 80, sub: "auth · rate-limit" },
+    { id: "orders",    kind: "service", label: "Orders",      x: 490,  y: 100, w: 160, h: 80, sub: "v4.2.1" },
+    { id: "inventory", kind: "service", label: "Inventory",   x: 490,  y: 340, w: 160, h: 80, sub: "v2.8.0" },
+    { id: "redis",     kind: "cache",   label: "Redis",       x: 720,  y: 40,  w: 150, h: 80 },
+    { id: "kafka",     kind: "queue",   label: "Events",      x: 720,  y: 220, w: 150, h: 80, sub: "kafka" },
+    { id: "postgres",  kind: "store",   label: "Postgres",    x: 720,  y: 400, w: 150, h: 80 },
+    { id: "audit",     kind: "service", label: "Audit",       x: 940,  y: 340, w: 150, h: 80, sub: "consumer" },
   ],
-  edges: EXAMPLE_GRAPH.edges,
-  steps: EXAMPLE_GRAPH.steps,
+  edges: [
+    { id: "e1", from: "client",    to: "gateway",   kind: "solid",  label: "HTTPS" },
+    { id: "e2", from: "gateway",   to: "orders",    kind: "solid",  label: "POST /order" },
+    { id: "e3", from: "gateway",   to: "inventory", kind: "solid",  label: "GET /stock" },
+    { id: "e4", from: "orders",    to: "redis",     kind: "dashed", label: "read" },
+    { id: "e5", from: "orders",    to: "kafka",     kind: "solid",  label: "publish" },
+    { id: "e6", from: "inventory", to: "postgres",  kind: "solid",  label: "query" },
+    { id: "e7", from: "kafka",     to: "audit",     kind: "dashed", label: "consume" },
+  ],
+  steps: [
+    { id: "s1", title: "Client sends request",
+      narration: "A browser issues an HTTPS request to the gateway.",
+      active: { nodes: ["client", "gateway"], edges: ["e1"] } },
+    { id: "s2", title: "Gateway fans out",
+      narration: "JWT is verified, rate-limit counter ticks, request routes to Orders and Inventory.",
+      active: { nodes: ["gateway", "orders", "inventory"], edges: ["e2", "e3"] } },
+    { id: "s3", title: "Services read their stores",
+      narration: "Orders checks Redis for the cart; Inventory queries Postgres for stock.",
+      active: { nodes: ["orders", "inventory", "redis", "postgres"], edges: ["e4", "e6"] } },
+    { id: "s4", title: "Order published",
+      narration: "A domain event is published to Kafka — downstream consumers take it from here.",
+      active: { nodes: ["orders", "kafka"], edges: ["e5"] } },
+    { id: "s5", title: "Event persisted",
+      narration: "The audit consumer picks up the event for replay and analytics.",
+      active: { nodes: ["kafka", "audit"], edges: ["e7"] } },
+  ],
+};
+
+// Isometric variant — same topology, scaled up so claymorphic blocks
+// have room to breathe. Used by the "city" style.
+const EXAMPLE_GRAPH = {
+  canvas: { w: 1600, h: 760, grid: 20 },
+  nodes: EXAMPLE_GRAPH_FLAT.nodes.map(n => ({
+    ...n,
+    x: Math.round(n.x * 1.42) + 20,
+    y: Math.round(n.y * 1.42) + 20,
+    w: Math.round(n.w * 1.1),
+    h: Math.round(n.h * 1.1),
+  })),
+  edges: EXAMPLE_GRAPH_FLAT.edges,
+  steps: EXAMPLE_GRAPH_FLAT.steps,
 };
 
 // A couple of smaller sample graphs for the style showcase.
@@ -333,7 +359,7 @@ function resolveGraph(graph) {
 }
 
 window.Flow = Object.assign(window.Flow || {}, {
-  NODE_KINDS, SHAPES, EXAMPLE_GRAPH, EXAMPLE_GRAPH_FLAT, MINI_GRAPH,
+  NODE_KINDS, SHAPES, EXAMPLE_GRAPH, EXAMPLE_GRAPH_FLAT, HERO_GRAPH, MINI_GRAPH,
   routeEdge, pathFromPoints, roughPath, resolveGraph, nodeRect, anchorOn,
   shapeOf,
 });

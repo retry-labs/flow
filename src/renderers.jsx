@@ -95,6 +95,366 @@ function NodeLabel({ node, fill, sub, subFill, fontFamily = "Inter Tight", fontW
   );
 }
 
+// -----------------------------------------------------------
+// sleekKindBody — per-kind premium silhouettes for the Sleek style.
+// Returns { body, decor, label?, noShadow? } — body goes under the
+// soft-shadow filter; decor stays crisp on top.
+// Designed so every kind reads as a distinct "thing" at a glance,
+// without relying on a tiny corner icon.
+// -----------------------------------------------------------
+function sleekKindBody(node, t) {
+  const { fill, stroke, strokeW, ink, muted, accent, active } = t;
+  const { w, h } = node;
+  const headerH = 22;
+  const subtleBand = active ? "#fef3c7" : "#f3ecd8";
+  const K = node.kind;
+
+  const card = (r = 12) => (
+    <rect width={w} height={h} rx={r} fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+  );
+  const centerLabel = (yOffset = 0) => (
+    <g>
+      <text x={w/2} y={h/2 + 4 + yOffset} textAnchor="middle"
+        fontFamily="Inter Tight" fontWeight={600} fontSize={13} fill={ink}>{node.label}</text>
+      {node.sub && (
+        <text x={w/2} y={h/2 + 18 + yOffset} textAnchor="middle"
+          fontFamily="JetBrains Mono" fontSize={9.5} fill={muted}>{node.sub}</text>
+      )}
+    </g>
+  );
+  const headerLabel = (badge) => (
+    <g>
+      <text x={12} y={14.5} fontFamily="JetBrains Mono" fontSize={9} letterSpacing=".08em"
+        fill={active ? "#7a5a00" : muted}>{badge}</text>
+      <text x={w/2} y={headerH + (h - headerH)/2 + 4} textAnchor="middle"
+        fontFamily="Inter Tight" fontWeight={600} fontSize={14} fill={ink}>{node.label}</text>
+      {node.sub && (
+        <text x={w/2} y={headerH + (h - headerH)/2 + 18} textAnchor="middle"
+          fontFamily="JetBrains Mono" fontSize={9.5} fill={muted}>{node.sub}</text>
+      )}
+    </g>
+  );
+
+  switch (K) {
+    case "service": {
+      return {
+        body: (
+          <g>
+            {card(12)}
+            <path d={`M0 ${headerH} H${w}`} stroke={stroke} strokeWidth={strokeW} opacity=".7"/>
+            <rect x={1} y={1} width={w-2} height={headerH-1} rx={11} fill={subtleBand} opacity=".55"
+              style={{ clipPath: "inset(0 0 50% 0)" }}/>
+          </g>
+        ),
+        decor: (
+          <g>
+            <circle cx={10} cy={11} r="2.2" fill={active ? accent : "#c9bf9e"}/>
+            <circle cx={17} cy={11} r="2.2" fill="#e4decd"/>
+            <circle cx={24} cy={11} r="2.2" fill="#e4decd"/>
+          </g>
+        ),
+        label: headerLabel("SERVICE"),
+      };
+    }
+    case "process": {
+      const notch = 10;
+      const d = `M12 0 H${w-12} Q${w} 0 ${w} 12 V${h-notch} L${w-notch} ${h} H${notch} L0 ${h-notch} V12 Q0 0 12 0 Z`;
+      return {
+        body: (
+          <g>
+            <path d={d} fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+            <rect x={0} y={0} width={w} height={4} rx={2} fill={active ? accent : "#e4decd"}/>
+          </g>
+        ),
+        decor: (
+          <g transform={`translate(${w-22} 10)`} stroke={active ? "#7a5a00" : muted} strokeWidth="1.1" fill="none">
+            <circle cx="6" cy="6" r="3"/>
+            <circle cx="6" cy="6" r="1" fill={active ? "#7a5a00" : muted}/>
+            {[0,60,120,180,240,300].map(a => <line key={a} x1="6" y1="1.5" x2="6" y2="2.5" transform={`rotate(${a} 6 6)`}/>)}
+          </g>
+        ),
+        label: centerLabel(),
+      };
+    }
+    case "store": {
+      const ry = 10;
+      return {
+        body: (
+          <g>
+            <path d={`M0 ${ry} V${h-ry} a${w/2} ${ry} 0 0 0 ${w} 0 V${ry}`}
+              fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+            <path d={`M0 ${ry} a${w/2} ${ry} 0 1 0 ${w} 0 a${w/2} ${ry} 0 1 0 ${-w} 0`}
+              fill={active ? "#fef3c7" : "#fbf6e7"} stroke={stroke} strokeWidth={strokeW}/>
+          </g>
+        ),
+        decor: (
+          <g>
+            <path d={`M6 ${h*0.5} Q${w/2} ${h*0.5 + 4} ${w-6} ${h*0.5}`}
+              stroke={active ? "#e7c97a" : "#e4decd"} strokeWidth="0.8" fill="none"/>
+            <path d={`M10 ${h*0.72} Q${w/2} ${h*0.72 + 3} ${w-10} ${h*0.72}`}
+              stroke={active ? "#e7c97a" : "#ece7db"} strokeWidth="0.6" fill="none"/>
+          </g>
+        ),
+        label: (
+          <g>
+            <text x={w/2} y={h/2 + 10} textAnchor="middle"
+              fontFamily="Inter Tight" fontWeight={600} fontSize={13} fill={ink}>{node.label}</text>
+            {node.sub && (
+              <text x={w/2} y={h/2 + 24} textAnchor="middle"
+                fontFamily="JetBrains Mono" fontSize={9.5} fill={muted}>{node.sub}</text>
+            )}
+          </g>
+        ),
+      };
+    }
+    case "cache": {
+      // RAM/cache card: top label, chip row, subtle contact strip at bottom
+      return {
+        body: card(10),
+        decor: (
+          <g>
+            {/* chip row */}
+            {[0,1,2,3].map(i => (
+              <rect key={i} x={12 + i*((w-24)/4) + 2} y={h/2 - 4} width={(w-24)/4 - 4} height={12} rx={1.5}
+                fill={active ? "#fde68a" : "#f0e9d6"} stroke={active ? accent : "#d9d0b8"} strokeWidth=".8"/>
+            ))}
+            {/* contact strip */}
+            <g transform={`translate(0 ${h-7})`}>
+              {Array.from({length: Math.max(10, Math.floor(w/8))}).map((_, i, a) => {
+                const cw = (w - 24) / a.length;
+                return <rect key={i} x={12 + i*cw + 0.5} y={0} width={cw - 1} height={3}
+                  fill={active ? "#d4a315" : "#c9bf9e"} opacity=".55"/>;
+              })}
+            </g>
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={16} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={13} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "queue": {
+      // Label up top; 3 FIFO pills below, front is highlighted
+      const labelH = 20;
+      const gap = 5;
+      const rowCount = 3;
+      const rowH = Math.max(8, (h - labelH - 8 - gap*(rowCount-1)) / rowCount);
+      const rowColors = [
+        active ? accent : "#e8b820",
+        "#f2d664",
+        "#e8deb5",
+      ];
+      return {
+        body: card(10),
+        decor: (
+          <g>
+            {Array.from({length: rowCount}).map((_, i) => {
+              const y = labelH + i*(rowH + gap);
+              const isFront = i === 0;
+              return (
+                <rect key={i} x={12} y={y} width={w-24} height={rowH} rx={Math.min(rowH/2, 5)}
+                  fill={rowColors[i]} stroke={isFront ? (active ? "#7a5a00" : "#b79414") : "#d9c98b"}
+                  strokeWidth={isFront ? 1 : .6}/>
+              );
+            })}
+            <path d={`M${w-8} ${labelH + rowH/2} l5 -3.5 v7 z`}
+              fill={active ? "#7a5a00" : "#b79414"}/>
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={14} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "actor": {
+      const headR = 9;
+      return {
+        body: (
+          <rect y={headR + 3} width={w} height={h - headR - 3} rx={12}
+            fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+        ),
+        decor: (
+          <g>
+            <circle cx={w/2} cy={headR + 1} r={headR} fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+            <circle cx={w/2} cy={headR - 1} r="2.2" fill={active ? "#7a5a00" : muted}/>
+            <path d={`M${w/2 - 4} ${headR + 4} Q${w/2} ${headR + 7} ${w/2 + 4} ${headR + 4}`}
+              stroke={active ? "#7a5a00" : muted} strokeWidth="1.2" fill="none"/>
+          </g>
+        ),
+        label: (
+          <g>
+            <text x={w/2} y={headR + 3 + (h - headR - 3)/2 + 8} textAnchor="middle"
+              fontFamily="Inter Tight" fontWeight={600} fontSize={13} fill={ink}>{node.label}</text>
+            {node.sub && (
+              <text x={w/2} y={headR + 3 + (h - headR - 3)/2 + 22} textAnchor="middle"
+                fontFamily="JetBrains Mono" fontSize={9.5} fill={muted}>{node.sub}</text>
+            )}
+          </g>
+        ),
+      };
+    }
+    case "gateway": {
+      const i = Math.min(w * 0.14, 16);
+      return {
+        body: (
+          <path d={`M${i} 0 L${w-i} 0 L${w} ${h/2} L${w-i} ${h} L${i} ${h} L0 ${h/2} Z`}
+            fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+        ),
+        decor: (
+          <g>
+            <path d={`M${i} 6 L${w-i} 6`} stroke={active ? accent : "#e4decd"} strokeWidth="1"/>
+            <path d={`M${i} ${h-6} L${w-i} ${h-6}`} stroke={active ? accent : "#e4decd"} strokeWidth="1"/>
+            <rect x={w/2 - 4} y={h/2 - 4} width="8" height="8" transform={`rotate(45 ${w/2} ${h/2})`}
+              fill={active ? accent : "#f0e9d6"} stroke={active ? "#7a5a00" : muted} strokeWidth=".8"/>
+          </g>
+        ),
+        label: centerLabel(),
+      };
+    }
+    case "external": {
+      const cd = `M${w*0.18} ${h*0.6} C ${w*0.02} ${h*0.6}, ${w*0.02} ${h*0.2}, ${w*0.22} ${h*0.25} C ${w*0.28} ${h*0.02}, ${w*0.58} ${h*0.02}, ${w*0.62} ${h*0.22} C ${w*0.85} ${h*0.15}, ${w*0.98} ${h*0.35}, ${w*0.9} ${h*0.6} C ${w*0.98} ${h*0.82}, ${w*0.75} ${h*0.98}, ${w*0.6} ${h*0.88} C ${w*0.4} ${h*1.02}, ${w*0.1} ${h*0.95}, ${w*0.18} ${h*0.6} Z`;
+      return {
+        body: <path d={cd} fill={fill} stroke={stroke} strokeWidth={strokeW}/>,
+        decor: (
+          <g>
+            <path d={`M${w*0.35} ${h*0.5} A 10 10 0 0 1 ${w*0.65} ${h*0.5}`}
+              stroke={active ? accent : muted} strokeWidth="1.2" fill="none"/>
+            <path d={`M${w*0.4} ${h*0.55} A 6 6 0 0 1 ${w*0.6} ${h*0.55}`}
+              stroke={active ? accent : muted} strokeWidth="1.2" fill="none"/>
+            <circle cx={w/2} cy={h*0.62} r="1.4" fill={active ? accent : muted}/>
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={h + 2} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "boundary": {
+      const chipW = Math.max(70, node.label.length * 7);
+      return {
+        noShadow: true,
+        body: (
+          <rect width={w} height={h} rx={10} fill="transparent"
+            stroke={active ? accent : "#a89e84"} strokeDasharray="5 4" strokeWidth="1.2"/>
+        ),
+        decor: (
+          <g>
+            <rect x={10} y={-8} width={chipW} height="16" rx="8"
+              fill={active ? "#fef3c7" : "#fbf7ea"} stroke={active ? accent : "#d9d0b8"} strokeWidth=".8"/>
+            <text x={10 + chipW/2} y={3} textAnchor="middle"
+              fontFamily="JetBrains Mono" fontSize={10} fill={active ? "#7a5a00" : "#7a7060"}
+              letterSpacing=".06em">{node.label}</text>
+          </g>
+        ),
+        label: null,
+      };
+    }
+    case "start": {
+      return {
+        body: (
+          <rect width={w} height={h} rx={h/2} fill={active ? "#fef3c7" : "#eef8e6"}
+            stroke={active ? accent : "#bfdfa8"} strokeWidth={strokeW}/>
+        ),
+        decor: (
+          <g>
+            <circle cx={18} cy={h/2} r="8" fill={active ? accent : "#9fcd7b"}/>
+            <path d={`M${18-2} ${h/2 - 4} L${18+4} ${h/2} L${18-2} ${h/2 + 4} Z`} fill="#fff"/>
+          </g>
+        ),
+        label: (
+          <text x={w/2 + 6} y={h/2 + 4.5} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={13} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "stop": {
+      return {
+        body: (
+          <rect width={w} height={h} rx={h/2} fill={active ? "#fef3c7" : "#fdecec"}
+            stroke={active ? accent : "#ecc7c7"} strokeWidth={strokeW}/>
+        ),
+        decor: (
+          <g>
+            <circle cx={18} cy={h/2} r="8" fill={active ? accent : "#d57a7a"}/>
+            <rect x={18-3.5} y={h/2-3.5} width="7" height="7" rx="1" fill="#fff"/>
+          </g>
+        ),
+        label: (
+          <text x={w/2 + 6} y={h/2 + 4.5} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={13} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "decision": {
+      return {
+        body: (
+          <path d={`M${w/2} 0 L${w} ${h/2} L${w/2} ${h} L0 ${h/2} Z`}
+            fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+        ),
+        decor: null,
+        label: (
+          <text x={w/2} y={h/2 + 4} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={13} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "event": {
+      const r = Math.min(w, h)/2 - 2;
+      return {
+        body: (
+          <circle cx={w/2} cy={h/2} r={r}
+            fill={active ? "#fef3c7" : "#fdf8e4"} stroke={active ? accent : "#d9c98b"} strokeWidth={strokeW}/>
+        ),
+        decor: (
+          <path d={`M ${w/2 + 2} ${h/2 - 8} L ${w/2 - 4} ${h/2 + 1} H ${w/2} L ${w/2 - 2} ${h/2 + 8} L ${w/2 + 4} ${h/2 - 1} H ${w/2} Z`}
+            fill={active ? "#7a5a00" : "#b79414"}/>
+        ),
+        label: (
+          <text x={w/2} y={h + 14} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "step":
+    case "tree": {
+      return {
+        body: (
+          <circle cx={w/2} cy={h/2} r={Math.min(w,h)/2 - 2}
+            fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+        ),
+        decor: <circle cx={w/2} cy={h/2} r="3" fill={active ? accent : muted}/>,
+        label: (
+          <text x={w/2} y={h + 14} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "image": {
+      return {
+        body: card(10),
+        decor: (
+          <g>
+            <rect x={10} y={10} width={w-20} height={h-30} rx={4}
+              fill={active ? "#fef3c7" : "#faf3dc"} stroke="#e4decd"/>
+            <circle cx={18} cy={18} r="3" fill={active ? accent : "#d9c98b"}/>
+            <path d={`M12 ${h-24} L ${w/2} ${h-34} L ${w-12} ${h-22}`}
+              stroke={active ? "#7a5a00" : muted} strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={h - 6} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={11.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    default:
+      return null;
+  }
+}
+
 // ===========================================================
 // SLEEK
 // ===========================================================
@@ -137,30 +497,40 @@ const SleekStyle = {
     </g>
   ),
   Node: ({ node, active }) => {
-    const iconColor = active ? "#f5c518" : "#b8b0a1";
     const ink = "#26231d";
+    const muted = "#8f8779";
     const shape = shapeOf(node);
     const isImg = node.kind === "image" && node.src;
+    const fill = active ? "url(#sleek-node-a)" : "url(#sleek-node)";
+    const stroke = active ? "#f5c518" : "#e4decd";
+    const strokeW = active ? 1.5 : 1;
+    const accentInk = active ? "#7a5a00" : muted;
+
+    // Kind-driven body: each semantic kind has its own silhouette + decoration.
+    // If node.shape is explicitly set, fall back to generic ShapeShell.
+    const useKind = !node.shape && node.kind;
+    const kindBody = useKind ? sleekKindBody(node, { fill, stroke, strokeW, ink, muted, accent: "#f5c518", active }) : null;
+
     return (
       <g transform={`translate(${node.x} ${node.y})`}>
         {active && shape !== "cylinder" && (
           <rect x={-10} y={-10} width={node.w + 20} height={node.h + 20}
             rx={18} fill="url(#sleek-glow)" style={{ animation: "sleek-pulse 2s ease-in-out infinite" }}/>
         )}
-        <g filter="url(#sleek-soft)">
-          <ShapeShell node={node}
-            fill={active ? "url(#sleek-node-a)" : "url(#sleek-node)"}
-            stroke={active ? "#f5c518" : "#e4decd"}
-            strokeWidth={active ? 1.5 : 1}/>
-        </g>
+        {kindBody ? (
+          <g filter={kindBody.noShadow ? undefined : "url(#sleek-soft)"}>{kindBody.body}</g>
+        ) : (
+          <g filter="url(#sleek-soft)">
+            <ShapeShell node={node} fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+          </g>
+        )}
+        {kindBody && kindBody.decor}
         {isImg && (
           <image href={node.src} x={node.w/2 - 16} y={node.h/2 - 22} width="32" height="32"/>
         )}
-        {!isImg && !["diamond","circle","oval","pill"].includes(shape) && (
-          <g transform="translate(12, 10)"><NodeIcon kind={node.kind} color={iconColor}/></g>
+        {kindBody && kindBody.label !== undefined ? kindBody.label : (
+          <NodeLabel node={node} fill={ink} sub={node.sub} subFill={muted} iconTop={isImg ? 28 : 10}/>
         )}
-        <NodeLabel node={node} fill={ink} sub={node.sub} subFill="#8f8779"
-          iconTop={isImg ? 28 : 10}/>
       </g>
     );
   },
@@ -453,9 +823,70 @@ const CityStyle = {
   Node: ({ node, active }) => {
     const w = node.w, h = node.h;
     const isBoundary = node.kind === "boundary";
-    
+    const kind = node.kind;
+
+    // -----------------------------------------------------------------
+    // STORE → proper isometric cylinder (not a stacked-block).
+    // -----------------------------------------------------------------
+    if (kind === "store") {
+      const rx = Math.min(w, h) / 2;
+      const cx = w / 2;
+      const cy = h / 2;
+      const ry = rx * 0.45;          // squash for iso projection
+      const lift = 58;                // cylinder height
+      return (
+        <g transform={`translate(${node.x} ${node.y})`}>
+          {/* AO ground shadow */}
+          <ellipse cx={cx + 8} cy={cy + 10} rx={rx} ry={ry} fill="rgba(0,0,0,0.35)" filter="url(#clay-ao)"/>
+          {/* Bottom rim (back half, faint) */}
+          <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="#d4d4d8"/>
+          {/* Cylinder side: rect between bottom and top ellipses, with curved caps */}
+          <path
+            d={`M ${cx - rx} ${cy}
+                L ${cx - rx} ${cy - lift}
+                A ${rx} ${ry} 0 0 0 ${cx + rx} ${cy - lift}
+                L ${cx + rx} ${cy}
+                A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy} Z`}
+            fill="url(#clay-wall-right)"
+          />
+          {/* Left-side darker gradient overlay */}
+          <path
+            d={`M ${cx - rx} ${cy}
+                L ${cx - rx} ${cy - lift}
+                A ${rx} ${ry} 0 0 0 ${cx} ${cy - lift - ry}
+                L ${cx} ${cy - ry}
+                A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy} Z`}
+            fill="url(#clay-wall-left)"
+            opacity="0.85"
+          />
+          {/* Partition bands — the database signature */}
+          {[0.33, 0.66].map((f, i) => (
+            <ellipse key={i} cx={cx} cy={cy - lift * f} rx={rx} ry={ry}
+              fill="none" stroke="#a1a1aa" strokeWidth="1" strokeDasharray="2 2" opacity="0.55"/>
+          ))}
+          {/* Top cap */}
+          <ellipse cx={cx} cy={cy - lift} rx={rx} ry={ry} fill="url(#clay-top)" stroke="#e4e4e7" strokeWidth="1"/>
+          <ellipse cx={cx} cy={cy - lift} rx={rx - 4} ry={ry - 2} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="1"/>
+          {/* DB icon + label on top cap */}
+          <g transform={`translate(${cx} ${cy - lift})`}>
+            <g transform="translate(-7 -8)"><NodeIcon kind="store" color="#475569" mono/></g>
+          </g>
+          {/* Floating label below the cylinder */}
+          <g transform={`translate(${cx} ${cy + ry + 14})`}>
+            <text textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
+            {node.sub && <text y={14} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
+          </g>
+          {active && (
+            <ellipse cx={cx} cy={cy - lift} rx={rx + 6} ry={ry + 3} fill="none" stroke="#007AFF" strokeWidth="2">
+              <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
+            </ellipse>
+          )}
+        </g>
+      );
+    }
+
     // Substantial thickness for hardware feel
-    const Z = isBoundary ? 6 : (node.kind === 'store' ? 64 : 42);
+    const Z = isBoundary ? 6 : (kind === 'client' || kind === 'actor' ? 32 : 42);
     const E = 1.225 * Z;
     
     const topFill = isBoundary ? "transparent" : "url(#clay-top)";
@@ -467,7 +898,7 @@ const CityStyle = {
     const icons = node.icons || [node.kind];
     
     // Large, smooth corner radius
-    const R = isBoundary ? 0 : (node.kind === 'store' ? 18 : 16);
+    const R = isBoundary ? 0 : 16;
 
     return (
       <g transform={`translate(${node.x} ${node.y})`}>
@@ -579,14 +1010,94 @@ const CityStyle = {
               {isBoundary ? (
                 <text x={18} y={28} fill="#94a3b8" fontSize="18" fontWeight="600" fontFamily="Inter Tight" letterSpacing="0.05em">{node.label.toUpperCase()}</text>
               ) : (
-                <g transform={`translate(${w/2} ${h/2})`}>
-                  {node.kind === "image" && node.src ? (
-                    <image href={node.src} x={-16} y={-16} width="32" height="32"/>
-                  ) : (
-                    <g transform="translate(-7 -16)"><NodeIcon kind={icons[0]} color="#475569" mono/></g>
+                <g>
+                  {/* Kind-specific top-face decoration */}
+                  {kind === "queue" && (
+                    <g>
+                      {[0, 1, 2].map(i => {
+                        const pw = (w - 28) / 3;
+                        const px = 10 + i * (pw + 4);
+                        return (
+                          <g key={i}>
+                            <rect x={px} y={8} width={pw} height={14} rx="3"
+                              fill={i === 2 ? "#FFB800" : "#fde68a"}
+                              stroke="#b45309" strokeWidth="1"/>
+                          </g>
+                        );
+                      })}
+                      <path d={`M ${w - 14} 15 L ${w - 6} 15 M ${w - 10} 11 L ${w - 6} 15 L ${w - 10} 19`}
+                        stroke="#b45309" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                    </g>
                   )}
-                  <text y={12} textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
-                  {node.sub && <text y={26} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
+                  {kind === "cache" && (
+                    <g>
+                      {[0, 1, 2, 3].map(i => {
+                        const cw = (w - 24) / 4;
+                        const cx = 10 + i * (cw + 1);
+                        return (
+                          <rect key={i} x={cx} y={10} width={cw - 1} height={10} rx="1.5"
+                            fill="#0f172a" stroke="#334155" strokeWidth="0.5"/>
+                        );
+                      })}
+                      {[0, 1, 2, 3].map(i => {
+                        const cw = (w - 24) / 4;
+                        const cx = 10 + i * (cw + 1);
+                        return (
+                          <g key={`pins-${i}`}>
+                            {[0, 1, 2, 3].map(j => (
+                              <rect key={j} x={cx + 2 + j * ((cw - 5) / 3)} y={20} width="1" height="2" fill="#334155"/>
+                            ))}
+                          </g>
+                        );
+                      })}
+                    </g>
+                  )}
+                  {kind === "gateway" && (
+                    <g>
+                      {/* Hex badge on top face */}
+                      <path d={`M ${w/2} 6 L ${w/2 + 10} 12 L ${w/2 + 10} 22 L ${w/2} 28 L ${w/2 - 10} 22 L ${w/2 - 10} 12 Z`}
+                        fill="#007AFF" stroke="#005bb5" strokeWidth="1"/>
+                      <path d={`M ${w/2} 12 L ${w/2 + 6} 15 L ${w/2 + 6} 21 L ${w/2} 24 L ${w/2 - 6} 21 L ${w/2 - 6} 15 Z`}
+                        fill="none" stroke="#fff" strokeWidth="1" opacity="0.6"/>
+                    </g>
+                  )}
+                  {(kind === "client" || kind === "actor") && (
+                    <g>
+                      {/* Head dome on top face */}
+                      <circle cx={w/2} cy={12} r="6" fill="#cbd5e1" stroke="#64748b" strokeWidth="1"/>
+                      <path d={`M ${w/2 - 10} 22 Q ${w/2} 14, ${w/2 + 10} 22`} fill="none" stroke="#64748b" strokeWidth="1"/>
+                    </g>
+                  )}
+                  {kind === "external" && (
+                    <g>
+                      {/* Wifi bars on top */}
+                      <g transform={`translate(${w/2} 16)`}>
+                        <path d="M -8 4 Q 0 -6, 8 4" fill="none" stroke="#64748b" strokeWidth="1.5"/>
+                        <path d="M -5 4 Q 0 -2, 5 4" fill="none" stroke="#64748b" strokeWidth="1.5"/>
+                        <circle cx="0" cy="4" r="1.5" fill="#64748b"/>
+                      </g>
+                    </g>
+                  )}
+                  {kind === "event" && (
+                    <g>
+                      <circle cx={w/2} cy={14} r="8" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1"/>
+                      <path d={`M ${w/2 + 1} 9 L ${w/2 - 2} 15 L ${w/2 + 1} 15 L ${w/2 - 1} 19 L ${w/2 + 3} 13 L ${w/2} 13 Z`}
+                        fill="#f59e0b"/>
+                    </g>
+                  )}
+
+                  {/* Central icon + label (pushed down when decoration present on top) */}
+                  <g transform={`translate(${w/2} ${
+                    ["queue","cache","gateway","client","actor","external","event"].includes(kind) ? h/2 + 8 : h/2
+                  })`}>
+                    {node.kind === "image" && node.src ? (
+                      <image href={node.src} x={-16} y={-16} width="32" height="32"/>
+                    ) : !["queue","cache","gateway","client","actor","external","event"].includes(kind) ? (
+                      <g transform="translate(-7 -16)"><NodeIcon kind={icons[0]} color="#475569" mono/></g>
+                    ) : null}
+                    <text y={12} textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
+                    {node.sub && <text y={26} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
+                  </g>
                 </g>
               )}
             </g>

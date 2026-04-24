@@ -5,17 +5,36 @@
 const { STYLES, Diagram, NODE_KINDS, SHAPES, EXAMPLE_GRAPH } = window.Flow;
 
 function nodeDemoGraph(kind, shape) {
-  const size = shape === "circle" ? { w: 80, h: 80, x: 40, y: 10 }
-             : shape === "diamond" ? { w: 110, h: 70, x: 25, y: 15 }
-             : shape === "oval" ? { w: 120, h: 60, x: 20, y: 20 }
-             : shape === "pill" ? { w: 120, h: 44, x: 20, y: 28 }
-             : shape === "hex" ? { w: 120, h: 60, x: 20, y: 20 }
-             : shape === "parallelogram" ? { w: 120, h: 58, x: 20, y: 21 }
-             : shape === "cylinder" ? { w: 90, h: 72, x: 35, y: 14 }
-             : shape === "cloud" ? { w: 130, h: 70, x: 15, y: 15 }
-             : { w: 120, h: 64, x: 20, y: 18 };
+  // Shape-sample sizing (geometric tab)
+  const shapeSize = shape === "circle" ? { w: 80, h: 80, x: 40, y: 15 }
+             : shape === "diamond" ? { w: 110, h: 70, x: 25, y: 20 }
+             : shape === "oval" ? { w: 120, h: 60, x: 20, y: 25 }
+             : shape === "pill" ? { w: 120, h: 44, x: 20, y: 33 }
+             : shape === "hex" ? { w: 120, h: 60, x: 20, y: 25 }
+             : shape === "parallelogram" ? { w: 120, h: 58, x: 20, y: 26 }
+             : shape === "cylinder" ? { w: 90, h: 72, x: 35, y: 19 }
+             : shape === "cloud" ? { w: 130, h: 70, x: 15, y: 20 }
+             : { w: 120, h: 64, x: 20, y: 23 };
+  // Kind-sample sizing — tailored per silhouette so decoration has room
+  const kindSize = kind === "actor"    ? { w: 130, h: 86, x: 15, y: 10 }
+                 : kind === "store"    ? { w: 110, h: 90, x: 25, y: 10 }
+                 : kind === "cache"    ? { w: 140, h: 64, x: 10, y: 25 }
+                 : kind === "queue"    ? { w: 140, h: 78, x: 10, y: 14 }
+                 : kind === "gateway"  ? { w: 130, h: 64, x: 15, y: 22 }
+                 : kind === "external" ? { w: 130, h: 72, x: 15, y: 14 }
+                 : kind === "boundary" ? { w: 130, h: 72, x: 15, y: 20 }
+                 : kind === "service"  ? { w: 140, h: 82, x: 10, y: 12 }
+                 : kind === "process"  ? { w: 130, h: 74, x: 15, y: 16 }
+                 : kind === "decision" ? { w: 110, h: 72, x: 25, y: 16 }
+                 : kind === "start" || kind === "stop" ? { w: 130, h: 50, x: 15, y: 28 }
+                 : kind === "event"    ? { w: 60, h: 60, x: 50, y: 12 }
+                 : kind === "step" || kind === "tree" ? { w: 54, h: 54, x: 53, y: 14 }
+                 : kind === "image"    ? { w: 130, h: 84, x: 15, y: 10 }
+                 : { w: 130, h: 72, x: 15, y: 16 };
+  const size = shape ? shapeSize : kindSize;
+  const canvasH = kind === "boundary" ? 108 : (kind === "event" || kind === "step" || kind === "tree" ? 108 : 104);
   return {
-    canvas: { w: 160, h: 100, grid: 14 },
+    canvas: { w: 160, h: canvasH, grid: 14 },
     nodes: [{ id: "n", kind: kind || "service", shape, label: shape ? shape : NODE_KINDS[kind].label, ...size,
       sub: kind === "service" ? "v1.0" : undefined }],
     edges: [],
@@ -167,11 +186,11 @@ function HeroDiagram() {
     const t = setInterval(() => setTick(x => x + 1), 2200);
     return () => clearInterval(t);
   }, []);
-  const steps = EXAMPLE_GRAPH.steps;
+  const steps = window.Flow.HERO_GRAPH.steps;
   const step = steps[tick % steps.length];
   return (
-    <Diagram graph={EXAMPLE_GRAPH} style="sleek"
-      activeNodes={step.active.nodes} activeEdges={step.active.edges} padding={20}/>
+    <Diagram graph={window.Flow.HERO_GRAPH} style="sleek"
+      activeNodes={step.active.nodes} activeEdges={step.active.edges} padding={16}/>
   );
 }
 
