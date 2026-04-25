@@ -832,6 +832,24 @@ const CityStyle = {
         <stop offset="0.5" stopColor="#fcd34d"/>
         <stop offset="1" stopColor="transparent"/>
       </linearGradient>
+
+      {/* Volumetric Packet Gradients */}
+      <linearGradient id="clay-packet-warm" x1="1" y1="0.5" x2="0" y2="0.5">
+        <stop offset="0%" stopColor="#FFBB0C" stopOpacity="1" />
+        <stop offset="50%" stopColor="#FFDD86" stopOpacity="0.6" />
+        <stop offset="100%" stopColor="#fef3c7" stopOpacity="0" />
+      </linearGradient>
+      <linearGradient id="clay-packet-cool" x1="1" y1="0.5" x2="0" y2="0.5">
+        <stop offset="0%" stopColor="#3b82f6" stopOpacity="1" />
+        <stop offset="50%" stopColor="#93c5fd" stopOpacity="0.6" />
+        <stop offset="100%" stopColor="#dbeafe" stopOpacity="0" />
+      </linearGradient>
+
+      {/* Packet Glow Filter */}
+      <filter id="clay-packet-glow" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+        <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+      </filter>
     </defs>
   ),
   Background: ({ w, h }) => (
@@ -1211,9 +1229,22 @@ const CityStyle = {
         
         {/* Animated glowing segments inside the pipe */}
         {active && (
-          <path d={edge.d} fill="none" stroke={warm ? "#fde68a" : "#93c5fd"} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="32 128" filter="url(#clay-ao-sm)" vectorEffect="non-scaling-stroke">
-            <animate attributeName="stroke-dashoffset" from="160" to="0" dur="2s" repeatCount="indefinite" />
-          </path>
+          <g>
+            {/* Trail of energy bursts */}
+            {[0, 1, 2, 3].map(i => (
+              <g key={i}>
+                <g>
+                  <animateMotion dur="1.8s" repeatCount="indefinite" path={edge.d} begin={`${i * -0.45}s`} rotate="auto" />
+                  {/* The trailing energy burst */}
+                  <path d="M -24 0 L -6 -3.5 L 6 0 L -6 3.5 Z" fill={warm ? "url(#clay-packet-warm)" : "url(#clay-packet-cool)"} filter="url(#clay-packet-glow)" />
+                  {/* The leading core flare */}
+                  <path d="M -8 0 L 0 -4.5 L 8 0 L 0 4.5 Z" fill="#ffffff" filter="url(#clay-packet-glow)" opacity="0.9" />
+                  {/* Intense center point */}
+                  <circle r="1.5" fill="white" />
+                </g>
+              </g>
+            ))}
+          </g>
         )}
         
         {/* Label floating ABOVE the line, facing the camera */}
