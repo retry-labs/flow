@@ -214,10 +214,23 @@ function sleekKindBody(node, t) {
         decor: (
           <g>
             {/* chip row */}
-            {[0,1,2,3].map(i => (
-              <rect key={i} x={12 + i*((w-24)/4) + 2} y={h/2 - 4} width={(w-24)/4 - 4} height={12} rx={1.5}
-                fill={active ? "#fde68a" : "#f0e9d6"} stroke={active ? accent : "#d9d0b8"} strokeWidth=".8"/>
-            ))}
+            {[0,1,2,3].map(i => {
+              const rectW = (w-24)/4 - 4;
+              const rectX = 12 + i*((w-24)/4) + 2;
+              const rectY = h/2 - 4;
+              return (
+                <rect key={i} x={rectX} y={rectY} width={rectW} height={12} rx={1.5}
+                  fill={active ? "#fde68a" : "#f0e9d6"} 
+                  stroke={active ? accent : "#d9d0b8"} 
+                  strokeWidth=".8"
+                  style={active ? {
+                    animation: `cache-flow 1.5s ease-in-out infinite`,
+                    animationDelay: `${i * 0.25}s`,
+                    transformOrigin: "center",
+                    transformBox: "fill-box"
+                  } : {}}/>
+              );
+            })}
             {/* contact strip */}
             <g transform={`translate(0 ${h-7})`}>
               {Array.from({length: Math.max(10, Math.floor(w/8))}).map((_, i, a) => {
