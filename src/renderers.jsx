@@ -189,10 +189,10 @@ function sleekKindBody(node, t) {
         ),
         decor: (
           <g>
-            <path d={`M6 ${h*0.5} Q${w/2} ${h*0.5 + 4} ${w-6} ${h*0.5}`}
-              stroke={active ? "#e7c97a" : "#e4decd"} strokeWidth="0.8" fill="none"/>
-            <path d={`M10 ${h*0.72} Q${w/2} ${h*0.72 + 3} ${w-10} ${h*0.72}`}
-              stroke={active ? "#e7c97a" : "#ece7db"} strokeWidth="0.6" fill="none"/>
+            <path d={`M0 ${h*0.5} a${w/2} ${ry} 0 0 0 ${w} 0`}
+              stroke={active ? "#e7c97a" : "#e4decd"} strokeWidth="1" fill="none"/>
+            <path d={`M0 ${h*0.72} a${w/2} ${ry} 0 0 0 ${w} 0`}
+              stroke={active ? "#e7c97a" : "#ece7db"} strokeWidth="0.8" fill="none"/>
           </g>
         ),
         label: (
