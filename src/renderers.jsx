@@ -878,6 +878,11 @@ const CityStyle = {
 
       return (
         <g transform={`translate(${node.x} ${node.y})`}>
+          {active && (
+            <ellipse cx={0} cy={cy} rx={r + 8} ry={28} fill="none" stroke="#007AFF" strokeWidth="3" opacity="0.6">
+              <animate attributeName="opacity" values="0.6;0.1;0.6" dur="2s" repeatCount="indefinite"/>
+            </ellipse>
+          )}
           {/* AO ground shadow */}
           <ellipse cx={cx + 8} cy={cy + 10} rx={r} ry={r * 0.577} fill="rgba(0,0,0,0.35)" filter="url(#clay-ao)"/>
           
@@ -926,12 +931,6 @@ const CityStyle = {
             <rect x="-2" y="-10" width={E*0.08} height="20" rx="3" fill="#1e293b" transform="skewY(-45)"/>
             <rect x="-1" y="-8" width={E*0.04} height="16" rx="2" fill="#007AFF" filter="url(#clay-ao-sm)" transform="skewY(-45)"/>
           </g>
-
-          {active && (
-            <circle cx={cx + E} cy={cy - E} r={r + 6} fill="none" stroke="#007AFF" strokeWidth="2">
-              <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
-            </circle>
-          )}
         </g>
       );
     }
@@ -956,6 +955,12 @@ const CityStyle = {
               <stop offset="0" stopColor="#e4e4e7"/><stop offset="1" stopColor="#d4d4d8"/>
             </linearGradient>
           </defs>
+
+          {active && (
+            <path d={`M ${poly([p0, p1, p2, p3, p4, p5])} Z`} fill="none" stroke="#007AFF" strokeWidth="3" opacity="0.6" transform="scale(1.05) translate(-2 1)">
+              <animate attributeName="opacity" values="0.6;0.1;0.6" dur="2s" repeatCount="indefinite"/>
+            </path>
+          )}
 
           {/* AO ground shadow */}
           <path d={`M ${poly([p0, p1, p2, p3, p4, p5])} Z`} fill="rgba(0,0,0,0.35)" filter="url(#clay-ao)"/>
@@ -991,12 +996,6 @@ const CityStyle = {
              <text y={12} textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
              {node.sub && <text y={26} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
           </g>
-
-          {active && (
-            <path d={`M ${poly([t0, t1, t2, t3, t4, t5])} Z`} fill="none" stroke="#007AFF" strokeWidth="2" transform="scale(1.1) translate(-6 2)">
-              <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
-            </path>
-          )}
         </g>
       );
     }
@@ -1020,6 +1019,12 @@ const CityStyle = {
       <g transform={`translate(${node.x} ${node.y})`}>
         {/* Deep Ground shadow with perfectly matching rounded footprint */}
         <rect width={w} height={h} rx={R} fill={isBoundary ? "rgba(0,0,0,0.05)" : "rgba(0,0,0,0.5)"} filter="url(#clay-ao)"/>
+
+        {active && !isBoundary && (
+          <rect width={w} height={h} rx={R} fill="none" stroke="#007AFF" strokeWidth="3" opacity="0.6" transform="scale(1.06) translate(-2 -2)">
+            <animate attributeName="opacity" values="0.6;0.1;0.6" dur="2s" repeatCount="indefinite"/>
+          </rect>
+        )}
         
         {isBoundary ? (
           <g>
