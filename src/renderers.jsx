@@ -1135,7 +1135,13 @@ const CityStyle = {
                           <g key={i}>
                             <rect x={px} y={8} width={pw} height={14} rx="3"
                               fill={i === 2 ? "#FFB800" : "#fde68a"}
-                              stroke="#b45309" strokeWidth="1"/>
+                              stroke="#b45309" strokeWidth="1"
+                              style={active ? {
+                                animation: `queue-flow 1.8s ease-in-out infinite`,
+                                animationDelay: `${(2 - i) * 0.25}s`,
+                                transformOrigin: "center",
+                                transformBox: "fill-box"
+                              } : {}}/>
                           </g>
                         );
                       })}
@@ -1150,7 +1156,13 @@ const CityStyle = {
                         const cx = 10 + i * (cw + 1);
                         return (
                           <rect key={i} x={cx} y={10} width={cw - 1} height={10} rx="1.5"
-                            fill="#0f172a" stroke="#334155" strokeWidth="0.5"/>
+                            fill="#0f172a" stroke="#334155" strokeWidth="0.5"
+                            style={active ? {
+                              animation: `cache-flow 1.8s ease-in-out infinite`,
+                              animationDelay: `${i * 0.2}s`,
+                              transformOrigin: "center",
+                              transformBox: "fill-box"
+                            } : {}}/>
                         );
                       })}
                       {[0, 1, 2, 3].map(i => {
