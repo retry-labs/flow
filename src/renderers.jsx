@@ -1427,40 +1427,41 @@ function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 2
         minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
         maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
       }));
-      return { minX, minY, w: maxX - minX, h: maxY - minY };
-    }
-
-    // Isometric projection mapping: rotate(-45) then scale(1, 0.577)
-    // X' = 0.707 X + 0.707 Y
-    // Y' = -0.408 X + 0.408 Y
-    const iso = (x, y, z=0) => ({
-      x: 0.707 * x + 0.707 * y,
-      y: -0.408 * x + 0.408 * y - z
-    });
-
-    G.nodes.forEach(n => {
-      const isBoundary = n.kind === "boundary";
-      const Z = isBoundary ? 6 : (n.kind === 'store' ? 56 : 36);
-      
-      const pts = [
-        iso(n.x, n.y, 0), iso(n.x+n.w, n.y, 0), iso(n.x, n.y+n.h, 0), iso(n.x+n.w, n.y+n.h, 0),
-        iso(n.x, n.y, Z), iso(n.x+n.w, n.y, Z), iso(n.x, n.y+n.h, Z), iso(n.x+n.w, n.y+n.h, Z)
-      ];
-      pts.forEach(p => {
-        minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
-        maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+    } else {
+      // Isometric projection mapping: rotate(-45) then scale(1, 0.577)
+      // X' = 0.707 X + 0.707 Y
+      // Y' = -0.408 X + 0.408 Y
+      const iso = (x, y, z=0) => ({
+        x: 0.707 * x + 0.707 * y,
+        y: -0.408 * x + 0.408 * y - z
       });
-    });
 
-    G.edges.forEach(e => e.points.forEach(p => {
-      const pIso = iso(p.x, p.y, 0);
-      minX = Math.min(minX, pIso.x); minY = Math.min(minY, pIso.y);
-      maxX = Math.max(maxX, pIso.x); maxY = Math.max(maxY, pIso.y);
-    }));
+      G.nodes.forEach(n => {
+        const isBoundary = n.kind === "boundary";
+        const Z = isBoundary ? 6 : (n.kind === 'store' ? 56 : 36);
+        
+        const pts = [
+          iso(n.x, n.y, 0), iso(n.x+n.w, n.y, 0), iso(n.x, n.y+n.h, 0), iso(n.x+n.w, n.y+n.h, 0),
+          iso(n.x, n.y, Z), iso(n.x+n.w, n.y, Z), iso(n.x, n.y+n.h, Z), iso(n.x+n.w, n.y+n.h, Z)
+        ];
+        pts.forEach(p => {
+          minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+        });
+      });
+
+      G.edges.forEach(e => e.points.forEach(p => {
+        const pIso = iso(p.x, p.y, 0);
+        minX = Math.min(minX, pIso.x); minY = Math.min(minY, pIso.y);
+        maxX = Math.max(maxX, pIso.x); maxY = Math.max(maxY, pIso.y);
+      }));
+    }
     
     // Add a bit of extra vertical space for shadows/overflow
-    minY -= 10;
-    maxY += 10;
+    minX -= 10;
+    minY -= 15;
+    maxX += 10;
+    maxY += 25;
 
     return { minX, minY, w: maxX - minX, h: maxY - minY };
   }, [G.nodes, G.edges, Style.isometric]);

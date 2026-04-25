@@ -108,7 +108,7 @@ function DSL() {
       <div className="dsl-right">
         <div className="dsl-render-frame">
           <FlowDiagram graph={DSL_GRAPH} style="sleek"
-            activeNodes={cur.active} activeEdges={cur.edges} padding={12}/>
+            activeNodes={cur.active} activeEdges={cur.edges} padding={28}/>
           <div className="dsl-caption">
             <span className="mono">step {activeStep + 1}/3</span> · live re-render on every keystroke
           </div>

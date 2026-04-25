@@ -215,6 +215,7 @@ const css = `
 .dsl-right { padding: 20px; display: flex; align-items: center; justify-content: center; }
 .dsl-render-frame {
   width: 100%;
+  min-height: 340px;
   background: #fffcf3;
   border-radius: var(--r-lg);
   border: 1px solid var(--line);
