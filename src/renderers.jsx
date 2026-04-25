@@ -268,7 +268,13 @@ function sleekKindBody(node, t) {
               return (
                 <rect key={i} x={12} y={y} width={w-24} height={rowH} rx={Math.min(rowH/2, 5)}
                   fill={rowColors[i]} stroke={isFront ? (active ? "#7a5a00" : "#b79414") : "#d9c98b"}
-                  strokeWidth={isFront ? 1 : .6}/>
+                  strokeWidth={isFront ? 1 : .6}
+                  style={active ? {
+                    animation: `queue-flow 1.4s ease-in-out infinite`,
+                    animationDelay: `${(rowCount - 1 - i) * 0.2}s`,
+                    transformOrigin: "center",
+                    transformBox: "fill-box"
+                  } : {}}/>
               );
             })}
             <path d={`M${w-8} ${labelH + rowH/2} l5 -3.5 v7 z`}

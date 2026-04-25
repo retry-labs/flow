@@ -44,6 +44,10 @@ const css = `
   0%, 100% { opacity: 0.3; transform: scale(1); } 
   35%, 65% { opacity: 1; transform: scale(1.04); } 
 }
+@keyframes queue-flow { 
+  0%, 100% { opacity: 0.4; transform: scaleX(0.98); } 
+  40%, 60% { opacity: 1; transform: scaleX(1); } 
+}
 
 .player-side {
   display: flex; flex-direction: column; gap: 20px;
