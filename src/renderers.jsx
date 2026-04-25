@@ -971,6 +971,13 @@ const CityStyle = {
              <ellipse cx={E*0.2} cy={-E*0.2 + 8} rx="1.5" ry="3.5" fill="#f59e0b" filter="url(#clay-ao-sm)"/>
           </g>
 
+          {/* Physical sockets (Ports) */}
+          {/* Left Socket (Visible from this angle) */}
+          <g transform={`translate(${p5.x + E*0.06} ${p5.y - E*0.06})`}>
+            <rect x="-2" y="-10" width={E*0.08} height="20" rx="3" fill="#1e293b" transform="skewY(-45)"/>
+            <rect x="-1" y="-8" width={E*0.04} height="16" rx="2" fill="#007AFF" filter="url(#clay-ao-sm)" transform="skewY(-45)"/>
+          </g>
+
           {/* Top face */}
           <path d={`M ${poly([t0, t1, t2, t3, t4, t5])} Z`} fill="url(#clay-top)" stroke="none"/>
           
