@@ -306,8 +306,6 @@ function sleekKindBody(node, t) {
           <g>
             <path d={`M${i} 6 L${w-i} 6`} stroke={active ? accent : "#e4decd"} strokeWidth="1"/>
             <path d={`M${i} ${h-6} L${w-i} ${h-6}`} stroke={active ? accent : "#e4decd"} strokeWidth="1"/>
-            <rect x={w/2 - 4} y={h/2 - 4} width="8" height="8" transform={`rotate(45 ${w/2} ${h/2})`}
-              fill={active ? accent : "#f0e9d6"} stroke={active ? "#7a5a00" : muted} strokeWidth=".8"/>
           </g>
         ),
         label: centerLabel(),
@@ -319,15 +317,15 @@ function sleekKindBody(node, t) {
         body: <path d={cd} fill={fill} stroke={stroke} strokeWidth={strokeW}/>,
         decor: (
           <g>
-            <path d={`M${w*0.35} ${h*0.5} A 10 10 0 0 1 ${w*0.65} ${h*0.5}`}
+            <path d={`M${w*0.35} ${h*0.42} A 10 10 0 0 1 ${w*0.65} ${h*0.42}`}
               stroke={active ? accent : muted} strokeWidth="1.2" fill="none"/>
-            <path d={`M${w*0.4} ${h*0.55} A 6 6 0 0 1 ${w*0.6} ${h*0.55}`}
+            <path d={`M${w*0.4} ${h*0.47} A 6 6 0 0 1 ${w*0.6} ${h*0.47}`}
               stroke={active ? accent : muted} strokeWidth="1.2" fill="none"/>
-            <circle cx={w/2} cy={h*0.62} r="1.4" fill={active ? accent : muted}/>
+            <circle cx={w/2} cy={h*0.54} r="1.4" fill={active ? accent : muted}/>
           </g>
         ),
         label: (
-          <text x={w/2} y={h + 2} textAnchor="middle"
+          <text x={w/2} y={h*0.8} textAnchor="middle"
             fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
         ),
       };
@@ -830,7 +828,8 @@ const CityStyle = {
     // -----------------------------------------------------------------
     if (kind === "store") {
       const r = Math.min(w, h) / 2;
-      const cx = w / 2;
+      // Shift cylinder left to naturally meet the incoming pipe at x=0
+      const cx = r;
       const cy = h / 2;
       const Z = 56;                   // Database height
       const E = 1.225 * Z;            // Vertical offset in grid space
@@ -883,6 +882,12 @@ const CityStyle = {
               <text y={12} textAnchor="middle" fill="#334155" fontSize="14" fontWeight="600" fontFamily="Inter Tight">{node.label}</text>
               {node.sub && <text y={26} textAnchor="middle" fill="#64748b" fontSize="11" fontFamily="JetBrains Mono">{node.sub}</text>}
             </g>
+          </g>
+
+          {/* Hardware Port attached to the cylinder wall (Matching standard node style exactly) */}
+          <g transform={`translate(${E*0.06} ${cy - E*0.06})`}>
+            <rect x="-2" y="-10" width={E*0.08} height="20" rx="3" fill="#1e293b" transform="skewY(-45)"/>
+            <rect x="-1" y="-8" width={E*0.04} height="16" rx="2" fill="#007AFF" filter="url(#clay-ao-sm)" transform="skewY(-45)"/>
           </g>
 
           {active && (
