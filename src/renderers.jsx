@@ -126,10 +126,10 @@ function sleekKindBody(node, t) {
     <g>
       <text x={12} y={14.5} fontFamily="JetBrains Mono" fontSize={9} letterSpacing=".08em"
         fill={active ? "#7a5a00" : muted}>{badge}</text>
-      <text x={w/2} y={headerH + (h - headerH)/2 + 4} textAnchor="middle"
+      <text x={w/2} y={headerH + (h - headerH)/2 + 2.5} textAnchor="middle"
         fontFamily="Inter Tight" fontWeight={600} fontSize={14} fill={ink}>{node.label}</text>
       {node.sub && (
-        <text x={w/2} y={headerH + (h - headerH)/2 + 18} textAnchor="middle"
+        <text x={w/2} y={headerH + (h - headerH)/2 + 16} textAnchor="middle"
           fontFamily="JetBrains Mono" fontSize={9.5} fill={muted}>{node.sub}</text>
       )}
     </g>
