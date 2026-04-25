@@ -224,8 +224,8 @@ function sleekKindBody(node, t) {
                   stroke={active ? accent : "#d9d0b8"} 
                   strokeWidth=".8"
                   style={active ? {
-                    animation: `cache-flow 1.5s ease-in-out infinite`,
-                    animationDelay: `${i * 0.25}s`,
+                    animation: `cache-flow 1.4s ease-in-out infinite`,
+                    animationDelay: `${i * 0.18}s`,
                     transformOrigin: "center",
                     transformBox: "fill-box"
                   } : {}}/>

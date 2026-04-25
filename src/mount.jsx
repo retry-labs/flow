@@ -41,9 +41,8 @@ const css = `
 @keyframes pulse-dot { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.3);opacity:.6} }
 @keyframes sleek-pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
 @keyframes cache-flow { 
-  0% { opacity: 0.4; transform: scale(1); } 
-  50% { opacity: 1; transform: scale(1.05); } 
-  100% { opacity: 0.4; transform: scale(1); } 
+  0%, 100% { opacity: 0.3; transform: scale(1); } 
+  35%, 65% { opacity: 1; transform: scale(1.04); } 
 }
 
 .player-side {
