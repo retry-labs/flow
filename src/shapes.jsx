@@ -1,9 +1,9 @@
-// -----------------------------------------------------------
-// Shape library — SVG path generators. Styles call these.
-// Each returns { path, cx, cy } where (cx,cy) is the label anchor.
-// -----------------------------------------------------------
+/**
+ * Shape library — SVG path generators.
+ * Each returns { path, cx, cy } where (cx,cy) is the label anchor.
+ */
 
-function shapePath(shape, w, h) {
+export function shapePath(shape, w, h) {
   switch (shape) {
     case "rect":   return { d: `M0 0 H${w} V${h} H0 Z`, cx: w/2, cy: h/2, rx: 10 };
     case "square": {
@@ -42,7 +42,6 @@ function shapePath(shape, w, h) {
       return { d: `M${skew} 0 H${w} L${w-skew} ${h} H0 Z`, cx: w/2, cy: h/2 };
     }
     case "shield": {
-      // Rounded top with pointed bottom — a security badge silhouette.
       const r = Math.min(w * 0.18, 14);
       return {
         d: `M${r} 0 H${w-r} Q${w} 0 ${w} ${r} V${h*0.55} Q${w} ${h*0.85} ${w/2} ${h} Q0 ${h*0.85} 0 ${h*0.55} V${r} Q0 0 ${r} 0 Z`,
@@ -50,7 +49,6 @@ function shapePath(shape, w, h) {
       };
     }
     case "tablet": {
-      // Mobile/tablet screen — rounded rect with small notch indicator
       const r = Math.min(w, h) * 0.18;
       return { d: `M${r} 0 H${w-r} Q${w} 0 ${w} ${r} V${h-r} Q${w} ${h} ${w-r} ${h} H${r} Q0 ${h} 0 ${h-r} V${r} Q0 0 ${r} 0 Z`, cx: w/2, cy: h/2, rx: r };
     }
@@ -67,8 +65,7 @@ function shapePath(shape, w, h) {
   }
 }
 
-// Anchor a point on the OUTSIDE of a non-rect shape, for edge routing
-function shapeAnchor(node, side) {
+export function shapeAnchor(node, side) {
   const { w, h } = node;
   const cx = node.x + w/2, cy = node.y + h/2;
   switch (side) {
@@ -78,5 +75,3 @@ function shapeAnchor(node, side) {
     case "b": return { x: cx,             y: node.y + h };
   }
 }
-
-window.Flow = Object.assign(window.Flow || {}, { shapePath, shapeAnchor });
