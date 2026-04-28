@@ -30,11 +30,24 @@ const NODE_KINDS = {
   tree:    { label: "Tree node", shape: "circle",   icon: "dot"      },
   // Media
   image:   { label: "Logo",      shape: "rect",     icon: "image"    },
+  // --- NEW node kinds ----------------------------------------
+  function:    { label: "Function",      shape: "rect",     icon: "lambda"   },  // serverless / lambda
+  worker:      { label: "Worker",        shape: "rect",     icon: "gear"     },  // background job runner
+  loadbalancer:{ label: "Load Balancer", shape: "rect",     icon: "scale"    },  // LB
+  cdn:         { label: "CDN",           shape: "cloud",    icon: "globe"    },  // edge cache
+  auth:        { label: "Auth",          shape: "shield",   icon: "key"      },  // identity provider
+  monitor:     { label: "Monitor",       shape: "rect",     icon: "chart"    },  // observability
+  bus:         { label: "Event Bus",     shape: "rect",     icon: "bus"      },  // pub/sub
+  stream:      { label: "Stream",        shape: "rect",     icon: "wave"     },  // kafka topic
+  firewall:    { label: "Firewall",      shape: "rect",     icon: "wall"     },  // perimeter
+  mobile:      { label: "Mobile",        shape: "tablet",   icon: "phone"    },  // mobile client
 };
 
 // All supported geometric shapes (the shape layer — decoupled from kind).
 const SHAPES = [
   "rect", "square", "circle", "oval", "diamond", "hex", "pill", "cylinder", "cloud", "parallelogram",
+  // NEW shapes
+  "shield", "tablet", "trapezoid", "chevron",
 ];
 
 // -----------------------------------------------------------

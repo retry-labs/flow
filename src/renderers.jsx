@@ -62,18 +62,18 @@ function ShapeShell({ node, fill, stroke, strokeWidth, strokeDasharray, shadowOp
   return <path d={s.d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray}/>;
 }
 
-function NodeLabel({ node, fill, sub, subFill, fontFamily = "Inter Tight", fontWeight = 600, fontSize = 13, hand = false, mono = false, iconTop = 10, center = false }) {
+function NodeLabel({ node, fill, sub, subFill, fontFamily = "Inter Tight", fontWeight = 600, fontSize = 13, hand = false, mono = false, iconTop = 10, center = false, centerOffsetY = 0 }) {
   const shape = shapeOf(node);
   // decision / diamond / circle: center label, no icon row
   if (center || ["diamond","circle","oval","pill"].includes(shape)) {
     return (
       <g>
-        <text x={node.w/2} y={node.h/2 + (sub ? -3 : 4)} textAnchor="middle" dominantBaseline="middle"
+        <text x={node.w/2} y={node.h/2 + (sub ? -3 : 4) + centerOffsetY} textAnchor="middle" dominantBaseline="middle"
           fontFamily={fontFamily} fontWeight={fontWeight} fontSize={fontSize} fill={fill}>
           {node.label}
         </text>
         {sub && (
-          <text x={node.w/2} y={node.h/2 + 12} textAnchor="middle" dominantBaseline="middle"
+          <text x={node.w/2} y={node.h/2 + 12 + centerOffsetY} textAnchor="middle" dominantBaseline="middle"
             fontFamily="JetBrains Mono" fontSize="9.5" fill={subFill}>{sub}</text>
         )}
       </g>
@@ -335,17 +335,23 @@ function sleekKindBody(node, t) {
       return {
         body: <path d={cd} fill={fill} stroke={stroke} strokeWidth={strokeW}/>,
         decor: (
-          <g>
-            <path d={`M${w*0.35} ${h*0.42} A 10 10 0 0 1 ${w*0.65} ${h*0.42}`}
+          <g transform="translate(0 -4)">
+            <path d={`M${w*0.42} ${h*0.32} A 6 6 0 0 1 ${w*0.58} ${h*0.32}`}
               stroke={active ? accent : muted} strokeWidth="1.2" fill="none"/>
-            <path d={`M${w*0.4} ${h*0.47} A 6 6 0 0 1 ${w*0.6} ${h*0.47}`}
+            <path d={`M${w*0.45} ${h*0.38} A 4 4 0 0 1 ${w*0.55} ${h*0.38}`}
               stroke={active ? accent : muted} strokeWidth="1.2" fill="none"/>
-            <circle cx={w/2} cy={h*0.54} r="1.4" fill={active ? accent : muted}/>
+            <circle cx={w/2} cy={h*0.45} r="1.3" fill={active ? accent : muted}/>
           </g>
         ),
         label: (
-          <text x={w/2} y={h*0.8} textAnchor="middle"
-            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+          <g>
+            <text x={w/2} y={h*0.74} textAnchor="middle"
+              fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+            {node.sub && (
+              <text x={w/2} y={h*0.86} textAnchor="middle"
+                fontFamily="JetBrains Mono" fontSize={9} fill={muted}>{node.sub}</text>
+            )}
+          </g>
         ),
       };
     }
@@ -467,6 +473,223 @@ function sleekKindBody(node, t) {
         ),
       };
     }
+    // ---- NEW kinds ------------------------------------------
+    case "function": {
+      // Lambda card: greek λ chip + dashed runtime ring
+      return {
+        body: card(12),
+        decor: (
+          <g>
+            <rect x={1} y={1} width={w-2} height={4} rx={2} fill={active ? accent : "#e4decd"}/>
+            <g transform={`translate(${w-26} 8)`}>
+              <rect width="20" height="14" rx="3" fill={active ? "#fef3c7" : "#faf3dc"} stroke={active ? accent : "#d9c98b"} strokeWidth=".8"/>
+              <text x="10" y="11" textAnchor="middle" fontFamily="JetBrains Mono" fontWeight={700} fontSize="10" fill={active ? "#7a5a00" : muted}>λ</text>
+            </g>
+          </g>
+        ),
+        label: centerLabel(),
+      };
+    }
+    case "worker": {
+      // Background worker — gear + work-queue dots
+      return {
+        body: card(10),
+        decor: (
+          <g>
+            <g transform={`translate(${w-22} 10)`} stroke={active ? "#7a5a00" : muted} strokeWidth="1.1" fill="none">
+              <circle cx="6" cy="6" r="3.6"/>
+              <circle cx="6" cy="6" r="1.2" fill={active ? "#7a5a00" : muted}/>
+              {[0,45,90,135,180,225,270,315].map(a => <line key={a} x1="6" y1="1.5" x2="6" y2="2.5" transform={`rotate(${a} 6 6)`}/>)}
+            </g>
+            <g transform={`translate(12 ${h-12})`}>
+              {[0,1,2].map(i => <circle key={i} cx={i*7} cy="0" r="2" fill={active ? accent : "#d9c98b"} opacity={1 - i*0.25}/>)}
+            </g>
+          </g>
+        ),
+        label: centerLabel(-2),
+      };
+    }
+    case "loadbalancer": {
+      // 3 outgoing rays from a central hub
+      return {
+        body: card(10),
+        decor: (
+          <g transform={`translate(${w-30} ${h/2})`} stroke={active ? "#7a5a00" : muted} strokeWidth="1.3" fill="none" strokeLinecap="round">
+            <circle cx="0" cy="0" r="3" fill={active ? accent : "#fbf6e7"}/>
+            <line x1="3" y1="0" x2="14" y2="-7"/>
+            <line x1="3" y1="0" x2="16" y2="0"/>
+            <line x1="3" y1="0" x2="14" y2="7"/>
+            <circle cx="14" cy="-7" r="1.5" fill={active ? "#7a5a00" : muted}/>
+            <circle cx="16" cy="0" r="1.5" fill={active ? "#7a5a00" : muted}/>
+            <circle cx="14" cy="7" r="1.5" fill={active ? "#7a5a00" : muted}/>
+          </g>
+        ),
+        label: centerLabel(),
+      };
+    }
+    case "cdn": {
+      const cd = `M${w*0.18} ${h*0.6} C ${w*0.02} ${h*0.6}, ${w*0.02} ${h*0.2}, ${w*0.22} ${h*0.25} C ${w*0.28} ${h*0.02}, ${w*0.58} ${h*0.02}, ${w*0.62} ${h*0.22} C ${w*0.85} ${h*0.15}, ${w*0.98} ${h*0.35}, ${w*0.9} ${h*0.6} C ${w*0.98} ${h*0.82}, ${w*0.75} ${h*0.98}, ${w*0.6} ${h*0.88} C ${w*0.4} ${h*1.02}, ${w*0.1} ${h*0.95}, ${w*0.18} ${h*0.6} Z`;
+      return {
+        body: <path d={cd} fill={fill} stroke={stroke} strokeWidth={strokeW}/>,
+        decor: (
+          <g transform={`translate(${w/2} ${h*0.42})`} stroke={active ? "#7a5a00" : muted} strokeWidth="1.1" fill="none">
+            <circle r="6"/>
+            <ellipse rx="6" ry="2.5"/>
+            <line x1="-6" y1="0" x2="6" y2="0"/>
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={h*0.78} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "auth": {
+      // Shield silhouette
+      const r = Math.min(w * 0.18, 14);
+      const d = `M${r} 0 H${w-r} Q${w} 0 ${w} ${r} V${h*0.55} Q${w} ${h*0.85} ${w/2} ${h} Q0 ${h*0.85} 0 ${h*0.55} V${r} Q0 0 ${r} 0 Z`;
+      return {
+        body: <path d={d} fill={fill} stroke={stroke} strokeWidth={strokeW}/>,
+        decor: (
+          <g transform={`translate(${w/2} ${h*0.34})`} stroke={active ? "#7a5a00" : muted} strokeWidth="1.4" fill="none">
+            <rect x="-4" y="-1" width="8" height="7" rx="1.2" fill={active ? "#fef3c7" : "#faf3dc"}/>
+            <path d="M-2.5 -1 V-3.5 Q0 -5.5 2.5 -3.5 V-1"/>
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={h*0.74} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "monitor": {
+      // Mini chart card
+      return {
+        body: card(10),
+        decor: (
+          <g transform={`translate(10 ${h/2 - 6})`}>
+            <rect width={w-20} height="24" rx="3" fill={active ? "#fef3c7" : "#faf3dc"} stroke={active ? accent : "#d9c98b"} strokeWidth=".7"/>
+            <polyline points={`4,18 ${(w-20)*0.25},10 ${(w-20)*0.45},14 ${(w-20)*0.7},6 ${w-24},12`}
+              fill="none" stroke={active ? "#7a5a00" : muted} strokeWidth="1.4"/>
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={14} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "bus": {
+      // Pub/sub bus: long bar with branching dots (different from Queue's FIFO pills)
+      return {
+        body: card(10),
+        decor: (
+          <g>
+            <rect x={10} y={h/2 - 4} width={w-20} height="8" rx="3"
+              fill={active ? accent : "#e8deb5"} stroke={active ? "#7a5a00" : "#b79414"} strokeWidth=".7"/>
+            {[0.2, 0.5, 0.8].map((p, i) => (
+              <g key={i} transform={`translate(${10 + (w-20)*p} ${h/2})`}>
+                <line x1="0" y1="-4" x2="0" y2="-9" stroke={active ? "#7a5a00" : muted} strokeWidth="1"/>
+                <circle cx="0" cy="-11" r="2" fill={active ? "#7a5a00" : muted}/>
+                <line x1="0" y1="4" x2="0" y2="9" stroke={active ? "#7a5a00" : muted} strokeWidth="1"/>
+                <circle cx="0" cy="11" r="2" fill={active ? "#7a5a00" : muted}/>
+              </g>
+            ))}
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={14} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "stream": {
+      // Wave silhouette — represents a stream/topic
+      return {
+        body: card(10),
+        decor: (
+          <g>
+            {[0,1,2].map(row => (
+              <path key={row}
+                d={`M10 ${20 + row*10} Q ${(w-20)*0.25 + 10} ${14 + row*10}, ${(w-20)*0.5 + 10} ${20 + row*10} T ${w-10} ${20 + row*10}`}
+                fill="none" stroke={active ? (row === 0 ? accent : "#e0c870") : (row === 0 ? "#b79414" : "#d9c98b")}
+                strokeWidth={row === 0 ? "1.6" : "1"} strokeLinecap="round"
+                opacity={1 - row * 0.25}>
+                {active && row === 0 && (
+                  <animate attributeName="d"
+                    values={`M10 ${20 + row*10} Q ${(w-20)*0.25 + 10} ${14 + row*10}, ${(w-20)*0.5 + 10} ${20 + row*10} T ${w-10} ${20 + row*10};M10 ${20 + row*10} Q ${(w-20)*0.25 + 10} ${26 + row*10}, ${(w-20)*0.5 + 10} ${20 + row*10} T ${w-10} ${20 + row*10};M10 ${20 + row*10} Q ${(w-20)*0.25 + 10} ${14 + row*10}, ${(w-20)*0.5 + 10} ${20 + row*10} T ${w-10} ${20 + row*10}`}
+                    dur="2s" repeatCount="indefinite"/>
+                )}
+              </path>
+            ))}
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={14} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "firewall": {
+      // Brick wall
+      return {
+        body: card(10),
+        decor: (
+          <g stroke={active ? "#7a5a00" : muted} strokeWidth=".7" fill="none">
+            {[0,1,2].map(row => {
+              const y = 22 + row * 8;
+              const offset = row % 2 === 0 ? 0 : (w-20)/4;
+              return (
+                <g key={row}>
+                  <line x1={10} y1={y} x2={w-10} y2={y}/>
+                  {[0,1,2,3].map(c => (
+                    <line key={c} x1={10 + offset + c*(w-20)/2} y1={y - 8} x2={10 + offset + c*(w-20)/2} y2={y}/>
+                  ))}
+                </g>
+              );
+            })}
+            <rect x={9.5} y={14} width={w-19} height={h-22} rx="2" fill={active ? "rgba(245,197,24,0.15)" : "transparent"} strokeWidth=".5"/>
+          </g>
+        ),
+        label: (
+          <text x={w/2} y={14} textAnchor="middle"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
+    case "mobile": {
+      // Phone silhouette
+      const pw = Math.min(w * 0.45, 44);
+      const ph = h - 12;
+      const px = (w - pw) / 2, py = 6;
+      return {
+        body: (
+          <g>
+            <rect width={w} height={h} rx={12} fill="transparent"/>
+            <rect x={px} y={py} width={pw} height={ph} rx="6"
+              fill={fill} stroke={stroke} strokeWidth={strokeW}/>
+            <rect x={px+4} y={py+8} width={pw-8} height={ph-16} rx="2"
+              fill={active ? "#fef3c7" : "#faf3dc"}/>
+          </g>
+        ),
+        decor: (
+          <g>
+            <circle cx={w/2} cy={py + 4} r="1" fill={muted}/>
+            <rect x={w/2 - 4} y={py + ph - 4} width="8" height="1.5" rx=".5" fill={muted}/>
+            {active && (
+              <g transform={`translate(${w/2} ${h/2})`} stroke={accent} strokeWidth="1.4" fill="none">
+                <path d="M -5 0 Q 0 -5 5 0"/>
+                <path d="M -3 2 Q 0 -1 3 2"/>
+              </g>
+            )}
+          </g>
+        ),
+        label: (
+          <text x={px - 4} y={h/2 + 4} textAnchor="end"
+            fontFamily="Inter Tight" fontWeight={600} fontSize={12.5} fill={ink}>{node.label}</text>
+        ),
+      };
+    }
     default:
       return null;
   }
@@ -501,6 +724,9 @@ const SleekStyle = {
       </marker>
       <marker id="sleek-arrow-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M0 0 L10 5 L0 10 z" fill="#f5c518"/>
+      </marker>
+      <marker id="sleek-arrow-err" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#c0392b"/>
       </marker>
       <pattern id="sleek-dots" width="20" height="20" patternUnits="userSpaceOnUse">
         <circle cx="10" cy="10" r=".8" fill="#d9d3c6"/>
@@ -552,21 +778,65 @@ const SleekStyle = {
     );
   },
   Edge: ({ edge, active }) => {
-    const dash = edge.kind === "dashed" ? "5 4" : undefined;
-    const stroke = active ? "#f5c518" : "#b8b0a1";
+    const kind = edge.kind || "solid";
+    const isDashed = kind === "dashed";
+    const isDotted = kind === "dotted";
+    const isBold = kind === "bold";
+    const isAsync = kind === "async";
+    const isBidir = kind === "bidir";
+    const isError = kind === "error";
+    const isSecure = kind === "secure";
+    const isRealtime = kind === "realtime";
+
+    const errorColor = "#c0392b";
+    const secureColor = "#3a6b3a";
+    const baseStroke = isError ? errorColor : isSecure ? secureColor : (active ? "#f5c518" : "#b8b0a1");
+    const dashAttr = isDashed ? "5 4" : isDotted ? "1 5" : isAsync ? "8 4 1 4" : isRealtime ? "6 3" : undefined;
+    const sw = isBold ? (active ? 3 : 2.4) : (active ? 2 : 1.4);
     const mid = edgeMidpoint(edge.points);
+    const arrowEnd = isError ? "url(#sleek-arrow-err)" : active ? "url(#sleek-arrow-a)" : "url(#sleek-arrow)";
+    const arrowStart = isBidir ? (active ? "url(#sleek-arrow-a)" : "url(#sleek-arrow)") : undefined;
+
     return (
       <g>
-        <path d={edge.d} fill="none" stroke={stroke}
-          strokeWidth={active ? 2 : 1.4} strokeDasharray={dash}
-          markerEnd={active ? "url(#sleek-arrow-a)" : "url(#sleek-arrow)"}
-          strokeLinecap="round" strokeLinejoin="round"/>
-        {active && (
-          <circle r="3.5" fill="#f5c518">
+        {isBold && (
+          <path d={edge.d} fill="none" stroke={baseStroke} opacity=".18"
+            strokeWidth={sw + 6} strokeLinecap="round" strokeLinejoin="round"/>
+        )}
+        {isRealtime && (
+          // outer rail of double-track
+          <path d={edge.d} fill="none" stroke="#f5c518" opacity=".35"
+            strokeWidth={sw + 3} strokeLinecap="round" strokeLinejoin="round"/>
+        )}
+        <path d={edge.d} fill="none" stroke={isRealtime ? "#b8860b" : baseStroke}
+          strokeWidth={sw} strokeDasharray={dashAttr} strokeLinecap={isDotted ? "round" : "butt"}
+          markerEnd={arrowEnd} markerStart={arrowStart}
+          strokeLinejoin="round">
+          {isRealtime && (
+            <animate attributeName="stroke-dashoffset" from="0" to="-18" dur=".5s" repeatCount="indefinite"/>
+          )}
+        </path>
+        {active && !isRealtime && (
+          <circle r="3.5" fill={isError ? errorColor : "#f5c518"}>
             <animateMotion dur="1.4s" repeatCount="indefinite" path={edge.d} rotate="auto"/>
           </circle>
         )}
-        <EdgeLabel text={edge.label} x={mid.x} y={mid.y} bg="#fffcf3" fg={active ? "#7a5a00" : "#8f8779"} mono/>
+        {isSecure && (
+          <g transform={`translate(${mid.x} ${mid.y - 14})`}>
+            <rect x="-7" y="-8" width="14" height="13" rx="2.5" fill="#fffcf3" stroke={secureColor} strokeWidth="1"/>
+            <rect x="-3" y="-3" width="6" height="6" rx=".8" fill={secureColor}/>
+            <path d="M-2 -3 V-5 Q0 -7 2 -5 V-3" fill="none" stroke={secureColor} strokeWidth="1"/>
+          </g>
+        )}
+        {isError && (
+          <g transform={`translate(${mid.x} ${mid.y - 12})`} stroke={errorColor} strokeWidth="1.4" fill="#fffcf3">
+            <circle r="6"/>
+            <line x1="-3" y1="-3" x2="3" y2="3"/>
+            <line x1="3" y1="-3" x2="-3" y2="3"/>
+          </g>
+        )}
+        <EdgeLabel text={edge.label} x={mid.x} y={mid.y} bg="#fffcf3"
+          fg={isError ? errorColor : isSecure ? secureColor : active ? "#7a5a00" : "#8f8779"} mono/>
       </g>
     );
   },
@@ -630,36 +900,78 @@ const SketchStyle = {
         {!isImg && !["diamond","circle","oval","pill"].includes(shape) && (
           <g transform="translate(12, 10)"><NodeIcon kind={node.kind} color={ink} sketchy/></g>
         )}
+        {!isImg && ["diamond","circle","oval","pill"].includes(shape) && (
+          <g transform={`translate(${node.w/2 - 7} ${node.h/2 - 18})`}><NodeIcon kind={node.kind} color={ink} sketchy/></g>
+        )}
         <NodeLabel node={node} fill={ink} sub={node.sub} subFill="#5a5148"
-          fontFamily="Caveat" fontWeight={600} fontSize={18} hand/>
+          fontFamily="Caveat" fontWeight={600} fontSize={18} hand
+          centerOffsetY={["diamond","circle","oval","pill"].includes(shape) ? 8 : 0}/>
       </g>
     );
   },
   Edge: ({ edge, active }) => {
+    const kind = edge.kind || "solid";
+    const isDashed = kind === "dashed";
+    const isDotted = kind === "dotted";
+    const isBold = kind === "bold";
+    const isAsync = kind === "async";
+    const isBidir = kind === "bidir";
+    const isError = kind === "error";
+    const isSecure = kind === "secure";
+    const isRealtime = kind === "realtime";
+
+    const errorColor = "#c14a3a";
+    const secureColor = "#3d6b3d";
+    const baseStroke = isError ? errorColor : isSecure ? secureColor : (active ? "#d97757" : "#3a362d");
+    const dashAttr = isDashed ? "6 5" : isDotted ? "1.5 5" : isAsync ? "9 4 1.5 4" : isRealtime ? "7 4" : undefined;
+    const sw = isBold ? (active ? 3 : 2.6) : (active ? 2.2 : 1.5);
+
     const d1 = roughPath(edge.points, 1.6, edge.id.charCodeAt(0) * 7);
     const d2 = roughPath(edge.points, 1.2, edge.id.charCodeAt(0) * 13 + 1);
-    const dash = edge.kind === "dashed" ? "6 5" : undefined;
-    const stroke = active ? "#d97757" : "#3a362d";
     const mid = edgeMidpoint(edge.points);
+
     return (
       <g>
-        <path d={d1} fill="none" stroke={stroke} strokeWidth={active ? 2.2 : 1.5}
-          strokeDasharray={dash}
+        {isRealtime && (
+          <path d={d1} fill="none" stroke="#d97757" opacity=".25"
+            strokeWidth={sw + 3} strokeLinecap="round" filter="url(#sk-rough)"/>
+        )}
+        <path d={d1} fill="none" stroke={isRealtime ? "#b85a3a" : baseStroke} strokeWidth={sw}
+          strokeDasharray={dashAttr} strokeLinecap={isDotted ? "round" : "round"}
           markerEnd={active ? "url(#sk-arrow-a)" : "url(#sk-arrow)"}
-          strokeLinecap="round" filter="url(#sk-rough)"/>
-        <path d={d2} fill="none" stroke={stroke} strokeWidth={active ? 1 : .7}
-          strokeDasharray={dash} opacity=".4" strokeLinecap="round"/>
-        {active && (
-          <circle r="4" fill="#d97757" stroke="#fbf7ec" strokeWidth="1.5">
+          markerStart={isBidir ? (active ? "url(#sk-arrow-a)" : "url(#sk-arrow)") : undefined}
+          filter="url(#sk-rough)">
+          {isRealtime && (
+            <animate attributeName="stroke-dashoffset" from="0" to="-22" dur=".55s" repeatCount="indefinite"/>
+          )}
+        </path>
+        <path d={d2} fill="none" stroke={baseStroke} strokeWidth={isBold ? 1.4 : .7}
+          strokeDasharray={dashAttr} opacity=".4" strokeLinecap="round"/>
+        {active && !isRealtime && (
+          <circle r="4" fill={isError ? errorColor : "#d97757"} stroke="#fbf7ec" strokeWidth="1.5">
             <animateMotion dur="1.6s" repeatCount="indefinite" path={edge.d} rotate="auto"/>
           </circle>
+        )}
+        {isSecure && (
+          <g transform={`translate(${mid.x} ${mid.y - 14}) rotate(-2)`} fill="#fbf7ec" stroke={secureColor} strokeWidth="1.4" filter="url(#sk-rough)">
+            <rect x="-7" y="-7" width="14" height="13" rx="2"/>
+            <path d="M-2.5 -7 V-10 Q0 -12 2.5 -10 V-7" fill="none"/>
+          </g>
+        )}
+        {isError && (
+          <g transform={`translate(${mid.x} ${mid.y - 13}) rotate(-3)`} stroke={errorColor} strokeWidth="1.6" fill="#fbf7ec" filter="url(#sk-rough)">
+            <circle r="7"/>
+            <line x1="-3.5" y1="-3.5" x2="3.5" y2="3.5"/>
+            <line x1="3.5" y1="-3.5" x2="-3.5" y2="3.5"/>
+          </g>
         )}
         {edge.label && (
           <g transform={`translate(${mid.x} ${mid.y - 2}) rotate(-3)`}>
             <rect x={-edge.label.length * 4.5 - 4} y={-10} width={edge.label.length * 9 + 8} height={18}
               rx={3} fill="#fbf7ec"/>
             <text textAnchor="middle" dominantBaseline="middle"
-              fontFamily="Caveat" fontSize="15" fill={active ? "#d97757" : "#5a5148"}>
+              fontFamily="Caveat" fontSize="15"
+              fill={isError ? errorColor : isSecure ? secureColor : active ? "#d97757" : "#5a5148"}>
               {edge.label}
             </text>
           </g>
@@ -683,6 +995,8 @@ const IsoStyle = {
       <linearGradient id="iso-front" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#e7ebf1"/><stop offset="1" stopColor="#d2d8e1"/></linearGradient>
       <linearGradient id="iso-pipe" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#2563eb"/><stop offset="1" stopColor="#60a5fa"/></linearGradient>
       <linearGradient id="iso-pipe-a" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#f59e0b"/><stop offset="1" stopColor="#fde68a"/></linearGradient>
+      <linearGradient id="iso-pipe-err" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#b91c1c"/><stop offset="1" stopColor="#ef4444"/></linearGradient>
+      <linearGradient id="iso-pipe-sec" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#15803d"/><stop offset="1" stopColor="#4ade80"/></linearGradient>
       <pattern id="iso-grid" width="24" height="14" patternUnits="userSpaceOnUse" patternTransform="skewX(-30)">
         <path d="M0 0 L24 0 M0 0 L0 14" stroke="#dbe0e7" strokeWidth=".6"/>
       </pattern>
@@ -716,27 +1030,74 @@ const IsoStyle = {
         {!isImg && !["diamond","circle","oval","pill"].includes(shape) && (
           <g transform="translate(10, 8)"><NodeIcon kind={node.kind} color={active ? "#7a5a00" : "#475569"}/></g>
         )}
+        {!isImg && ["diamond","circle","oval","pill"].includes(shape) && (
+          <g transform={`translate(${w/2 - 7} ${h/2 - 18})`}><NodeIcon kind={node.kind} color={active ? "#7a5a00" : "#475569"}/></g>
+        )}
         <NodeLabel node={node} fill={active ? "#3a2a00" : "#1e293b"} sub={node.sub}
-          subFill={active ? "#7a5a00" : "#64748b"} fontSize={12.5}/>
+          subFill={active ? "#7a5a00" : "#64748b"} fontSize={12.5}
+          centerOffsetY={["diamond","circle","oval","pill"].includes(shape) ? 8 : 0}/>
       </g>
     );
   },
   Edge: ({ edge, active }) => {
+    const kind = edge.kind || "solid";
+    const isDashed = kind === "dashed";
+    const isDotted = kind === "dotted";
+    const isBold = kind === "bold";
+    const isAsync = kind === "async";
+    const isBidir = kind === "bidir";
+    const isError = kind === "error";
+    const isSecure = kind === "secure";
+    const isRealtime = kind === "realtime";
+
     const mid = edgeMidpoint(edge.points);
-    const stroke = active ? "url(#iso-pipe-a)" : "url(#iso-pipe)";
+    const errorStroke = "url(#iso-pipe-err)";
+    const secureStroke = "url(#iso-pipe-sec)";
+    const stroke = isError ? errorStroke : isSecure ? secureStroke : (active ? "url(#iso-pipe-a)" : "url(#iso-pipe)");
+    const dashAttr = isDashed ? "10 6" : isDotted ? "2 7" : isAsync ? "12 5 2 5" : isRealtime ? "8 5" : undefined;
+    const sw = isBold ? (active ? 8 : 6) : (active ? 6 : 4);
+    const labelFg = isError ? "#7a1a1a" : isSecure ? "#1f4d1f" : active ? "#7a5a00" : "#475569";
+
     return (
       <g>
-        <path d={edge.d} fill="none" stroke="rgba(0,0,0,.08)" strokeWidth={active ? 8 : 6}
+        <path d={edge.d} fill="none" stroke="rgba(0,0,0,.08)" strokeWidth={sw + 2}
           transform="translate(1,2)" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d={edge.d} fill="none" stroke={stroke} strokeWidth={active ? 6 : 4}
+        {isRealtime && (
+          <path d={edge.d} fill="none" stroke="#f59e0b" opacity=".35"
+            strokeWidth={sw + 4} strokeLinecap="round" strokeLinejoin="round"/>
+        )}
+        <path d={edge.d} fill="none" stroke={stroke} strokeWidth={sw}
           strokeLinecap="round" strokeLinejoin="round"
-          strokeDasharray={edge.kind === "dashed" ? "10 6" : undefined}/>
-        {active && (
+          strokeDasharray={dashAttr}>
+          {isRealtime && (
+            <animate attributeName="stroke-dashoffset" from="0" to="-26" dur=".6s" repeatCount="indefinite"/>
+          )}
+        </path>
+        {active && !isRealtime && (
           <circle r="3" fill="#fff">
             <animateMotion dur="1.4s" repeatCount="indefinite" path={edge.d} rotate="auto"/>
           </circle>
         )}
-        <EdgeLabel text={edge.label} x={mid.x} y={mid.y} bg="#f3f4f6" fg={active ? "#7a5a00" : "#475569"} mono/>
+        {isBidir && (
+          <circle r="3" fill="#fff">
+            <animateMotion dur="1.6s" repeatCount="indefinite" path={edge.d} rotate="auto" keyPoints="1;0" keyTimes="0;1"/>
+          </circle>
+        )}
+        {isSecure && (
+          <g transform={`translate(${mid.x} ${mid.y - 14})`}>
+            <rect x="-8" y="-9" width="16" height="14" rx="3" fill="#fff" stroke="#1f4d1f" strokeWidth="1.2"/>
+            <rect x="-3" y="-3" width="6" height="6" rx=".8" fill="#1f4d1f"/>
+            <path d="M-2.5 -3 V-6 Q0 -8 2.5 -6 V-3" fill="none" stroke="#1f4d1f" strokeWidth="1.2"/>
+          </g>
+        )}
+        {isError && (
+          <g transform={`translate(${mid.x} ${mid.y - 14})`} stroke="#7a1a1a" strokeWidth="1.5" fill="#fff">
+            <circle r="7"/>
+            <line x1="-3.5" y1="-3.5" x2="3.5" y2="3.5"/>
+            <line x1="3.5" y1="-3.5" x2="-3.5" y2="3.5"/>
+          </g>
+        )}
+        <EdgeLabel text={edge.label} x={mid.x} y={mid.y} bg="#f3f4f6" fg={labelFg} mono/>
       </g>
     );
   },
@@ -1231,9 +1592,22 @@ const CityStyle = {
     );
   },
   Edge: ({ edge, active }) => {
-    const warm = active || edge.warm || edge.kind === "warm";
-    const pipeSide = warm ? "url(#clay-pipe-warm)" : "url(#clay-pipe-cool)";
-    const dash = edge.kind === "dashed" ? "16 10" : undefined;
+    const kind = edge.kind || "solid";
+    const isDashed = kind === "dashed";
+    const isDotted = kind === "dotted";
+    const isBold = kind === "bold";
+    const isAsync = kind === "async";
+    const isBidir = kind === "bidir";
+    const isError = kind === "error";
+    const isSecure = kind === "secure";
+    const isRealtime = kind === "realtime";
+    const warm = active || edge.warm || kind === "warm" || isError || isRealtime;
+    const errorPipe = "#dc2626";
+    const securePipe = "#16a34a";
+    const pipeSide = isError ? errorPipe : isSecure ? securePipe : (warm ? "url(#clay-pipe-warm)" : "url(#clay-pipe-cool)");
+    const dash = isDashed ? "16 10" : isDotted ? "2 9" : isAsync ? "14 5 2 5" : isRealtime ? "10 6" : undefined;
+    const coreSw = isBold ? 8 : 6;
+    const outerSw = isBold ? 11 : 8;
     
     const mid = window.Flow.edgeMidpoint ? window.Flow.edgeMidpoint(edge.points) : edge.points[Math.floor(edge.points.length/2)];
     
@@ -1243,16 +1617,20 @@ const CityStyle = {
         <path d={edge.d} fill="none" stroke="rgba(0,0,0,.15)" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" filter="url(#clay-ao-sm)"/>
         
         {/* Volumetric Pipe - Base Shadow/Outer Body */}
-        <path d={edge.d} fill="none" stroke="#64748b" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+        <path d={edge.d} fill="none" stroke={isError ? "#7f1d1d" : isSecure ? "#14532d" : "#64748b"} strokeWidth={outerSw} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
         
         {/* Volumetric Pipe - Main Core */}
-        <path d={edge.d} fill="none" stroke={pipeSide} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dash} vectorEffect="non-scaling-stroke"/>
+        <path d={edge.d} fill="none" stroke={pipeSide} strokeWidth={coreSw} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dash} vectorEffect="non-scaling-stroke">
+          {isRealtime && (
+            <animate attributeName="stroke-dashoffset" from="0" to="-32" dur=".7s" repeatCount="indefinite"/>
+          )}
+        </path>
         
         {/* Volumetric Pipe - Specular Highlight (shifted up/left) */}
         <path d={edge.d} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" transform="translate(-1, -1)" vectorEffect="non-scaling-stroke"/>
         
         {/* Animated glowing segments inside the pipe */}
-        {active && (
+        {active && !isRealtime && (
           <g>
             {/* Trail of energy bursts */}
             {[0, 1, 2, 3].map(i => (
@@ -1260,7 +1638,7 @@ const CityStyle = {
                 <g>
                   <animateMotion dur="1.8s" repeatCount="indefinite" path={edge.d} begin={`${i * -0.45}s`} rotate="auto" />
                   {/* The trailing energy burst */}
-                  <path d="M -24 0 L -6 -3.5 L 6 0 L -6 3.5 Z" fill={warm ? "url(#clay-packet-warm)" : "url(#clay-packet-cool)"} filter="url(#clay-packet-glow)" />
+                  <path d="M -24 0 L -6 -3.5 L 6 0 L -6 3.5 Z" fill={isError ? errorPipe : warm ? "url(#clay-packet-warm)" : "url(#clay-packet-cool)"} filter="url(#clay-packet-glow)" />
                   {/* The leading core flare */}
                   <path d="M -8 0 L 0 -4.5 L 8 0 L 0 4.5 Z" fill="#ffffff" filter="url(#clay-packet-glow)" opacity="0.9" />
                   {/* Intense center point */}
@@ -1268,6 +1646,26 @@ const CityStyle = {
                 </g>
               </g>
             ))}
+          </g>
+        )}
+        {isBidir && (
+          <g>
+            <animateMotion dur="2s" repeatCount="indefinite" path={edge.d} keyPoints="1;0" keyTimes="0;1" rotate="auto"/>
+            <circle r="3.5" fill="#fff" filter="url(#clay-packet-glow)"/>
+          </g>
+        )}
+        {isSecure && (
+          <g transform={`translate(${mid.x} ${mid.y - 30}) rotate(45) scale(1, 1.732)`} fill="#fff" stroke="#16a34a" strokeWidth="1.5" filter="url(#clay-ao-sm)">
+            <rect x="-9" y="-10" width="18" height="16" rx="3"/>
+            <path d="M-3 -10 V-13.5 Q0 -16 3 -13.5 V-10" fill="none"/>
+            <rect x="-3.5" y="-5" width="7" height="7" rx="1" fill="#16a34a"/>
+          </g>
+        )}
+        {isError && (
+          <g transform={`translate(${mid.x} ${mid.y - 30}) rotate(45) scale(1, 1.732)`} fill="#fff" stroke="#dc2626" strokeWidth="2" filter="url(#clay-ao-sm)">
+            <circle r="9"/>
+            <line x1="-4.5" y1="-4.5" x2="4.5" y2="4.5"/>
+            <line x1="4.5" y1="-4.5" x2="-4.5" y2="4.5"/>
           </g>
         )}
         
@@ -1326,8 +1724,11 @@ const BlueprintStyle = {
         {!isImg && !["diamond","circle","oval","pill"].includes(shape) && (
           <g transform="translate(10, 8)"><NodeIcon kind={node.kind} color={stroke} mono/></g>
         )}
+        {!isImg && ["diamond","circle","oval","pill"].includes(shape) && (
+          <g transform={`translate(${node.w/2 - 7} ${node.h/2 - 18})`}><NodeIcon kind={node.kind} color={stroke} mono/></g>
+        )}
         <g>
-          <text x={node.w / 2} y={node.h / 2 + 4} textAnchor="middle"
+          <text x={node.w / 2} y={node.h / 2 + 4 + (["diamond","circle","oval","pill"].includes(shape) ? 8 : 0)} textAnchor="middle"
             fontFamily="JetBrains Mono" fontWeight="600" fontSize="11" fill={active ? "#ffd166" : "#e0fbfc"}
             letterSpacing=".04em">
             {node.label.toUpperCase()}
@@ -1341,26 +1742,63 @@ const BlueprintStyle = {
     );
   },
   Edge: ({ edge, active }) => {
-    const dash = edge.kind === "dashed" ? "4 3" : undefined;
-    const stroke = active ? "#ffd166" : "#80d0e0";
+    const kind = edge.kind || "solid";
+    const isDashed = kind === "dashed";
+    const isDotted = kind === "dotted";
+    const isBold = kind === "bold";
+    const isAsync = kind === "async";
+    const isBidir = kind === "bidir";
+    const isError = kind === "error";
+    const isSecure = kind === "secure";
+    const isRealtime = kind === "realtime";
+
+    const errorColor = "#ff6b6b";
+    const secureColor = "#7eea9c";
+    const stroke = isError ? errorColor : isSecure ? secureColor : (active ? "#ffd166" : "#80d0e0");
+    const dashAttr = isDashed ? "4 3" : isDotted ? "1 4" : isAsync ? "7 3 1 3" : isRealtime ? "5 3" : undefined;
+    const sw = isBold ? (active ? 2.2 : 1.8) : (active ? 1.4 : 1);
     const mid = edgeMidpoint(edge.points);
+    const arrowEnd = active ? "url(#bp-arrow-a)" : "url(#bp-arrow)";
+
     return (
       <g>
-        <path d={edge.d} fill="none" stroke={stroke}
-          strokeWidth={active ? 1.4 : 1}
-          strokeDasharray={dash}
-          markerEnd={active ? "url(#bp-arrow-a)" : "url(#bp-arrow)"}/>
-        {active && (
-          <circle r="2.5" fill="#ffd166">
+        {isRealtime && (
+          <path d={edge.d} fill="none" stroke="#ffd166" opacity=".3"
+            strokeWidth={sw + 2.5}/>
+        )}
+        <path d={edge.d} fill="none" stroke={isRealtime ? "#ffd166" : stroke}
+          strokeWidth={sw}
+          strokeDasharray={dashAttr} strokeLinecap={isDotted ? "round" : "butt"}
+          markerEnd={arrowEnd}
+          markerStart={isBidir ? arrowEnd : undefined}>
+          {isRealtime && (
+            <animate attributeName="stroke-dashoffset" from="0" to="-16" dur=".5s" repeatCount="indefinite"/>
+          )}
+        </path>
+        {active && !isRealtime && (
+          <circle r="2.5" fill={isError ? errorColor : "#ffd166"}>
             <animateMotion dur="1.5s" repeatCount="indefinite" path={edge.d} rotate="auto"/>
           </circle>
+        )}
+        {isSecure && (
+          <g transform={`translate(${mid.x} ${mid.y - 13})`} fill="#0b2545" stroke={secureColor} strokeWidth="1">
+            <rect x="-6" y="-7" width="12" height="11" rx="1.5"/>
+            <path d="M-2 -7 V-9.5 Q0 -11 2 -9.5 V-7" fill="none"/>
+          </g>
+        )}
+        {isError && (
+          <g transform={`translate(${mid.x} ${mid.y - 12})`} stroke={errorColor} strokeWidth="1.2" fill="#0b2545">
+            <circle r="6"/>
+            <line x1="-3" y1="-3" x2="3" y2="3"/>
+            <line x1="3" y1="-3" x2="-3" y2="3"/>
+          </g>
         )}
         {edge.label && (
           <g transform={`translate(${mid.x} ${mid.y})`}>
             <rect x={-edge.label.length * 3.3 - 4} y={-7} width={edge.label.length * 6.6 + 8} height={14}
               fill="#0b2545" stroke={stroke} strokeWidth=".5"/>
             <text textAnchor="middle" dominantBaseline="middle"
-              fontFamily="JetBrains Mono" fontSize="9" fill={active ? "#ffd166" : "#8bb5d4"}
+              fontFamily="JetBrains Mono" fontSize="9" fill={stroke}
               letterSpacing=".05em">
               {edge.label.toUpperCase()}
             </text>
@@ -1379,47 +1817,154 @@ function NodeIcon({ kind, color = "#8f8779", sketchy = false, mono = false }) {
   const sw = mono ? 1 : 1.2;
   const common = { stroke: color, strokeWidth: sw, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" };
   const filter = sketchy ? { filter: "url(#sk-rough)" } : {};
-  switch (kind) {
+
+  // Resolve to a glyph: prefer kind's `icon` field, then fall back to kind itself.
+  const kindDef = (window.Flow && window.Flow.NODE_KINDS && window.Flow.NODE_KINDS[kind]) || null;
+  const glyph = (kindDef && kindDef.icon) || kind;
+
+  switch (glyph) {
+    // people
+    case "person":
     case "actor":
       return <g {...filter}><circle cx={s/2} cy={4} r="2.5" {...common}/><path d={`M1 ${s} C 2 9, 5 9, ${s/2} 9 C ${s-5} 9, ${s-2} 9, ${s-1} ${s}`} {...common}/></g>;
+    // service
+    case "square":
     case "service":
     case "process":
       return <g {...filter}><rect x="1" y="2" width={s-2} height={s-4} rx="1.5" {...common}/><line x1="1" y1="6" x2={s-1} y2="6" {...common}/></g>;
+    // gateway
+    case "diamond":
     case "gateway":
       return <g {...filter}><path d={`M${s/2} 1 L${s-1} ${s/2} L${s/2} ${s-1} L1 ${s/2} Z`} {...common}/></g>;
+    // database / store
+    case "cylinder":
     case "store":
+    case "database":
       return <g {...filter}>
         <ellipse cx={s/2} cy="3" rx="5.5" ry="1.8" {...common}/>
         <path d={`M1 3 L1 ${s-3} C 1 ${s-1}, ${s-1} ${s-1}, ${s-1} ${s-3} L${s-1} 3`} {...common}/>
       </g>;
+    case "disk":
     case "cache":
       return <g {...filter}><circle cx={s/2} cy={s/2} r="5.5" {...common}/><circle cx={s/2} cy={s/2} r="1.2" {...common}/></g>;
+    case "stack":
     case "queue":
       return <g {...filter}>
         <rect x="1" y="3" width={s-2} height="3" {...common}/>
         <rect x="1" y="7.5" width={s-2} height="3" {...common}/>
       </g>;
+    case "cloud":
     case "external":
+    case "globe":
+      if (glyph === "globe") {
+        return <g {...filter}>
+          <circle cx={s/2} cy={s/2} r="5.5" {...common}/>
+          <path d={`M1.5 ${s/2} H${s-1.5}`} {...common}/>
+          <path d={`M${s/2} 1.5 C 4 ${s/2}, 4 ${s/2}, ${s/2} ${s-1.5}`} {...common}/>
+          <path d={`M${s/2} 1.5 C 10 ${s/2}, 10 ${s/2}, ${s/2} ${s-1.5}`} {...common}/>
+        </g>;
+      }
       return <g {...filter}>
         <path d={`M3 ${s/2+2} C 1 ${s/2+2}, 1 ${s/2-1}, 3 ${s/2-1} C 3 3, 8 2, 10 ${s/2-2} C 13 ${s/2-2}, 13 ${s/2+2}, ${s-2} ${s/2+2} Z`} {...common}/>
       </g>;
+    case "group":
     case "boundary":
       return <g {...filter}><rect x="1" y="1" width={s-2} height={s-2} rx="1" strokeDasharray="2 1.5" {...common}/></g>;
-    case "start":
+    // start/stop
     case "play":
+    case "start":
       return <g {...filter}><path d={`M4 2 L11 7 L4 12 Z`} fill={color} stroke="none"/></g>;
     case "stop":
-    case "square":
       return <g {...filter}><rect x="3" y="3" width="8" height="8" fill={color} stroke="none"/></g>;
+    case "qmark":
     case "decision":
       return <g {...filter}><text x={s/2} y={s-3} textAnchor="middle" fontSize="11" fontFamily="Inter Tight" fontWeight="700" fill={color}>?</text></g>;
+    case "bolt":
     case "event":
       return <g {...filter}><path d={`M8 1 L3 8 H7 L6 13 L11 6 H7 L8 1 Z`} fill={color} stroke="none"/></g>;
+    case "dot":
     case "tree":
     case "step":
       return <g {...filter}><circle cx={s/2} cy={s/2} r="3" {...common}/></g>;
     case "image":
       return <g {...filter}><rect x="1" y="2" width={s-2} height={s-4} rx="1" {...common}/><circle cx="5" cy="6" r="1.2" {...common}/><path d={`M1 ${s-4} L5 ${s-7} L9 ${s-5} L${s-1} ${s-2}`} {...common}/></g>;
+    // --- new kinds ---
+    case "lambda":
+    case "function":
+      return <g {...filter}><text x={s/2} y={s-2} textAnchor="middle" fontSize="13" fontFamily="Inter Tight" fontWeight="500" fill={color}>λ</text></g>;
+    case "gear":
+    case "cog":
+    case "worker": {
+      const teeth = [];
+      for (let i = 0; i < 6; i++) {
+        const a = (i * Math.PI) / 3;
+        const x1 = s/2 + Math.cos(a) * 5;
+        const y1 = s/2 + Math.sin(a) * 5;
+        const x2 = s/2 + Math.cos(a) * 6.7;
+        const y2 = s/2 + Math.sin(a) * 6.7;
+        teeth.push(<line key={i} x1={x1} y1={y1} x2={x2} y2={y2} {...common}/>);
+      }
+      return <g {...filter}><circle cx={s/2} cy={s/2} r="3.5" {...common}/>{teeth}</g>;
+    }
+    case "scale":
+    case "loadbalancer":
+      return <g {...filter}>
+        <circle cx={s/2} cy="3" r="1.6" {...common}/>
+        <line x1={s/2} y1="4.5" x2={s/2} y2={s-2} {...common}/>
+        <line x1="2" y1={s-2} x2={s-2} y2={s-2} {...common}/>
+        <path d={`M2 ${s-2} L${s/2} 7 L${s-2} ${s-2}`} {...common}/>
+      </g>;
+    case "key":
+    case "auth":
+      return <g {...filter}>
+        <circle cx="4" cy={s/2} r="2.5" {...common}/>
+        <line x1="6" y1={s/2} x2={s-1} y2={s/2} {...common}/>
+        <line x1={s-3} y1={s/2} x2={s-3} y2={s/2 + 2.5} {...common}/>
+        <line x1={s-1} y1={s/2} x2={s-1} y2={s/2 + 2.5} {...common}/>
+      </g>;
+    case "chart":
+    case "monitor":
+      return <g {...filter}>
+        <line x1="1.5" y1="2" x2="1.5" y2={s-1.5} {...common}/>
+        <line x1="1.5" y1={s-1.5} x2={s-1} y2={s-1.5} {...common}/>
+        <path d={`M3 ${s-4} L6 ${s-7} L9 ${s-5} L12 ${s-9}`} {...common}/>
+      </g>;
+    case "bus":
+      return <g {...filter}>
+        <line x1="1" y1={s/2} x2={s-1} y2={s/2} {...common}/>
+        <circle cx="3" cy={s/2-3} r="1.4" {...common}/>
+        <line x1="3" y1={s/2-1.6} x2="3" y2={s/2} {...common}/>
+        <circle cx={s/2} cy={s/2+3} r="1.4" {...common}/>
+        <line x1={s/2} y1={s/2} x2={s/2} y2={s/2+1.6} {...common}/>
+        <circle cx={s-3} cy={s/2-3} r="1.4" {...common}/>
+        <line x1={s-3} y1={s/2-1.6} x2={s-3} y2={s/2} {...common}/>
+      </g>;
+    case "wave":
+    case "stream":
+      return <g {...filter}>
+        <path d={`M1 ${s/2} Q 3 ${s/2-3}, 5 ${s/2} T 9 ${s/2} T 13 ${s/2}`} {...common}/>
+        <path d={`M1 ${s/2+3} Q 3 ${s/2}, 5 ${s/2+3} T 9 ${s/2+3} T 13 ${s/2+3}`} {...common} opacity=".55"/>
+      </g>;
+    case "wall":
+    case "firewall":
+      return <g {...filter}>
+        <rect x="1" y="2" width={s-2} height="3" {...common}/>
+        <rect x="1" y="5.5" width={s-2} height="3" {...common}/>
+        <rect x="1" y="9" width={s-2} height="3" {...common}/>
+        <line x1="5" y1="2" x2="5" y2="5" {...common}/>
+        <line x1="9" y1="2" x2="9" y2="5" {...common}/>
+        <line x1="3" y1="5.5" x2="3" y2="8.5" {...common}/>
+        <line x1="7" y1="5.5" x2="7" y2="8.5" {...common}/>
+        <line x1="11" y1="5.5" x2="11" y2="8.5" {...common}/>
+        <line x1="5" y1="9" x2="5" y2="12" {...common}/>
+        <line x1="9" y1="9" x2="9" y2="12" {...common}/>
+      </g>;
+    case "phone":
+    case "mobile":
+      return <g {...filter}>
+        <rect x="3.5" y="1" width="7" height={s-2} rx="1.2" {...common}/>
+        <line x1="6" y1={s-2.5} x2="8" y2={s-2.5} {...common}/>
+      </g>;
     default:
       return <rect x="2" y="2" width={s-4} height={s-4} {...common}/>;
   }
@@ -1428,7 +1973,15 @@ function NodeIcon({ kind, color = "#8f8779", sketchy = false, mono = false }) {
 // ===========================================================
 // Generic <Diagram>
 // ===========================================================
-function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 24, className }) {
+function Diagram({ 
+  graph, 
+  style, 
+  activeNodes = [], 
+  activeEdges = [], 
+  padding = 24, 
+  className,
+  fullscreenTarget = null 
+}) {
   const Style = STYLES[style] || SleekStyle;
   const [viewAngle, setViewAngle] = React.useState(0);
 
@@ -1519,6 +2072,7 @@ function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 2
           iso(n.x, n.y, Z), iso(n.x+n.w, n.y, Z), iso(n.x, n.y+n.h, Z), iso(n.x+n.w, n.y+n.h, Z)
         ];
         pts.forEach(p => {
+          if (isNaN(p.x) || isNaN(p.y)) return;
           minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
           maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
         });
@@ -1541,6 +2095,7 @@ function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 2
   }, [G.nodes, G.edges, Style.isometric]);
 
   const containerRef = React.useRef(null);
+  const svgRef = React.useRef(null);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [zoom, setZoom] = React.useState(1.0);
   const [pan, setPan] = React.useState({ x: 0, y: 0 });
@@ -1558,7 +2113,8 @@ function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 2
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(err => {
+      const target = (fullscreenTarget && fullscreenTarget.current) || containerRef.current;
+      target?.requestFullscreen().catch(err => {
         console.error(`Error attempting to enable fullscreen: ${err.message}`);
       });
     } else {
@@ -1633,6 +2189,7 @@ function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 2
       onMouseLeave={() => setIsHovered(false)}
       style={{ width: "100%", height: "100%", position: "relative", background: Style.tokens.bg }}>
       <svg 
+        ref={svgRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -1705,28 +2262,79 @@ function Diagram({ graph, style, activeNodes = [], activeEdges = [], padding = 2
             </button>
           )}
 
-          {/* Fullscreen Toggle */}
+          {/* Fullscreen Toggles */}
           {showFullscreen && (
-            <button 
-              onClick={toggleFullscreen}
-              style={{
-                background: "var(--paper, #ffffff)", border: "1px solid var(--line, #e2e8f0)",
-                borderRadius: "8px", padding: "8px", cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--ink-600, #475569)", transition: "all 0.2s ease"
-              }}
-              title="Toggle Fullscreen"
-              onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"}
-              onMouseOut={e => e.currentTarget.style.background = "var(--paper, #ffffff)"}
-            >
-              {isFullscreen ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
-              ) : (
+            <div style={{ display: "flex", gap: "4px" }}>
+              <button 
+                onClick={() => {
+                  const target = containerRef.current;
+                  if (document.fullscreenElement === target) {
+                    document.exitFullscreen();
+                  } else {
+                    target?.requestFullscreen();
+                  }
+                }}
+                style={{
+                  background: (isFullscreen && document.fullscreenElement === containerRef.current) ? "var(--ink-100)" : "var(--paper, #ffffff)", 
+                  border: "1px solid var(--line, #e2e8f0)",
+                  borderRadius: "8px", padding: "8px", cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: (isFullscreen && document.fullscreenElement === containerRef.current) ? "var(--ink-900)" : "var(--ink-600, #475569)", 
+                  transition: "all 0.2s ease"
+                }}
+                title="Fullscreen Diagram"
+                onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"}
+                onMouseOut={e => e.currentTarget.style.background = (isFullscreen && document.fullscreenElement === containerRef.current) ? "var(--ink-100)" : "var(--paper, #ffffff)"}
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+              </button>
+
+              {fullscreenTarget && (
+                <button 
+                  onClick={() => {
+                    const target = fullscreenTarget.current;
+                    if (document.fullscreenElement === target) {
+                      document.exitFullscreen();
+                    } else {
+                      target?.requestFullscreen();
+                    }
+                  }}
+                  style={{
+                    background: (isFullscreen && document.fullscreenElement === fullscreenTarget.current) ? "var(--ink-100)" : "var(--paper, #ffffff)", 
+                    border: "1px solid var(--line, #e2e8f0)",
+                    borderRadius: "8px", padding: "8px", cursor: "pointer",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: (isFullscreen && document.fullscreenElement === fullscreenTarget.current) ? "var(--ink-900)" : "var(--ink-600, #475569)", 
+                    transition: "all 0.2s ease"
+                  }}
+                  title="Fullscreen Player"
+                  onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"}
+                  onMouseOut={e => e.currentTarget.style.background = (isFullscreen && document.fullscreenElement === fullscreenTarget.current) ? "var(--ink-100)" : "var(--paper, #ffffff)"}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </button>
               )}
-            </button>
+            </div>
           )}
+
+          {/* Export Utility */}
+          <button 
+            onClick={() => window.Flow.downloadSVG(svgRef.current, `flow-diagram-${Style.id}.svg`)}
+            style={{
+              background: "var(--paper, #ffffff)", border: "1px solid var(--line, #e2e8f0)",
+              borderRadius: "8px", padding: "8px", cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "var(--ink-600, #475569)", transition: "all 0.2s ease"
+            }}
+            title="Download SVG"
+            onMouseOver={e => e.currentTarget.style.background = "var(--paper-2, #f8fafc)"}
+            onMouseOut={e => e.currentTarget.style.background = "var(--paper, #ffffff)"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
         </div>
       )}
     </div>

@@ -31,15 +31,17 @@ function Player() {
 
   const active = step.active;
   const styleTokens = STYLES[styleId].tokens;
+  const playerRef = React.useRef(null);
 
   return (
-    <div className="player">
+    <div className="player" ref={playerRef}>
       <div className="player-canvas" style={{ background: styleTokens.bg }}>
         <Diagram
           graph={graphToUse}
           style={styleId}
           activeNodes={active.nodes}
           activeEdges={active.edges}
+          fullscreenTarget={playerRef}
         />
         <div className="player-overlay">
           <div className="overlay-pill">

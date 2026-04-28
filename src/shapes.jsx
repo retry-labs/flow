@@ -41,6 +41,27 @@ function shapePath(shape, w, h) {
       const skew = 14;
       return { d: `M${skew} 0 H${w} L${w-skew} ${h} H0 Z`, cx: w/2, cy: h/2 };
     }
+    case "shield": {
+      // Rounded top with pointed bottom — a security badge silhouette.
+      const r = Math.min(w * 0.18, 14);
+      return {
+        d: `M${r} 0 H${w-r} Q${w} 0 ${w} ${r} V${h*0.55} Q${w} ${h*0.85} ${w/2} ${h} Q0 ${h*0.85} 0 ${h*0.55} V${r} Q0 0 ${r} 0 Z`,
+        cx: w/2, cy: h/2,
+      };
+    }
+    case "tablet": {
+      // Mobile/tablet screen — rounded rect with small notch indicator
+      const r = Math.min(w, h) * 0.18;
+      return { d: `M${r} 0 H${w-r} Q${w} 0 ${w} ${r} V${h-r} Q${w} ${h} ${w-r} ${h} H${r} Q0 ${h} 0 ${h-r} V${r} Q0 0 ${r} 0 Z`, cx: w/2, cy: h/2, rx: r };
+    }
+    case "trapezoid": {
+      const i = Math.min(w * 0.16, 18);
+      return { d: `M${i} 0 H${w-i} L${w} ${h} H0 Z`, cx: w/2, cy: h/2 };
+    }
+    case "chevron": {
+      const a = Math.min(w * 0.12, 14);
+      return { d: `M0 0 H${w-a} L${w} ${h/2} L${w-a} ${h} H0 L${a} ${h/2} Z`, cx: w/2, cy: h/2 };
+    }
     default:
       return { d: `M0 0 H${w} V${h} H0 Z`, cx: w/2, cy: h/2, rx: 10 };
   }

@@ -78,12 +78,12 @@ function NodeCatalog() {
 
 function capitalize(s) { return s[0].toUpperCase() + s.slice(1); }
 
-function edgeDemoGraph(kind, label) {
+function edgeDemoGraph(kind, label, fromKind = "client", toKind = "service", fromLabel = "Client", toLabel = "API") {
   return {
-    canvas: { w: 240, h: 80, grid: 14 },
+    canvas: { w: 260, h: 96, grid: 14 },
     nodes: [
-      { id: "a", kind: "service", label: "A", x: 10,  y: 18, w: 60, h: 44 },
-      { id: "b", kind: "service", label: "B", x: 170, y: 18, w: 60, h: 44 },
+      { id: "a", kind: fromKind, label: fromLabel, x: 10,  y: 22, w: 70, h: 52 },
+      { id: "b", kind: toKind,   label: toLabel,   x: 180, y: 22, w: 70, h: 52 },
     ],
     edges: [{ id: "e", from: "a", to: "b", kind, label }],
   };
@@ -92,15 +92,23 @@ function edgeDemoGraph(kind, label) {
 function EdgeCatalog() {
   const [styleId, setStyleId] = React.useState("sleek");
   const samples = [
-    { id: "solid", label: "request",  kind: "solid",  active: false, title: "Solid" },
-    { id: "dash",  label: "optional", kind: "dashed", active: false, title: "Dashed" },
-    { id: "act",   label: "writing",  kind: "solid",  active: true,  title: "Active (flowing)" },
-    { id: "lab",   label: "POST /order", kind: "solid", active: false, title: "Labeled" },
+    { id: "solid",  label: "request",     kind: "solid",    active: false, title: "Solid",          from: "client",  to: "service",  fromLabel: "Client", toLabel: "API" },
+    { id: "dash",   label: "optional",    kind: "dashed",   active: false, title: "Dashed",         from: "service", to: "external", fromLabel: "App",    toLabel: "3rd-party" },
+    { id: "dot",    label: "weak ref",    kind: "dotted",   active: false, title: "Dotted",         from: "service", to: "store",    fromLabel: "Worker", toLabel: "Cache" },
+    { id: "bold",   label: "primary",     kind: "bold",     active: false, title: "Bold",           from: "gateway", to: "service",  fromLabel: "GW",     toLabel: "Core" },
+    { id: "async",  label: "queued",      kind: "async",    active: false, title: "Async",          from: "service", to: "queue",    fromLabel: "Producer", toLabel: "Queue" },
+    { id: "bidir",  label: "sync",        kind: "bidir",    active: false, title: "Bidirectional",  from: "service", to: "service",  fromLabel: "Peer A", toLabel: "Peer B" },
+    { id: "secure", label: "TLS",         kind: "secure",   active: false, title: "Secure",         from: "client",  to: "gateway",  fromLabel: "Browser", toLabel: "Edge" },
+    { id: "error",  label: "timeout",     kind: "error",    active: false, title: "Error",          from: "service", to: "store",    fromLabel: "Service", toLabel: "DB" },
+    { id: "rt",     label: "stream",      kind: "realtime", active: false, title: "Realtime",       from: "actor",   to: "service",  fromLabel: "Sensor", toLabel: "Ingest" },
+    { id: "act",    label: "writing",     kind: "solid",    active: true,  title: "Active flow",    from: "service", to: "store",    fromLabel: "Worker", toLabel: "DB" },
+    { id: "lab",    label: "POST /order", kind: "solid",    active: false, title: "Labeled",        from: "client",  to: "gateway",  fromLabel: "App",    toLabel: "API" },
+    { id: "actlab", label: "200 OK",      kind: "bold",     active: true,  title: "Active + bold",  from: "gateway", to: "client",   fromLabel: "API",    toLabel: "App" },
   ];
   return (
     <div className="catalog">
       <div className="catalog-head">
-        <div className="catalog-title">Edge variants <span className="mono">× 8</span></div>
+        <div className="catalog-title">Edge variants <span className="mono">× 12</span></div>
         <div className="style-switcher sm">
           {Object.values(STYLES).map(s => (
             <button key={s.id} className={"style-chip " + (s.id === styleId ? "is-active" : "")} onClick={() => setStyleId(s.id)}>{s.name}</button>
@@ -111,7 +119,7 @@ function EdgeCatalog() {
         {samples.map(sm => (
           <div key={sm.id} className="edge-cell">
             <div className="edge-frame" style={{ background: STYLES[styleId].tokens.bg }}>
-              <Diagram graph={edgeDemoGraph(sm.kind, sm.label)} style={styleId}
+              <Diagram graph={edgeDemoGraph(sm.kind, sm.label, sm.from, sm.to, sm.fromLabel, sm.toLabel)} style={styleId}
                 activeEdges={sm.active ? ["e"] : []}
                 activeNodes={sm.active ? ["a","b"] : []}
                 padding={6}/>

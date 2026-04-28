@@ -52,8 +52,41 @@
     --font-serif: 'Instrument Serif', serif;
   }
 
+  body.dark {
+    --ink-900: #f5f1e6;
+    --ink-800: #ece7db;
+    --ink-700: #d9d3c6;
+    --ink-500: #b8b0a1;
+    --ink-400: #8f8779;
+    --ink-300: #6b6459;
+    --ink-200: #3a362d;
+    --ink-100: #26231d;
+    --ink-50:  #1a1814;
+    --paper:   #0d0c0a;
+    --paper-2: #141310;
+
+    --line: rgba(255,255,255,0.1);
+    --line-strong: rgba(255,255,255,0.15);
+    
+    --d-bg: #141310;
+    --d-grid: rgba(255,255,255,0.04);
+    --d-node-bg: #1c1b18;
+    --d-node-border: #33312c;
+    --d-node-ink: #f5f1e6;
+    --d-edge: #666;
+    --d-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .theme-toggle {
+    background: transparent; border: 1px solid var(--line);
+    width: 28px; height: 28px; border-radius: 8px;
+    cursor: pointer; display: grid; place-items: center;
+    color: var(--ink-500); transition: all 0.2s;
+  }
+  .theme-toggle:hover { background: var(--ink-50); color: var(--ink-800); }
+
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; transition: background 0.3s, color 0.3s; }
   body {
     font-family: var(--font-sans);
     background: var(--paper);
@@ -184,9 +217,15 @@
       <a href="#nodes">Nodes</a>
       <a href="#edges">Edges</a>
       <a href="#dsl">Config</a>
+      <a href="#playground">Playground</a>
       <a href="#tokens">Architecture</a>
     </nav>
-    <span class="ship-badge">v0.1 · 2026.04</span>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <button class="theme-toggle" id="theme-toggle" title="Toggle Dark Mode">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <span class="ship-badge">v0.1 · 2026.04</span>
+    </div>
   </header>
 
   <div class="hero">
@@ -260,10 +299,21 @@
     <div id="dsl-mount" class="ph">[DSL ↔ rendered diagram]</div>
   </section>
 
+  <section id="playground">
+    <div class="sec-head">
+      <div>
+        <div class="sec-num">06 / playground</div>
+        <h2>Try it. Right <em>here</em>.</h2>
+      </div>
+      <div class="sec-desc">Edit the DSL and watch every keystroke compile. Swap aesthetics. Pick a starter. Share a URL of exactly what you see.</div>
+    </div>
+    <div id="playground-mount" class="ph">[playground]</div>
+  </section>
+
   <section id="tokens">
     <div class="sec-head">
       <div>
-        <div class="sec-num">06 / architecture</div>
+        <div class="sec-num">07 / architecture</div>
         <h2>Tokens in, <em>themes</em> out.</h2>
       </div>
       <div class="sec-desc">Three-layer tokens (primitive → semantic → style-theme), a renderer contract, and a motion timeline. New style = new theme file + 6 renderer functions.</div>
@@ -283,7 +333,21 @@
 <script type="text/babel" src="src/player.jsx?v=17"></script>
 <script type="text/babel" src="src/catalogs.jsx?v=2"></script>
 <script type="text/babel" src="src/dsl.jsx"></script>
+<script type="text/babel" src="src/playground.jsx"></script>
 <script type="text/babel" src="src/tokens.jsx"></script>
+<script type="text/babel" src="src/parser.jsx"></script>
+<script type="text/babel" src="src/export.jsx"></script>
 <script type="text/babel" src="src/mount.jsx"></script>
+<script>
+  const btn = document.getElementById('theme-toggle');
+  const body = document.body;
+  const saved = localStorage.getItem('flow-theme');
+  if (saved === 'dark') body.classList.add('dark');
+
+  btn.addEventListener('click', () => {
+    body.classList.toggle('dark');
+    localStorage.setItem('flow-theme', body.classList.contains('dark') ? 'dark' : 'light');
+  });
+</script>
 </body>
 </html>

@@ -18,7 +18,7 @@ edges:
   - client -> api                  label: "HTTPS"
   - api    -> orders               label: "POST /order"
   - orders -> db                   label: "write"
-  - api   ..> logs                 label: "audit"     # dashed
+  - api   -> db                    label: "audit"     # corrected
 
 # narrate it
 story:
@@ -47,29 +47,48 @@ const DSL_GRAPH = {
 
 function DSL() {
   const [tab, setTab] = React.useState("yaml");
+  const [code, setCode] = React.useState(DSL_SAMPLE);
+  const graph = React.useMemo(() => {
+    try {
+      return window.Flow.parseDSL(code);
+    } catch (e) {
+      console.error(e);
+      return DSL_GRAPH; // fallback
+    }
+  }, [code]);
+
   const [activeStep, setActiveStep] = React.useState(1);
   const steps = [
     { active: ["client", "api"], edges: ["e1"] },
     { active: ["api", "orders"], edges: ["e2"] },
     { active: ["orders", "db"], edges: ["e3"] },
   ];
+  
   React.useEffect(() => {
     const t = setInterval(() => setActiveStep(s => (s + 1) % steps.length), 1800);
     return () => clearInterval(t);
   }, []);
-  const cur = steps[activeStep];
+  
+  const cur = steps[activeStep] || { active: [], edges: [] };
 
   return (
     <div className="dsl">
       <div className="dsl-left">
         <div className="dsl-tabs">
-          {[["yaml", "flow.yml"], ["mermaid", "mermaid-like"], ["jsx", "React"]].map(([id, lbl]) => (
+          {[["yaml", "flow.yml (editable)"], ["mermaid", "mermaid-like"], ["jsx", "React"]].map(([id, lbl]) => (
             <button key={id} className={"dsl-tab " + (tab === id ? "is-active" : "")} onClick={() => setTab(id)}>{lbl}</button>
           ))}
         </div>
-        <pre className="dsl-code">
-{tab === "yaml" && syntaxHighlight(DSL_SAMPLE)}
-{tab === "mermaid" && syntaxHighlight(`flow sleek
+        {tab === "yaml" ? (
+          <textarea 
+            className="dsl-editor" 
+            value={code} 
+            onChange={(e) => setCode(e.target.value)}
+            spellCheck="false"
+          />
+        ) : (
+          <pre className="dsl-code">
+            {tab === "mermaid" && syntaxHighlight(`flow sleek
   client[Client]:actor --"HTTPS"--> api[API Gateway]:gateway
   api --"POST /order"--> orders[Orders v4.2.1]:service
   orders -- "write" --> db[Postgres]:store
@@ -79,7 +98,7 @@ function DSL() {
     - "Client calls gateway"   :: client, api
     - "Gateway routes"         :: api, orders
     - "Persist"                :: orders, db`)}
-{tab === "jsx" && syntaxHighlight(`<Flow style="sleek">
+            {tab === "jsx" && syntaxHighlight(`<Flow style="sleek">
   <Actor    id="client" label="Client"/>
   <Gateway  id="api"    label="API Gateway"/>
   <Service  id="orders" label="Orders" sub="v4.2.1"/>
@@ -96,21 +115,22 @@ function DSL() {
     <Step active={["orders","db"]}>Persist</Step>
   </Story>
 </Flow>`)}
-        </pre>
+          </pre>
+        )}
         <div className="dsl-foot">
-          <span className="dsl-foot-k">compiles to</span>
+          <span className="dsl-foot-k">live parser</span>
           <span className="dsl-foot-arr">→</span>
-          <span className="dsl-foot-v mono">graph IR</span>
+          <span className="dsl-foot-v mono">Reactive IR</span>
           <span className="dsl-foot-arr">→</span>
-          <span className="dsl-foot-v mono">renderer(style)</span>
+          <span className="dsl-foot-v mono">renderer</span>
         </div>
       </div>
       <div className="dsl-right">
         <div className="dsl-render-frame">
-          <FlowDiagram graph={DSL_GRAPH} style="sleek"
-            activeNodes={cur.active} activeEdges={cur.edges} padding={28}/>
+          <FlowDiagram graph={graph} style="sleek"
+            activeNodes={cur.active} activeEdges={cur.edges} padding={42}/>
           <div className="dsl-caption">
-            <span className="mono">step {activeStep + 1}/3</span> · live re-render on every keystroke
+             Live re-render on every keystroke
           </div>
         </div>
       </div>
