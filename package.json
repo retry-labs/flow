@@ -1,0 +1,85 @@
+{
+  "name": "flow-diagram",
+  "version": "0.1.0",
+  "description": "A versatile diagramming library for system architecture and flow diagrams. Zero-dependency, works in React, Vue, Angular, or plain HTML.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "unpkg": "./dist/flow-diagram.umd.js",
+  "jsdelivr": "./dist/flow-diagram.umd.min.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./styles": {
+      "import": "./dist/styles/index.mjs",
+      "require": "./dist/styles/index.js",
+      "types": "./dist/styles/index.d.ts"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:lib && npm run build:types",
+    "build:lib": "rollup -c",
+    "build:types": "tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build:watch": "rollup -c -w",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "diagram",
+    "flowchart",
+    "architecture",
+    "system-design",
+    "svg",
+    "visualization",
+    "react",
+    "vue",
+    "angular"
+  ],
+  "author": "Flow Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.6",
+    "@babel/preset-react": "^7.28.5",
+    "@rollup/plugin-babel": "^7.0.0",
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "rollup": "^4.9.6",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  }
+}
