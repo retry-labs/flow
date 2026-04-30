@@ -1,9 +1,16 @@
 /**
  * Flow Diagram - UMD Bundle Entry
- * Standalone browser bundle with React included
+ * Standalone browser bundle with React included + gallery components
  */
 
 import FlowDiagramLib from './index.jsx'
+
+// Gallery components (for landing page)
+import { default as Player } from './player.jsx'
+import { StyleShowcase, NodeCatalog, EdgeCatalog } from './catalogs.jsx'
+import { DSL } from './dsl.jsx'
+import { Playground } from './playground.jsx'
+import { Tokens } from './tokens.jsx'
 
 // Attach to window for browser usage
 if (typeof window !== 'undefined') {
@@ -13,15 +20,22 @@ if (typeof window !== 'undefined') {
   // Backwards compatibility
   Object.assign(window.Flow, FlowDiagramLib)
   
-  // Auto-initialize on DOM ready for simple embedded usage
+  // Gallery components for landing page
+  window.Flow.Player = Player
+  window.Flow.StyleShowcase = StyleShowcase
+  window.Flow.NodeCatalog = NodeCatalog
+  window.Flow.EdgeCatalog = EdgeCatalog
+  window.Flow.DSL = DSL
+  window.Flow.Playground = Playground
+  window.Flow.Tokens = Tokens
+  window.Flow.HeroDiagram = Player
+  
+  // Auto-initialize on DOM ready
   if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
-      // Auto-initialize any elements with data-flow-diagram attribute
       document.querySelectorAll('[data-flow-diagram]').forEach(el => {
         try {
           const config = JSON.parse(el.getAttribute('data-flow-diagram'))
-          // Simple SVG renderer for static embeds
-          // In practice, users would use the proper component
         } catch (e) {
           console.warn('Flow: Failed to parse diagram config', e)
         }
