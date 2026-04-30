@@ -809,8 +809,6 @@ window.Flow = Object.assign(window.Flow || {}, { shapePath, shapeAnchor });
 // Nodes respect their `shape` (from graph.jsx shapeOf()).
 // -----------------------------------------------------------
 
-const { resolveGraph, pathFromPoints, roughPath, shapePath, shapeOf } = window.Flow;
-
 function edgeMidpoint(pts) {
   if (pts.length >= 3) {
     const a = pts[Math.floor(pts.length / 2) - 1];
@@ -3166,8 +3164,6 @@ window.Flow = Object.assign(window.Flow || {}, { STYLES, Diagram, NodeIcon });
 // show the narration.
 // -----------------------------------------------------------
 
-const { EXAMPLE_GRAPH, EXAMPLE_GRAPH_FLAT, STYLES, Diagram } = window.Flow;
-
 function Player() {
   const [styleId, setStyleId] = React.useState("sleek");
   const [stepIdx, setStepIdx] = React.useState(0);
@@ -3292,8 +3288,6 @@ window.Flow = Object.assign(window.Flow || {}, { Player });
 // -----------------------------------------------------------
 // Catalogs — node kinds, shape primitives, edges, style showcase.
 // -----------------------------------------------------------
-
-const { STYLES, Diagram, NODE_KINDS, SHAPES, EXAMPLE_GRAPH } = window.Flow;
 
 function nodeDemoGraph(kind, shape) {
   // Shape-sample sizing (geometric tab)
@@ -3501,8 +3495,6 @@ window.Flow = Object.assign(window.Flow || {}, { NodeCatalog, EdgeCatalog, Style
 // DSL section — shows the YAML-like input side by side with its rendered diagram.
 // -----------------------------------------------------------
 
-const { Diagram: FlowDiagram } = window.Flow;
-
 const DSL_SAMPLE = `# flow.yml — a tiny DSL that compiles to a graph
 version: 1
 style: sleek
@@ -3626,7 +3618,7 @@ function DSL() {
       </div>
       <div className="dsl-right">
         <div className="dsl-render-frame">
-          <FlowDiagram graph={graph} style="sleek"
+          <Diagram graph={graph} style="sleek"
             activeNodes={cur.active} activeEdges={cur.edges} padding={42}/>
           <div className="dsl-caption">
              Live re-render on every keystroke
@@ -3674,7 +3666,6 @@ window.Flow = Object.assign(window.Flow || {}, { DSL });
 // style swap, presets, share-via-URL, copy-code, error handling.
 // -----------------------------------------------------------
 
-const { Diagram: PG_Diagram } = window.Flow;
 const PG_parse = (code) => window.Flow.parseDSL(code);
 
 const PRESETS = {
@@ -3990,7 +3981,7 @@ function Playground() {
           )}
           <div className="pg-canvas" data-style={style}>
             {graph ? (
-              <PG_Diagram graph={graph} style={style} padding={36}/>
+              <Diagram graph={graph} style={style} padding={36}/>
             ) : (
               <div className="pg-empty">Add nodes to see a diagram</div>
             )}
@@ -4786,12 +4777,12 @@ function mount(id, Comp) {
   el.classList.remove("ph");
   el.textContent = "";
   el.style.cssText = ""; // clear ph styling
-  ReactDOM.createRoot(el).render(<Comp/>);
+  ReactDOM.createRoot(el).render(React.createElement(Comp));
 }
 
 // hero gets a non-clickable ambient diagram
 const heroEl = document.getElementById("hero-diagram-mount");
-if (heroEl) ReactDOM.createRoot(heroEl).render(<window.Flow.HeroDiagram/>);
+if (heroEl) ReactDOM.createRoot(heroEl).render(React.createElement(window.Flow.HeroDiagram));
 
 mount("player-mount", window.Flow.Player);
 mount("styles-mount", window.Flow.StyleShowcase);
@@ -4803,7 +4794,7 @@ mount("tokens-mount", window.Flow.Tokens);
 
 </script>
 
-<script type="text/babel">
+<script>
   const btn = document.getElementById("theme-toggle");
   const body = document.body;
   const saved = localStorage.getItem("flow-theme");
