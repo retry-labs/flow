@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
-  "unpkg": "./dist/flow-diagram.umd.js",
-  "jsdelivr": "./dist/flow-diagram.umd.min.js",
+  "unpkg": "./dist/flow-diagram.standalone.js",
+  "jsdelivr": "./dist/flow-diagram.standalone.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -15,14 +15,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.mjs"
     },
-    "./styles": {
-      "import": "./dist/styles/index.mjs",
-      "require": "./dist/styles/index.js",
-      "types": "./dist/styles/index.d.ts"
-    },
     "./dist/*": "./dist/*",
     "./package.json": "./package.json"
   },
+  "browser": "./dist/flow-diagram.umd.js",
   "files": [
     "dist",
     "src",
@@ -37,7 +33,11 @@
     "build:watch": "rollup -c -w",
     "preview": "vite preview",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "node scripts/smoke-test.cjs",
+    "test:anchor": "node scripts/anchor-test.cjs",
+    "test:dsl": "node scripts/dsl-test.cjs",
+    "test": "npm run test:smoke && npm run test:anchor && npm run test:dsl"
   },
   "keywords": [
     "diagram",
@@ -48,19 +48,30 @@
     "visualization",
     "react",
     "vue",
-    "angular"
+    "angular",
+    "web-component",
+    "docusaurus",
+    "confluence",
+    "isometric",
+    "blueprint",
+    "dsl",
+    "no-dependency"
   ],
   "author": "Flow Team",
   "license": "MIT",
   "peerDependencies": {
-    "react": ">=16.8.0",
-    "react-dom": ">=16.8.0"
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0",
+    "vue": ">=3.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "vue": {
       "optional": true
     }
   },
@@ -77,6 +88,8 @@
     "@typescript-eslint/parser": "^6.19.0",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.33.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "rollup": "^4.9.6",
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "typescript": "^5.3.3",

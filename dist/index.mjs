@@ -1,464 +1,219 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { defineComponent, ref, watch, onMounted, h } from 'vue';
+import ReactDOM from 'react-dom/client';
 
-/**
- * Graph module - legacy code adapted for ES modules
- */
+// -----------------------------------------------------------
+// Graph IR — the shared data model all styles render from.
+// A diagram is: { nodes, edges, steps, canvas }
+// - node.kind drives which renderer shape is used
+// - edge.path is computed from node positions (orthogonal router)
+// - step.highlight marks nodes + edges active at each step
+// -----------------------------------------------------------
 
-const NODE_KINDS$1 = {
-  // System / architecture kinds
+const NODE_KINDS = {
   service: {
-    label: "Service",
-    shape: "rect",
-    icon: "square"
+    label: 'Service',
+    shape: 'rect',
+    icon: 'square'
   },
   store: {
-    label: "Database",
-    shape: "cylinder",
-    icon: "cylinder"
+    label: 'Database',
+    shape: 'cylinder',
+    icon: 'cylinder'
   },
   cache: {
-    label: "Cache",
-    shape: "rect",
-    icon: "disk"
+    label: 'Cache',
+    shape: 'rect',
+    icon: 'disk'
   },
   queue: {
-    label: "Queue",
-    shape: "rect",
-    icon: "stack"
+    label: 'Queue',
+    shape: 'rect',
+    icon: 'stack'
   },
   actor: {
-    label: "Client",
-    shape: "rect",
-    icon: "person"
+    label: 'Client',
+    shape: 'rect',
+    icon: 'person'
   },
   gateway: {
-    label: "Gateway",
-    shape: "hex",
-    icon: "diamond"
+    label: 'Gateway',
+    shape: 'hex',
+    icon: 'diamond'
   },
   external: {
-    label: "External",
-    shape: "cloud",
-    icon: "cloud"
+    label: 'External',
+    shape: 'cloud',
+    icon: 'cloud'
   },
   boundary: {
-    label: "Boundary",
-    shape: "rect",
-    icon: "group"
+    label: 'Boundary',
+    shape: 'rect',
+    icon: 'group'
   },
-  // Flowchart / process kinds
   start: {
-    label: "Start",
-    shape: "pill",
-    icon: "play"
+    label: 'Start',
+    shape: 'pill',
+    icon: 'play'
   },
   stop: {
-    label: "Stop",
-    shape: "pill",
-    icon: "square"
+    label: 'Stop',
+    shape: 'pill',
+    icon: 'square'
   },
   decision: {
-    label: "Decision",
-    shape: "diamond",
-    icon: "qmark"
+    label: 'Decision',
+    shape: 'diamond',
+    icon: 'qmark'
   },
   process: {
-    label: "Process",
-    shape: "square",
-    icon: "cog"
+    label: 'Process',
+    shape: 'square',
+    icon: 'cog'
   },
   event: {
-    label: "Event",
-    shape: "circle",
-    icon: "bolt"
+    label: 'Event',
+    shape: 'circle',
+    icon: 'bolt'
   },
   step: {
-    label: "Step",
-    shape: "oval",
-    icon: "dot"
+    label: 'Step',
+    shape: 'oval',
+    icon: 'dot'
   },
   tree: {
-    label: "Tree node",
-    shape: "circle",
-    icon: "dot"
+    label: 'Tree node',
+    shape: 'circle',
+    icon: 'dot'
   },
-  // Media
   image: {
-    label: "Logo",
-    shape: "rect",
-    icon: "image"
+    label: 'Logo',
+    shape: 'rect',
+    icon: 'image'
   },
-  // --- NEW node kinds ----------------------------------------
   function: {
-    label: "Function",
-    shape: "rect",
-    icon: "lambda"
+    label: 'Function',
+    shape: 'rect',
+    icon: 'lambda'
   },
   worker: {
-    label: "Worker",
-    shape: "rect",
-    icon: "gear"
+    label: 'Worker',
+    shape: 'rect',
+    icon: 'gear'
   },
   loadbalancer: {
-    label: "Load Balancer",
-    shape: "rect",
-    icon: "scale"
+    label: 'Load Balancer',
+    shape: 'rect',
+    icon: 'scale'
   },
   cdn: {
-    label: "CDN",
-    shape: "cloud",
-    icon: "globe"
+    label: 'CDN',
+    shape: 'cloud',
+    icon: 'globe'
   },
   auth: {
-    label: "Auth",
-    shape: "shield",
-    icon: "key"
+    label: 'Auth',
+    shape: 'shield',
+    icon: 'key'
   },
   monitor: {
-    label: "Monitor",
-    shape: "rect",
-    icon: "chart"
+    label: 'Monitor',
+    shape: 'rect',
+    icon: 'chart'
   },
   bus: {
-    label: "Event Bus",
-    shape: "rect",
-    icon: "bus"
+    label: 'Event Bus',
+    shape: 'rect',
+    icon: 'bus'
   },
   stream: {
-    label: "Stream",
-    shape: "rect",
-    icon: "wave"
+    label: 'Stream',
+    shape: 'rect',
+    icon: 'wave'
   },
   firewall: {
-    label: "Firewall",
-    shape: "rect",
-    icon: "wall"
+    label: 'Firewall',
+    shape: 'rect',
+    icon: 'wall'
   },
   mobile: {
-    label: "Mobile",
-    shape: "tablet",
-    icon: "phone"
+    label: 'Mobile',
+    shape: 'tablet',
+    icon: 'phone'
   }
 };
-const SHAPES$1 = ["rect", "square", "circle", "oval", "diamond", "hex", "pill", "cylinder", "cloud", "parallelogram", "shield", "tablet", "trapezoid", "chevron"];
-const EXAMPLE_GRAPH$1 = {
+const SHAPES = ['rect', 'square', 'circle', 'oval', 'diamond', 'hex', 'pill', 'cylinder', 'cloud', 'parallelogram', 'shield', 'tablet', 'trapezoid', 'chevron'];
+const EXAMPLE_GRAPH = {
   canvas: {
     w: 560,
     h: 280,
     grid: 20
   },
   nodes: [{
-    id: "client",
-    kind: "actor",
-    label: "Client",
+    id: 'client',
+    kind: 'actor',
+    label: 'Client',
     x: 30,
     y: 110,
     w: 100,
     h: 60
   }, {
-    id: "api",
-    kind: "gateway",
-    label: "API Gateway",
+    id: 'api',
+    kind: 'gateway',
+    label: 'API Gateway',
     x: 170,
     y: 110,
     w: 130,
     h: 60
   }, {
-    id: "orders",
-    kind: "service",
-    label: "Orders",
+    id: 'orders',
+    kind: 'service',
+    label: 'Orders',
     x: 340,
     y: 40,
     w: 120,
     h: 60,
-    sub: "v4.2.1"
+    sub: 'v4.2.1'
   }, {
-    id: "db",
-    kind: "store",
-    label: "Postgres",
+    id: 'db',
+    kind: 'store',
+    label: 'Postgres',
     x: 360,
     y: 180,
     w: 100,
     h: 70
   }],
   edges: [{
-    id: "e1",
-    from: "client",
-    to: "api",
-    kind: "solid",
-    label: "HTTPS"
+    id: 'e1',
+    from: 'client',
+    to: 'api',
+    kind: 'solid',
+    label: 'HTTPS'
   }, {
-    id: "e2",
-    from: "api",
-    to: "orders",
-    kind: "solid",
-    label: "POST /order"
+    id: 'e2',
+    from: 'api',
+    to: 'orders',
+    kind: 'solid',
+    label: 'POST /order'
   }, {
-    id: "e3",
-    from: "orders",
-    to: "db",
-    kind: "solid",
-    label: "write"
+    id: 'e3',
+    from: 'orders',
+    to: 'db',
+    kind: 'solid',
+    label: 'write'
   }, {
-    id: "e4",
-    from: "api",
-    to: "db",
-    kind: "dashed",
-    label: "audit"
+    id: 'e4',
+    from: 'api',
+    to: 'db',
+    kind: 'dashed',
+    label: 'audit'
   }]
 };
-const EXAMPLE_GRAPH_FLAT$1 = {
-  canvas: {
-    w: 1120,
-    h: 520,
-    grid: 20
-  },
-  nodes: [{
-    id: "client",
-    kind: "actor",
-    label: "Client",
-    x: 40,
-    y: 220,
-    w: 150,
-    h: 80
-  }, {
-    id: "gateway",
-    kind: "gateway",
-    label: "API Gateway",
-    x: 250,
-    y: 220,
-    w: 170,
-    h: 80,
-    sub: "edge"
-  }, {
-    id: "orders",
-    kind: "service",
-    label: "Orders",
-    x: 490,
-    y: 100,
-    w: 160,
-    h: 80,
-    sub: "v4.2.1"
-  }, {
-    id: "inventory",
-    kind: "service",
-    label: "Inventory",
-    x: 490,
-    y: 340,
-    w: 160,
-    h: 80,
-    sub: "v2.8.0"
-  }, {
-    id: "redis",
-    kind: "cache",
-    label: "Redis",
-    x: 720,
-    y: 40,
-    w: 150,
-    h: 80
-  }, {
-    id: "kafka",
-    kind: "queue",
-    label: "Events",
-    x: 450,
-    y: 360,
-    w: 160,
-    h: 80,
-    sub: "kafka"
-  }, {
-    id: "db",
-    kind: "store",
-    label: "Postgres",
-    x: 680,
-    y: 360,
-    w: 160,
-    h: 80
-  }],
-  edges: [{
-    id: "e1",
-    from: "client",
-    to: "gateway",
-    kind: "solid",
-    label: "HTTPS"
-  }, {
-    id: "e2",
-    from: "gateway",
-    to: "orders",
-    kind: "solid",
-    label: "POST /order"
-  }, {
-    id: "e3",
-    from: "orders",
-    to: "redis",
-    kind: "dashed",
-    label: "cache"
-  }, {
-    id: "e4",
-    from: "orders",
-    to: "kafka",
-    kind: "solid",
-    label: "publish"
-  }, {
-    id: "e5",
-    from: "kafka",
-    to: "db",
-    kind: "dashed",
-    label: "persist"
-  }],
-  steps: [{
-    id: "s1",
-    active: {
-      nodes: ["client", "gateway"],
-      edges: ["e1"]
-    }
-  }, {
-    id: "s2",
-    active: {
-      nodes: ["gateway", "orders"],
-      edges: ["e2"]
-    }
-  }, {
-    id: "s3",
-    active: {
-      nodes: ["orders", "redis"],
-      edges: ["e3"]
-    }
-  }, {
-    id: "s4",
-    active: {
-      nodes: ["orders", "kafka"],
-      edges: ["e4"]
-    }
-  }, {
-    id: "s5",
-    active: {
-      nodes: ["kafka", "db"],
-      edges: ["e5"]
-    }
-  }]
-};
-const HERO_GRAPH$1 = {
-  canvas: {
-    w: 880,
-    h: 540,
-    grid: 20
-  },
-  nodes: [{
-    id: "client",
-    kind: "actor",
-    label: "Client",
-    x: 40,
-    y: 230,
-    w: 140,
-    h: 78
-  }, {
-    id: "gateway",
-    kind: "gateway",
-    label: "Gateway",
-    x: 230,
-    y: 230,
-    w: 160,
-    h: 78,
-    sub: "edge"
-  }, {
-    id: "orders",
-    kind: "service",
-    label: "Orders",
-    x: 450,
-    y: 100,
-    w: 160,
-    h: 80,
-    sub: "v4.2.1"
-  }, {
-    id: "redis",
-    kind: "cache",
-    label: "Redis",
-    x: 680,
-    y: 100,
-    w: 160,
-    h: 80
-  }, {
-    id: "kafka",
-    kind: "queue",
-    label: "Events",
-    x: 450,
-    y: 360,
-    w: 160,
-    h: 80,
-    sub: "kafka"
-  }, {
-    id: "db",
-    kind: "store",
-    label: "Postgres",
-    x: 680,
-    y: 360,
-    w: 160,
-    h: 80
-  }],
-  edges: [{
-    id: "e1",
-    from: "client",
-    to: "gateway",
-    kind: "solid",
-    label: "HTTPS"
-  }, {
-    id: "e2",
-    from: "gateway",
-    to: "orders",
-    kind: "solid",
-    label: "POST /order"
-  }, {
-    id: "e3",
-    from: "orders",
-    to: "redis",
-    kind: "dashed",
-    label: "cache"
-  }, {
-    id: "e4",
-    from: "orders",
-    to: "kafka",
-    kind: "solid",
-    label: "publish"
-  }, {
-    id: "e5",
-    from: "kafka",
-    to: "db",
-    kind: "dashed",
-    label: "persist"
-  }],
-  steps: [{
-    id: "s1",
-    active: {
-      nodes: ["client", "gateway"],
-      edges: ["e1"]
-    }
-  }, {
-    id: "s2",
-    active: {
-      nodes: ["gateway", "orders"],
-      edges: ["e2"]
-    }
-  }, {
-    id: "s3",
-    active: {
-      nodes: ["orders", "redis"],
-      edges: ["e3"]
-    }
-  }, {
-    id: "s4",
-    active: {
-      nodes: ["orders", "kafka"],
-      edges: ["e4"]
-    }
-  }, {
-    id: "s5",
-    active: {
-      nodes: ["kafka", "db"],
-      edges: ["e5"]
-    }
-  }]
-};
+function shapeOf(node) {
+  if (node.shape) return node.shape;
+  const k = NODE_KINDS[node.kind];
+  return k && k.shape || 'rect';
+}
 function nodeRect(node) {
   return {
     x: node.x,
@@ -502,24 +257,40 @@ function anchorOn(rect, side, t) {
       };
   }
 }
+function flip(side) {
+  return {
+    l: 'r',
+    r: 'l',
+    t: 'b',
+    b: 't'
+  }[side];
+}
+
+// Given the geometric relation of A→B, return the "best" sides for A (exit)
+// and B (enter) in priority order. The enter side must face A — i.e. it is the
+// opposite of the exit side, not the same one.
 function sideCandidates(A, B) {
-  const dx = B.x + B.w / 2 - (A.x + A.w / 2);
-  const dy = B.y + B.h / 2 - (A.y + A.h / 2);
-  const candidates = {
-    exit: [],
-    enter: []
+  const aCx = A.x + A.w / 2,
+    aCy = A.y + A.h / 2;
+  const bCx = B.x + B.w / 2,
+    bCy = B.y + B.h / 2;
+  const dx = bCx - aCx,
+    dy = bCy - aCy;
+  const horiz = Math.abs(dx) >= Math.abs(dy);
+  const exitH = dx >= 0 ? 'r' : 'l';
+  const exitV = dy >= 0 ? 'b' : 't';
+  const enterH = dx >= 0 ? 'l' : 'r';
+  const enterV = dy >= 0 ? 't' : 'b';
+  if (horiz) {
+    return {
+      exit: [exitH, exitV, flip(exitV), flip(exitH)],
+      enter: [enterH, enterV, flip(enterV), flip(enterH)]
+    };
+  }
+  return {
+    exit: [exitV, exitH, flip(exitH), flip(exitV)],
+    enter: [enterV, enterH, flip(enterH), flip(enterV)]
   };
-  const sides = [{
-    s: dx >= 0 ? 'r' : 'l',
-    r: Math.abs(dx) / (Math.abs(dx) + Math.abs(dy))
-  }, {
-    s: dy >= 0 ? 'b' : 't',
-    r: Math.abs(dy) / (Math.abs(dx) + Math.abs(dy))
-  }];
-  sides.sort((a, b) => b.r - a.r);
-  candidates.exit = sides.map(s => s.s);
-  candidates.enter = sides.map(s => s.s);
-  return candidates;
 }
 function assignAnchors(nodes, edges) {
   const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
@@ -548,14 +319,10 @@ function assignAnchors(nodes, edges) {
       occ[e.to][e.toSide].in.push(e.id);
     }
   });
-  const score = (nodeId, side, role, naturalRank) => {
+  const score = (nodeId, side, role, rank) => {
     const o = occ[nodeId][side];
-    const otherRole = role === "out" ? "in" : "out";
-    let s = 0;
-    s += o[otherRole].length * 100;
-    s += o[role].length * 4;
-    s += naturalRank * 10;
-    return s;
+    const other = role === 'out' ? 'in' : 'out';
+    return o[other].length * 100 + o[role].length * 4 + rank * 10;
   };
   edges.forEach(e => {
     const A = nodeRect(byId[e.from]),
@@ -563,11 +330,11 @@ function assignAnchors(nodes, edges) {
     const cands = sideCandidates(A, B);
     if (!anchors[e.id].fromSide) {
       let best = cands.exit[0],
-        bestScore = Infinity;
+        bestS = Infinity;
       cands.exit.forEach((side, rank) => {
-        const s = score(e.from, side, "out", rank);
-        if (s < bestScore) {
-          bestScore = s;
+        const s = score(e.from, side, 'out', rank);
+        if (s < bestS) {
+          bestS = s;
           best = side;
         }
       });
@@ -576,11 +343,11 @@ function assignAnchors(nodes, edges) {
     }
     if (!anchors[e.id].toSide) {
       let best = cands.enter[0],
-        bestScore = Infinity;
+        bestS = Infinity;
       cands.enter.forEach((side, rank) => {
-        const s = score(e.to, side, "in", rank);
-        if (s < bestScore) {
-          bestScore = s;
+        const s = score(e.to, side, 'in', rank);
+        if (s < bestS) {
+          bestS = s;
           best = side;
         }
       });
@@ -593,28 +360,28 @@ function assignAnchors(nodes, edges) {
     edgeT[e.id] = {};
   });
   nodes.forEach(n => {
-    ["l", "r", "t", "b"].forEach(side => {
+    ['l', 'r', 't', 'b'].forEach(side => {
       const items = [];
       occ[n.id][side].out.forEach(eid => {
         const other = byId[edges.find(e => e.id === eid).to];
         items.push({
           eid,
-          role: "out",
-          c: side === "l" || side === "r" ? other.y + other.h / 2 : other.x + other.w / 2
+          role: 'out',
+          c: side === 'l' || side === 'r' ? other.y + other.h / 2 : other.x + other.w / 2
         });
       });
       occ[n.id][side].in.forEach(eid => {
         const other = byId[edges.find(e => e.id === eid).from];
         items.push({
           eid,
-          role: "in",
-          c: side === "l" || side === "r" ? other.y + other.h / 2 : other.x + other.w / 2
+          role: 'in',
+          c: side === 'l' || side === 'r' ? other.y + other.h / 2 : other.x + other.w / 2
         });
       });
       items.sort((a, b) => a.c - b.c);
       items.forEach((it, i) => {
         const t = items.length === 1 ? 0.5 : (i + 1) / (items.length + 1);
-        if (it.role === "out") edgeT[it.eid].fromT = t;else edgeT[it.eid].toT = t;
+        if (it.role === 'out') edgeT[it.eid].fromT = t;else edgeT[it.eid].toT = t;
       });
     });
   });
@@ -623,13 +390,13 @@ function assignAnchors(nodes, edges) {
     edgeT
   };
 }
-function routeEdge$1(fromNode, toNode, fromSide, toSide, fromT = 0.5, toT = 0.5) {
+function routeEdge(fromNode, toNode, fromSide, toSide, fromT = 0.5, toT = 0.5) {
   const A = nodeRect(fromNode),
     B = nodeRect(toNode);
-  const p0 = anchorOn(A, fromSide, fromT),
-    p3 = anchorOn(B, toSide, toT);
-  const hFrom = fromSide === "l" || fromSide === "r";
-  const hTo = toSide === "l" || toSide === "r";
+  const p0 = anchorOn(A, fromSide, fromT);
+  const p3 = anchorOn(B, toSide, toT);
+  const hFrom = fromSide === 'l' || fromSide === 'r';
+  const hTo = toSide === 'l' || toSide === 'r';
   if (hFrom && hTo) {
     const midX = (p0.x + p3.x) / 2;
     return [p0, {
@@ -650,18 +417,16 @@ function routeEdge$1(fromNode, toNode, fromSide, toSide, fromT = 0.5, toT = 0.5)
       y: midY
     }, p3];
   }
-  if (hFrom && !hTo) {
-    return [p0, {
-      x: p3.x,
-      y: p0.y
-    }, p3];
-  }
+  if (hFrom && !hTo) return [p0, {
+    x: p3.x,
+    y: p0.y
+  }, p3];
   return [p0, {
     x: p0.x,
     y: p3.y
   }, p3];
 }
-function pathFromPoints$1(pts, rounded = 8) {
+function pathFromPoints(pts, rounded = 8) {
   if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
   let d = `M ${pts[0].x} ${pts[0].y}`;
   for (let i = 1; i < pts.length - 1; i++) {
@@ -673,17 +438,13 @@ function pathFromPoints$1(pts, rounded = 8) {
     const v2x = Math.sign(next.x - cur.x),
       v2y = Math.sign(next.y - cur.y);
     const r = rounded;
-    const px = cur.x - v1x * r,
-      py = cur.y - v1y * r;
-    const qx = cur.x + v2x * r,
-      qy = cur.y + v2y * r;
-    d += ` L ${px} ${py} Q ${cur.x} ${cur.y} ${qx} ${qy}`;
+    d += ` L ${cur.x - v1x * r} ${cur.y - v1y * r} Q ${cur.x} ${cur.y} ${cur.x + v2x * r} ${cur.y + v2y * r}`;
   }
   const last = pts[pts.length - 1];
   d += ` L ${last.x} ${last.y}`;
   return d;
 }
-function roughPath$1(pts, amp = 1.4, seed = 7) {
+function roughPath(pts, amp = 1.4, seed = 7) {
   let s = seed;
   const rnd = () => {
     s = (s * 9301 + 49297) % 233280;
@@ -692,12 +453,151 @@ function roughPath$1(pts, amp = 1.4, seed = 7) {
   const offs = () => (rnd() - 0.5) * 2 * amp;
   let d = `M ${pts[0].x + offs()} ${pts[0].y + offs()}`;
   for (let i = 1; i < pts.length; i++) {
-    const p = pts[i];
-    d += ` L ${p.x + offs()} ${p.y + offs()}`;
+    d += ` L ${pts[i].x + offs()} ${pts[i].y + offs()}`;
   }
   return d;
 }
-function resolveGraph$1(graph) {
+function edgeMidpoint(pts) {
+  if (pts.length >= 3) {
+    const a = pts[Math.floor(pts.length / 2) - 1];
+    const b = pts[Math.floor(pts.length / 2)];
+    return {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2
+    };
+  }
+  return {
+    x: (pts[0].x + pts[1].x) / 2,
+    y: (pts[0].y + pts[1].y) / 2
+  };
+}
+
+// -----------------------------------------------------------
+// Auto-layout — left-to-right hierarchical flow.
+// Used when any node is missing x/y. Computes node "ranks" (longest
+// path from a source) and groups nodes by rank into columns. Within
+// each column, distributes nodes vertically with even spacing.
+// Ignores boundary nodes (they're containers and get their layout
+// from their members or explicit coords).
+// -----------------------------------------------------------
+function autoLayout(nodes, edges, opts = {}) {
+  const gapX = opts.gapX || 200;
+  const gapY = opts.gapY || 110;
+  const startX = opts.startX || 60;
+  const startY = opts.startY || 60;
+  const nodeW = opts.nodeW || 150;
+  const nodeH = opts.nodeH || 70;
+  if (!nodes || nodes.length === 0) return;
+
+  // Boundaries are containers — auto-layout positions only non-boundary nodes.
+  const layoutables = nodes.filter(n => n.kind !== 'boundary');
+  if (layoutables.length === 0) return;
+
+  // Build adjacency over layoutable nodes only.
+  const layoutableIds = new Set(layoutables.map(n => n.id));
+  const inDeg = {};
+  const outAdj = {};
+  for (const n of layoutables) {
+    inDeg[n.id] = 0;
+    outAdj[n.id] = [];
+  }
+  for (const e of edges || []) {
+    if (layoutableIds.has(e.from) && layoutableIds.has(e.to)) {
+      inDeg[e.to]++;
+      outAdj[e.from].push(e.to);
+    }
+  }
+
+  // Rank assignment (longest-path from any root).
+  const rank = {};
+  const queue = [];
+  for (const n of layoutables) {
+    if (inDeg[n.id] === 0) {
+      rank[n.id] = 0;
+      queue.push(n.id);
+    }
+  }
+  // Cyclic graph or no roots: pick the first node as a fake root.
+  if (queue.length === 0) {
+    rank[layoutables[0].id] = 0;
+    queue.push(layoutables[0].id);
+  }
+  // BFS, taking the maximum rank seen on each visit.
+  const seen = new Set();
+  while (queue.length) {
+    const id = queue.shift();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const r = rank[id];
+    for (const t of outAdj[id]) {
+      const next = rank[t] === undefined ? r + 1 : Math.max(rank[t], r + 1);
+      rank[t] = next;
+      queue.push(t);
+    }
+  }
+  // Disconnected nodes default to rank 0.
+  for (const n of layoutables) {
+    if (rank[n.id] === undefined) rank[n.id] = 0;
+  }
+
+  // Group by rank → columns.
+  const cols = {};
+  for (const n of layoutables) {
+    const r = rank[n.id];
+    if (!cols[r]) cols[r] = [];
+    cols[r].push(n);
+  }
+
+  // Find the tallest column to vertically center shorter ones.
+  const ranks = Object.keys(cols).map(Number).sort((a, b) => a - b);
+  const maxRows = ranks.reduce((m, r) => Math.max(m, cols[r].length), 1);
+  for (const r of ranks) {
+    const col = cols[r];
+    const colCount = col.length;
+    const yOffset = (maxRows - colCount) * gapY / 2;
+    col.forEach((n, i) => {
+      n.x = startX + r * gapX;
+      n.y = startY + yOffset + i * gapY;
+      n.w = n.w || nodeW;
+      n.h = n.h || nodeH;
+    });
+  }
+}
+
+// Compute a sensible canvas size from node positions + sizes.
+function autoCanvas(nodes, padding = 60) {
+  if (!nodes || nodes.length === 0) return {
+    w: 800,
+    h: 400
+  };
+  let maxX = 0,
+    maxY = 0;
+  for (const n of nodes) {
+    if (n.kind === 'boundary') continue;
+    if (typeof n.x === 'number' && typeof n.w === 'number') maxX = Math.max(maxX, n.x + n.w);
+    if (typeof n.y === 'number' && typeof n.h === 'number') maxY = Math.max(maxY, n.y + n.h);
+  }
+  return {
+    w: Math.max(800, maxX + padding),
+    h: Math.max(400, maxY + padding)
+  };
+}
+function resolveGraph(graph) {
+  // Apply auto-layout if ANY node is missing x or y. Mutates the input
+  // nodes' x/y/w/h in place; downstream renderers can then count on them.
+  const needsLayout = !graph.nodes || graph.nodes.some(n => n.kind !== 'boundary' && (n.x === undefined || n.y === undefined));
+  if (needsLayout) {
+    autoLayout(graph.nodes || [], graph.edges || []);
+    if (!graph.canvas || !graph.canvas.w) {
+      graph = {
+        ...graph,
+        canvas: {
+          ...(graph.canvas || {}),
+          ...autoCanvas(graph.nodes)
+        }
+      };
+    }
+  }
   const byId = Object.fromEntries(graph.nodes.map(n => [n.id, n]));
   const {
     anchors,
@@ -706,20 +606,20 @@ function resolveGraph$1(graph) {
   const edges = graph.edges.map(e => {
     const a = anchors[e.id];
     const t = edgeT[e.id];
-    const pts = routeEdge$1(byId[e.from], byId[e.to], a.fromSide, a.toSide, t.fromT, t.toT);
+    const pts = routeEdge(byId[e.from], byId[e.to], a.fromSide, a.toSide, t.fromT ?? 0.5, t.toT ?? 0.5);
     return {
       ...e,
       fromSide: a.fromSide,
       toSide: a.toSide,
       points: pts,
-      d: pathFromPoints$1(pts, 10),
+      d: pathFromPoints(pts, 10),
       length: pts.reduce((acc, p, i) => i === 0 ? 0 : acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y), 0)
     };
   });
   const sortedNodes = [...graph.nodes].sort((a, b) => {
-    const isBoundaryA = a.kind === "boundary" ? 1 : 0;
-    const isBoundaryB = b.kind === "boundary" ? 1 : 0;
-    if (isBoundaryA !== isBoundaryB) return isBoundaryB - isBoundaryA;
+    const bA = a.kind === 'boundary' ? 1 : 0;
+    const bB = b.kind === 'boundary' ? 1 : 0;
+    if (bA !== bB) return bB - bA;
     return a.y + a.x - (b.y + b.x);
   });
   return {
@@ -730,21 +630,21 @@ function resolveGraph$1(graph) {
   };
 }
 
-/**
- * Shape library — SVG path generators.
- * Each returns { path, cx, cy } where (cx,cy) is the label anchor.
- */
+// -----------------------------------------------------------
+// Shape library — SVG path generators. Pure JS, no React dep.
+// Each returns { d, cx, cy, rx?, circle?, ellipse?, top?, body? }
+// -----------------------------------------------------------
 
-function shapePath$1(shape, w, h) {
+function shapePath(shape, w, h) {
   switch (shape) {
-    case "rect":
+    case 'rect':
       return {
         d: `M0 0 H${w} V${h} H0 Z`,
         cx: w / 2,
         cy: h / 2,
         rx: 10
       };
-    case "square":
+    case 'square':
       {
         const s = Math.min(w, h);
         const ox = (w - s) / 2,
@@ -756,7 +656,7 @@ function shapePath$1(shape, w, h) {
           rx: 4
         };
       }
-    case "circle":
+    case 'circle':
       {
         const r = Math.min(w, h) / 2;
         return {
@@ -770,7 +670,7 @@ function shapePath$1(shape, w, h) {
           }
         };
       }
-    case "oval":
+    case 'oval':
       return {
         d: `M0 ${h / 2} a${w / 2} ${h / 2} 0 1 0 ${w} 0 a${w / 2} ${h / 2} 0 1 0 ${-w} 0`,
         cx: w / 2,
@@ -782,13 +682,13 @@ function shapePath$1(shape, w, h) {
           ry: h / 2
         }
       };
-    case "diamond":
+    case 'diamond':
       return {
         d: `M${w / 2} 0 L${w} ${h / 2} L${w / 2} ${h} L0 ${h / 2} Z`,
         cx: w / 2,
         cy: h / 2
       };
-    case "hex":
+    case 'hex':
       {
         const i = Math.min(w * 0.18, 18);
         return {
@@ -797,7 +697,7 @@ function shapePath$1(shape, w, h) {
           cy: h / 2
         };
       }
-    case "pill":
+    case 'pill':
       {
         const r = h / 2;
         return {
@@ -807,7 +707,7 @@ function shapePath$1(shape, w, h) {
           rx: r
         };
       }
-    case "cylinder":
+    case 'cylinder':
       {
         const ry = 7;
         return {
@@ -818,15 +718,13 @@ function shapePath$1(shape, w, h) {
           cy: h / 2 + ry / 2
         };
       }
-    case "cloud":
-      {
-        return {
-          d: `M${w * 0.18} ${h * 0.55} C ${w * 0.02} ${h * 0.55}, ${w * 0.02} ${h * 0.15}, ${w * 0.22} ${h * 0.22} C ${w * 0.28} ${h * 0.02}, ${w * 0.6} ${h * 0.02}, ${w * 0.62} ${h * 0.22} C ${w * 0.82} ${h * 0.15}, ${w * 0.98} ${h * 0.3}, ${w * 0.9} ${h * 0.55} C ${w * 0.98} ${h * 0.75}, ${w * 0.78} ${h * 0.95}, ${w * 0.6} ${h * 0.85} C ${w * 0.4} ${h * 1.02}, ${w * 0.1} ${h * 0.95}, ${w * 0.18} ${h * 0.55} Z`,
-          cx: w / 2,
-          cy: h / 2
-        };
-      }
-    case "parallelogram":
+    case 'cloud':
+      return {
+        d: `M${w * 0.18} ${h * 0.55} C ${w * 0.02} ${h * 0.55}, ${w * 0.02} ${h * 0.15}, ${w * 0.22} ${h * 0.22} C ${w * 0.28} ${h * 0.02}, ${w * 0.6} ${h * 0.02}, ${w * 0.62} ${h * 0.22} C ${w * 0.82} ${h * 0.15}, ${w * 0.98} ${h * 0.3}, ${w * 0.9} ${h * 0.55} C ${w * 0.98} ${h * 0.75}, ${w * 0.78} ${h * 0.95}, ${w * 0.6} ${h * 0.85} C ${w * 0.4} ${h * 1.02}, ${w * 0.1} ${h * 0.95}, ${w * 0.18} ${h * 0.55} Z`,
+        cx: w / 2,
+        cy: h / 2
+      };
+    case 'parallelogram':
       {
         const skew = 14;
         return {
@@ -835,7 +733,7 @@ function shapePath$1(shape, w, h) {
           cy: h / 2
         };
       }
-    case "shield":
+    case 'shield':
       {
         const r = Math.min(w * 0.18, 14);
         return {
@@ -844,7 +742,7 @@ function shapePath$1(shape, w, h) {
           cy: h / 2
         };
       }
-    case "tablet":
+    case 'tablet':
       {
         const r = Math.min(w, h) * 0.18;
         return {
@@ -854,7 +752,7 @@ function shapePath$1(shape, w, h) {
           rx: r
         };
       }
-    case "trapezoid":
+    case 'trapezoid':
       {
         const i = Math.min(w * 0.16, 18);
         return {
@@ -863,7 +761,7 @@ function shapePath$1(shape, w, h) {
           cy: h / 2
         };
       }
-    case "chevron":
+    case 'chevron':
       {
         const a = Math.min(w * 0.12, 14);
         return {
@@ -881,7 +779,7 @@ function shapePath$1(shape, w, h) {
       };
   }
 }
-function shapeAnchor$1(node, side) {
+function shapeAnchor(node, side) {
   const {
     w,
     h
@@ -889,1693 +787,352 @@ function shapeAnchor$1(node, side) {
   const cx = node.x + w / 2,
     cy = node.y + h / 2;
   switch (side) {
-    case "l":
+    case 'l':
       return {
         x: node.x,
         y: cy
       };
-    case "r":
+    case 'r':
       return {
         x: node.x + w,
         y: cy
       };
-    case "t":
+    case 't':
       return {
         x: cx,
         y: node.y
       };
-    case "b":
+    case 'b':
       return {
         x: cx,
         y: node.y + h
       };
+    default:
+      return {
+        x: cx,
+        y: cy
+      };
   }
 }
 
-/**
- * DSL Parser - converts YAML-like text into a Graph IR
- */
+// -----------------------------------------------------------
+// DSL Parser — converts YAML-like text into a Graph IR.
+// Zero dependencies. Works in any environment.
+// -----------------------------------------------------------
 
-function parseDSL$1(text) {
-  const lines = text.split("\n");
+function parseDSL(text) {
+  const lines = text.split('\n');
   const nodes = [];
   const edges = [];
+  const steps = [];
   const config = {
     gapX: 180,
     gapY: 120,
     nodesPerRow: 3
   };
+  const meta = {}; // top-level scalars like `style: city`, `title: "..."`
   let mode = null;
   lines.forEach(line => {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) return;
+    if (!trimmed || trimmed.startsWith('#')) return;
     const lower = trimmed.toLowerCase();
-    if (lower === "nodes:") {
-      mode = "nodes";
+    if (lower === 'nodes:') {
+      mode = 'nodes';
       return;
     }
-    if (lower === "edges:") {
-      mode = "edges";
+    if (lower === 'edges:') {
+      mode = 'edges';
       return;
     }
-    if (lower === "story:") {
-      mode = "story";
+    if (lower === 'steps:') {
+      mode = 'steps';
       return;
     }
-    if (lower === "config:") {
-      mode = "config";
+    if (lower === 'story:') {
+      mode = 'steps';
       return;
     }
-    if (mode === "config") {
-      const match = trimmed.match(/^(\w+):\s*(\d+)/);
-      if (match) {
-        const val = parseInt(match[2], 10);
-        if (!isNaN(val)) config[match[1]] = val;
+    if (lower === 'config:') {
+      mode = 'config';
+      return;
+    }
+
+    // Top-level scalar: `key: value` outside any section. Captures `style:`,
+    // `title:`, etc. so DSLs can carry per-graph metadata.
+    if (mode === null) {
+      const m = trimmed.match(/^(\w+):\s*(.+)$/);
+      if (m) {
+        let [, k, v] = m;
+        v = v.trim();
+        if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+        meta[k] = v;
+        return;
       }
     }
-    if (mode === "nodes" && trimmed.startsWith("-")) {
+    if (mode === 'config') {
+      const m = trimmed.match(/^(\w+):\s*(\d+)/);
+      if (m) {
+        const val = parseInt(m[2], 10);
+        if (!isNaN(val)) config[m[1]] = val;
+      }
+      return;
+    }
+    if (mode === 'nodes' && trimmed.startsWith('-')) {
       const parts = trimmed.slice(1).trim();
       const node = {};
-      const pairs = parts.match(/(\w+):\s*("[^"]*"|\S+)/g);
+      // Unquoted values must not include commas (which separate inline pairs)
+      // or whitespace. Quoted values ("...") accept anything but quotes.
+      const pairs = parts.match(/(\w+):\s*("[^"]*"|[^,\s][^,]*?)(?=\s*(?:,|$))/g);
       if (pairs) {
         pairs.forEach(p => {
-          const match = p.match(/^(\w+):\s*(.*)$/);
-          if (match) {
-            let [_, k, v] = match;
-            v = v.startsWith('"') ? v.slice(1, -1) : v;
-            node[k] = k === "x" || k === "y" || k === "w" || k === "h" ? Number(v) : v;
+          const m = p.match(/^(\w+):\s*(.*)$/);
+          if (m) {
+            let [, k, v] = m;
+            v = v.trim();
+            v = v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v;
+            node[k] = ['x', 'y', 'w', 'h'].includes(k) ? Number(v) : v;
           }
         });
       }
       if (node.id) {
-        node.w = node.w || 120;
-        node.h = node.h || 60;
-        node.kind = node.type || "service";
+        node.w = node.w || 140;
+        node.h = node.h || 70;
+        node.kind = node.kind || node.type || 'service';
         nodes.push(node);
       }
+      return;
     }
-    if (mode === "edges" && trimmed.startsWith("-")) {
+    if (mode === 'edges' && trimmed.startsWith('-')) {
       const parts = trimmed.slice(1).trim();
-      const edgeMatch = parts.match(/(\S+)\s*(\-\>|\.\.>)\s*(\S+)/);
-      if (edgeMatch) {
-        const [_, from, op, to] = edgeMatch;
+      const m = parts.match(/(\S+)\s*(->|\.\.>?|-->)\s*([^,\s]+)/);
+      if (m) {
+        const [, from, op, to] = m;
         const edge = {
           id: `e-${from}-${to}-${edges.length}`,
           from,
           to,
-          kind: op === ".." ? "dashed" : "solid"
+          kind: op === '..>' || op === '..' ? 'dashed' : 'solid'
         };
-        const labelMatch = parts.match(/label:\s*"([^"]*)"/);
-        if (labelMatch) edge.label = labelMatch[1];
+        const labelM = parts.match(/label:\s*"([^"]*)"/);
+        if (labelM) edge.label = labelM[1];
+        const kindM = parts.match(/kind:\s*(\S+)/);
+        if (kindM) edge.kind = kindM[1];
         edges.push(edge);
       }
+      return;
+    }
+    if (mode === 'steps' && trimmed.startsWith('-')) {
+      const parts = trimmed.slice(1).trim();
+      const step = {
+        id: `s${steps.length}`,
+        active: {
+          nodes: [],
+          edges: []
+        }
+      };
+      const titleM = parts.match(/title:\s*"([^"]*)"/);
+      if (titleM) step.title = titleM[1];
+      const narM = parts.match(/narration:\s*"([^"]*)"/);
+      if (narM) step.narration = narM[1];
+      const nodesM = parts.match(/nodes:\s*\[([^\]]*)\]/);
+      if (nodesM) step.active.nodes = nodesM[1].split(',').map(s => s.trim().replace(/"/g, ''));
+      const edgesM = parts.match(/edges:\s*\[([^\]]*)\]/);
+      if (edgesM) step.active.edges = edgesM[1].split(',').map(s => s.trim().replace(/"/g, ''));
+      steps.push(step);
+      return;
     }
   });
 
-  // Auto-layout pass
-  const hasManualLayout = nodes.some(n => n.x !== undefined || n.y !== undefined);
-  if (!hasManualLayout) {
-    const gapX = Number(config.gapX) || 180;
-    const gapY = Number(config.gapY) || 120;
-    const nPerRow = Number(config.nodesPerRow) || 3;
-    nodes.forEach((node, i) => {
-      const col = i % nPerRow;
-      const row = Math.floor(i / nPerRow);
-      node.x = 60 + col * gapX;
-      node.y = 40 + row * gapY;
-      node.w = node.w || 120;
-      node.h = node.h || 60;
-    });
-  }
+  // Coerce any provided positions/sizes to numbers; leave undefined ones
+  // alone so resolveGraph's smart auto-layout can position them.
+  nodes.forEach(n => {
+    if (n.x !== undefined) n.x = Number(n.x);
+    if (n.y !== undefined) n.y = Number(n.y);
+    if (n.w !== undefined) n.w = Number(n.w);
+    if (n.h !== undefined) n.h = Number(n.h);
+  });
   return {
+    // Canvas is computed by resolveGraph from final node positions when
+    // unspecified. Users can override with `canvasW: ...` config keys if
+    // they need a fixed viewport.
+    canvas: {
+      grid: 20
+    },
+    ...(meta.style ? {
+      style: meta.style
+    } : {}),
+    ...(meta.title ? {
+      title: meta.title
+    } : {}),
     nodes,
     edges,
-    canvas: {
-      w: 1100,
-      h: 500,
-      grid: 20
-    }
+    ...(steps.length > 0 ? {
+      steps
+    } : {})
   };
 }
 
-function getDefaultExportFromCjs (x) {
-	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
+// -----------------------------------------------------------
+// graphToDSL — inverse of parseDSL.
+// Serializes a graph object back to DSL text. The output is
+// designed to round-trip cleanly through parseDSL: feeding
+// graphToDSL(g) into parseDSL produces an equivalent graph.
+// -----------------------------------------------------------
+
+function quote(s) {
+  if (s == null) return '';
+  const str = String(s);
+  // Quote when value has whitespace, leading/trailing space, or special chars
+  return /[\s"',]/.test(str) ? `"${str.replace(/"/g, '\\"')}"` : str;
 }
-
-var propTypes = {exports: {}};
-
-var reactIs = {exports: {}};
-
-var reactIs_production_min = {};
-
-/** @license React v16.13.1
- * react-is.production.min.js
- *
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-var hasRequiredReactIs_production_min;
-
-function requireReactIs_production_min () {
-	if (hasRequiredReactIs_production_min) return reactIs_production_min;
-	hasRequiredReactIs_production_min = 1;
-var b="function"===typeof Symbol&&Symbol.for,c=b?Symbol.for("react.element"):60103,d=b?Symbol.for("react.portal"):60106,e=b?Symbol.for("react.fragment"):60107,f=b?Symbol.for("react.strict_mode"):60108,g=b?Symbol.for("react.profiler"):60114,h=b?Symbol.for("react.provider"):60109,k=b?Symbol.for("react.context"):60110,l=b?Symbol.for("react.async_mode"):60111,m=b?Symbol.for("react.concurrent_mode"):60111,n=b?Symbol.for("react.forward_ref"):60112,p=b?Symbol.for("react.suspense"):60113,q=b?
-	Symbol.for("react.suspense_list"):60120,r=b?Symbol.for("react.memo"):60115,t=b?Symbol.for("react.lazy"):60116,v=b?Symbol.for("react.block"):60121,w=b?Symbol.for("react.fundamental"):60117,x=b?Symbol.for("react.responder"):60118,y=b?Symbol.for("react.scope"):60119;
-	function z(a){if("object"===typeof a&&null!==a){var u=a.$$typeof;switch(u){case c:switch(a=a.type,a){case l:case m:case e:case g:case f:case p:return a;default:switch(a=a&&a.$$typeof,a){case k:case n:case t:case r:case h:return a;default:return u}}case d:return u}}}function A(a){return z(a)===m}reactIs_production_min.AsyncMode=l;reactIs_production_min.ConcurrentMode=m;reactIs_production_min.ContextConsumer=k;reactIs_production_min.ContextProvider=h;reactIs_production_min.Element=c;reactIs_production_min.ForwardRef=n;reactIs_production_min.Fragment=e;reactIs_production_min.Lazy=t;reactIs_production_min.Memo=r;reactIs_production_min.Portal=d;
-	reactIs_production_min.Profiler=g;reactIs_production_min.StrictMode=f;reactIs_production_min.Suspense=p;reactIs_production_min.isAsyncMode=function(a){return A(a)||z(a)===l};reactIs_production_min.isConcurrentMode=A;reactIs_production_min.isContextConsumer=function(a){return z(a)===k};reactIs_production_min.isContextProvider=function(a){return z(a)===h};reactIs_production_min.isElement=function(a){return "object"===typeof a&&null!==a&&a.$$typeof===c};reactIs_production_min.isForwardRef=function(a){return z(a)===n};reactIs_production_min.isFragment=function(a){return z(a)===e};reactIs_production_min.isLazy=function(a){return z(a)===t};
-	reactIs_production_min.isMemo=function(a){return z(a)===r};reactIs_production_min.isPortal=function(a){return z(a)===d};reactIs_production_min.isProfiler=function(a){return z(a)===g};reactIs_production_min.isStrictMode=function(a){return z(a)===f};reactIs_production_min.isSuspense=function(a){return z(a)===p};
-	reactIs_production_min.isValidElementType=function(a){return "string"===typeof a||"function"===typeof a||a===e||a===m||a===g||a===f||a===p||a===q||"object"===typeof a&&null!==a&&(a.$$typeof===t||a.$$typeof===r||a.$$typeof===h||a.$$typeof===k||a.$$typeof===n||a.$$typeof===w||a.$$typeof===x||a.$$typeof===y||a.$$typeof===v)};reactIs_production_min.typeOf=z;
-	return reactIs_production_min;
-}
-
-var reactIs_development = {};
-
-/** @license React v16.13.1
- * react-is.development.js
- *
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-var hasRequiredReactIs_development;
-
-function requireReactIs_development () {
-	if (hasRequiredReactIs_development) return reactIs_development;
-	hasRequiredReactIs_development = 1;
-
-
-
-	if (process.env.NODE_ENV !== "production") {
-	  (function() {
-
-	// The Symbol used to tag the ReactElement-like types. If there is no native Symbol
-	// nor polyfill, then a plain number is used for performance.
-	var hasSymbol = typeof Symbol === 'function' && Symbol.for;
-	var REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for('react.element') : 0xeac7;
-	var REACT_PORTAL_TYPE = hasSymbol ? Symbol.for('react.portal') : 0xeaca;
-	var REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for('react.fragment') : 0xeacb;
-	var REACT_STRICT_MODE_TYPE = hasSymbol ? Symbol.for('react.strict_mode') : 0xeacc;
-	var REACT_PROFILER_TYPE = hasSymbol ? Symbol.for('react.profiler') : 0xead2;
-	var REACT_PROVIDER_TYPE = hasSymbol ? Symbol.for('react.provider') : 0xeacd;
-	var REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for('react.context') : 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
-	// (unstable) APIs that have been removed. Can we remove the symbols?
-
-	var REACT_ASYNC_MODE_TYPE = hasSymbol ? Symbol.for('react.async_mode') : 0xeacf;
-	var REACT_CONCURRENT_MODE_TYPE = hasSymbol ? Symbol.for('react.concurrent_mode') : 0xeacf;
-	var REACT_FORWARD_REF_TYPE = hasSymbol ? Symbol.for('react.forward_ref') : 0xead0;
-	var REACT_SUSPENSE_TYPE = hasSymbol ? Symbol.for('react.suspense') : 0xead1;
-	var REACT_SUSPENSE_LIST_TYPE = hasSymbol ? Symbol.for('react.suspense_list') : 0xead8;
-	var REACT_MEMO_TYPE = hasSymbol ? Symbol.for('react.memo') : 0xead3;
-	var REACT_LAZY_TYPE = hasSymbol ? Symbol.for('react.lazy') : 0xead4;
-	var REACT_BLOCK_TYPE = hasSymbol ? Symbol.for('react.block') : 0xead9;
-	var REACT_FUNDAMENTAL_TYPE = hasSymbol ? Symbol.for('react.fundamental') : 0xead5;
-	var REACT_RESPONDER_TYPE = hasSymbol ? Symbol.for('react.responder') : 0xead6;
-	var REACT_SCOPE_TYPE = hasSymbol ? Symbol.for('react.scope') : 0xead7;
-
-	function isValidElementType(type) {
-	  return typeof type === 'string' || typeof type === 'function' || // Note: its typeof might be other than 'symbol' or 'number' if it's a polyfill.
-	  type === REACT_FRAGMENT_TYPE || type === REACT_CONCURRENT_MODE_TYPE || type === REACT_PROFILER_TYPE || type === REACT_STRICT_MODE_TYPE || type === REACT_SUSPENSE_TYPE || type === REACT_SUSPENSE_LIST_TYPE || typeof type === 'object' && type !== null && (type.$$typeof === REACT_LAZY_TYPE || type.$$typeof === REACT_MEMO_TYPE || type.$$typeof === REACT_PROVIDER_TYPE || type.$$typeof === REACT_CONTEXT_TYPE || type.$$typeof === REACT_FORWARD_REF_TYPE || type.$$typeof === REACT_FUNDAMENTAL_TYPE || type.$$typeof === REACT_RESPONDER_TYPE || type.$$typeof === REACT_SCOPE_TYPE || type.$$typeof === REACT_BLOCK_TYPE);
-	}
-
-	function typeOf(object) {
-	  if (typeof object === 'object' && object !== null) {
-	    var $$typeof = object.$$typeof;
-
-	    switch ($$typeof) {
-	      case REACT_ELEMENT_TYPE:
-	        var type = object.type;
-
-	        switch (type) {
-	          case REACT_ASYNC_MODE_TYPE:
-	          case REACT_CONCURRENT_MODE_TYPE:
-	          case REACT_FRAGMENT_TYPE:
-	          case REACT_PROFILER_TYPE:
-	          case REACT_STRICT_MODE_TYPE:
-	          case REACT_SUSPENSE_TYPE:
-	            return type;
-
-	          default:
-	            var $$typeofType = type && type.$$typeof;
-
-	            switch ($$typeofType) {
-	              case REACT_CONTEXT_TYPE:
-	              case REACT_FORWARD_REF_TYPE:
-	              case REACT_LAZY_TYPE:
-	              case REACT_MEMO_TYPE:
-	              case REACT_PROVIDER_TYPE:
-	                return $$typeofType;
-
-	              default:
-	                return $$typeof;
-	            }
-
-	        }
-
-	      case REACT_PORTAL_TYPE:
-	        return $$typeof;
-	    }
-	  }
-
-	  return undefined;
-	} // AsyncMode is deprecated along with isAsyncMode
-
-	var AsyncMode = REACT_ASYNC_MODE_TYPE;
-	var ConcurrentMode = REACT_CONCURRENT_MODE_TYPE;
-	var ContextConsumer = REACT_CONTEXT_TYPE;
-	var ContextProvider = REACT_PROVIDER_TYPE;
-	var Element = REACT_ELEMENT_TYPE;
-	var ForwardRef = REACT_FORWARD_REF_TYPE;
-	var Fragment = REACT_FRAGMENT_TYPE;
-	var Lazy = REACT_LAZY_TYPE;
-	var Memo = REACT_MEMO_TYPE;
-	var Portal = REACT_PORTAL_TYPE;
-	var Profiler = REACT_PROFILER_TYPE;
-	var StrictMode = REACT_STRICT_MODE_TYPE;
-	var Suspense = REACT_SUSPENSE_TYPE;
-	var hasWarnedAboutDeprecatedIsAsyncMode = false; // AsyncMode should be deprecated
-
-	function isAsyncMode(object) {
-	  {
-	    if (!hasWarnedAboutDeprecatedIsAsyncMode) {
-	      hasWarnedAboutDeprecatedIsAsyncMode = true; // Using console['warn'] to evade Babel and ESLint
-
-	      console['warn']('The ReactIs.isAsyncMode() alias has been deprecated, ' + 'and will be removed in React 17+. Update your code to use ' + 'ReactIs.isConcurrentMode() instead. It has the exact same API.');
-	    }
-	  }
-
-	  return isConcurrentMode(object) || typeOf(object) === REACT_ASYNC_MODE_TYPE;
-	}
-	function isConcurrentMode(object) {
-	  return typeOf(object) === REACT_CONCURRENT_MODE_TYPE;
-	}
-	function isContextConsumer(object) {
-	  return typeOf(object) === REACT_CONTEXT_TYPE;
-	}
-	function isContextProvider(object) {
-	  return typeOf(object) === REACT_PROVIDER_TYPE;
-	}
-	function isElement(object) {
-	  return typeof object === 'object' && object !== null && object.$$typeof === REACT_ELEMENT_TYPE;
-	}
-	function isForwardRef(object) {
-	  return typeOf(object) === REACT_FORWARD_REF_TYPE;
-	}
-	function isFragment(object) {
-	  return typeOf(object) === REACT_FRAGMENT_TYPE;
-	}
-	function isLazy(object) {
-	  return typeOf(object) === REACT_LAZY_TYPE;
-	}
-	function isMemo(object) {
-	  return typeOf(object) === REACT_MEMO_TYPE;
-	}
-	function isPortal(object) {
-	  return typeOf(object) === REACT_PORTAL_TYPE;
-	}
-	function isProfiler(object) {
-	  return typeOf(object) === REACT_PROFILER_TYPE;
-	}
-	function isStrictMode(object) {
-	  return typeOf(object) === REACT_STRICT_MODE_TYPE;
-	}
-	function isSuspense(object) {
-	  return typeOf(object) === REACT_SUSPENSE_TYPE;
-	}
-
-	reactIs_development.AsyncMode = AsyncMode;
-	reactIs_development.ConcurrentMode = ConcurrentMode;
-	reactIs_development.ContextConsumer = ContextConsumer;
-	reactIs_development.ContextProvider = ContextProvider;
-	reactIs_development.Element = Element;
-	reactIs_development.ForwardRef = ForwardRef;
-	reactIs_development.Fragment = Fragment;
-	reactIs_development.Lazy = Lazy;
-	reactIs_development.Memo = Memo;
-	reactIs_development.Portal = Portal;
-	reactIs_development.Profiler = Profiler;
-	reactIs_development.StrictMode = StrictMode;
-	reactIs_development.Suspense = Suspense;
-	reactIs_development.isAsyncMode = isAsyncMode;
-	reactIs_development.isConcurrentMode = isConcurrentMode;
-	reactIs_development.isContextConsumer = isContextConsumer;
-	reactIs_development.isContextProvider = isContextProvider;
-	reactIs_development.isElement = isElement;
-	reactIs_development.isForwardRef = isForwardRef;
-	reactIs_development.isFragment = isFragment;
-	reactIs_development.isLazy = isLazy;
-	reactIs_development.isMemo = isMemo;
-	reactIs_development.isPortal = isPortal;
-	reactIs_development.isProfiler = isProfiler;
-	reactIs_development.isStrictMode = isStrictMode;
-	reactIs_development.isSuspense = isSuspense;
-	reactIs_development.isValidElementType = isValidElementType;
-	reactIs_development.typeOf = typeOf;
-	  })();
-	}
-	return reactIs_development;
-}
-
-var hasRequiredReactIs;
-
-function requireReactIs () {
-	if (hasRequiredReactIs) return reactIs.exports;
-	hasRequiredReactIs = 1;
-
-	if (process.env.NODE_ENV === 'production') {
-	  reactIs.exports = requireReactIs_production_min();
-	} else {
-	  reactIs.exports = requireReactIs_development();
-	}
-	return reactIs.exports;
-}
-
-/*
-object-assign
-(c) Sindre Sorhus
-@license MIT
-*/
-
-var objectAssign;
-var hasRequiredObjectAssign;
-
-function requireObjectAssign () {
-	if (hasRequiredObjectAssign) return objectAssign;
-	hasRequiredObjectAssign = 1;
-	/* eslint-disable no-unused-vars */
-	var getOwnPropertySymbols = Object.getOwnPropertySymbols;
-	var hasOwnProperty = Object.prototype.hasOwnProperty;
-	var propIsEnumerable = Object.prototype.propertyIsEnumerable;
-
-	function toObject(val) {
-		if (val === null || val === undefined) {
-			throw new TypeError('Object.assign cannot be called with null or undefined');
-		}
-
-		return Object(val);
-	}
-
-	function shouldUseNative() {
-		try {
-			if (!Object.assign) {
-				return false;
-			}
-
-			// Detect buggy property enumeration order in older V8 versions.
-
-			// https://bugs.chromium.org/p/v8/issues/detail?id=4118
-			var test1 = new String('abc');  // eslint-disable-line no-new-wrappers
-			test1[5] = 'de';
-			if (Object.getOwnPropertyNames(test1)[0] === '5') {
-				return false;
-			}
-
-			// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-			var test2 = {};
-			for (var i = 0; i < 10; i++) {
-				test2['_' + String.fromCharCode(i)] = i;
-			}
-			var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
-				return test2[n];
-			});
-			if (order2.join('') !== '0123456789') {
-				return false;
-			}
-
-			// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-			var test3 = {};
-			'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
-				test3[letter] = letter;
-			});
-			if (Object.keys(Object.assign({}, test3)).join('') !==
-					'abcdefghijklmnopqrst') {
-				return false;
-			}
-
-			return true;
-		} catch (err) {
-			// We don't expect any of the above to throw, but better to be safe.
-			return false;
-		}
-	}
-
-	objectAssign = shouldUseNative() ? Object.assign : function (target, source) {
-		var from;
-		var to = toObject(target);
-		var symbols;
-
-		for (var s = 1; s < arguments.length; s++) {
-			from = Object(arguments[s]);
-
-			for (var key in from) {
-				if (hasOwnProperty.call(from, key)) {
-					to[key] = from[key];
-				}
-			}
-
-			if (getOwnPropertySymbols) {
-				symbols = getOwnPropertySymbols(from);
-				for (var i = 0; i < symbols.length; i++) {
-					if (propIsEnumerable.call(from, symbols[i])) {
-						to[symbols[i]] = from[symbols[i]];
-					}
-				}
-			}
-		}
-
-		return to;
-	};
-	return objectAssign;
-}
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-var ReactPropTypesSecret_1;
-var hasRequiredReactPropTypesSecret;
-
-function requireReactPropTypesSecret () {
-	if (hasRequiredReactPropTypesSecret) return ReactPropTypesSecret_1;
-	hasRequiredReactPropTypesSecret = 1;
-
-	var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
-
-	ReactPropTypesSecret_1 = ReactPropTypesSecret;
-	return ReactPropTypesSecret_1;
-}
-
-var has;
-var hasRequiredHas;
-
-function requireHas () {
-	if (hasRequiredHas) return has;
-	hasRequiredHas = 1;
-	has = Function.call.bind(Object.prototype.hasOwnProperty);
-	return has;
-}
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-var checkPropTypes_1;
-var hasRequiredCheckPropTypes;
-
-function requireCheckPropTypes () {
-	if (hasRequiredCheckPropTypes) return checkPropTypes_1;
-	hasRequiredCheckPropTypes = 1;
-
-	var printWarning = function() {};
-
-	if (process.env.NODE_ENV !== 'production') {
-	  var ReactPropTypesSecret = requireReactPropTypesSecret();
-	  var loggedTypeFailures = {};
-	  var has = requireHas();
-
-	  printWarning = function(text) {
-	    var message = 'Warning: ' + text;
-	    if (typeof console !== 'undefined') {
-	      console.error(message);
-	    }
-	    try {
-	      // --- Welcome to debugging React ---
-	      // This error was thrown as a convenience so that you can use this stack
-	      // to find the callsite that caused this warning to fire.
-	      throw new Error(message);
-	    } catch (x) { /**/ }
-	  };
-	}
-
-	/**
-	 * Assert that the values match with the type specs.
-	 * Error messages are memorized and will only be shown once.
-	 *
-	 * @param {object} typeSpecs Map of name to a ReactPropType
-	 * @param {object} values Runtime values that need to be type-checked
-	 * @param {string} location e.g. "prop", "context", "child context"
-	 * @param {string} componentName Name of the component for error messages.
-	 * @param {?Function} getStack Returns the component stack.
-	 * @private
-	 */
-	function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
-	  if (process.env.NODE_ENV !== 'production') {
-	    for (var typeSpecName in typeSpecs) {
-	      if (has(typeSpecs, typeSpecName)) {
-	        var error;
-	        // Prop type validation may throw. In case they do, we don't want to
-	        // fail the render phase where it didn't fail before. So we log it.
-	        // After these have been cleaned up, we'll let them throw.
-	        try {
-	          // This is intentionally an invariant that gets caught. It's the same
-	          // behavior as without this statement except with a better message.
-	          if (typeof typeSpecs[typeSpecName] !== 'function') {
-	            var err = Error(
-	              (componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' +
-	              'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.' +
-	              'This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.'
-	            );
-	            err.name = 'Invariant Violation';
-	            throw err;
-	          }
-	          error = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, ReactPropTypesSecret);
-	        } catch (ex) {
-	          error = ex;
-	        }
-	        if (error && !(error instanceof Error)) {
-	          printWarning(
-	            (componentName || 'React class') + ': type specification of ' +
-	            location + ' `' + typeSpecName + '` is invalid; the type checker ' +
-	            'function must return `null` or an `Error` but returned a ' + typeof error + '. ' +
-	            'You may have forgotten to pass an argument to the type checker ' +
-	            'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' +
-	            'shape all require an argument).'
-	          );
-	        }
-	        if (error instanceof Error && !(error.message in loggedTypeFailures)) {
-	          // Only monitor this failure once because there tends to be a lot of the
-	          // same error.
-	          loggedTypeFailures[error.message] = true;
-
-	          var stack = getStack ? getStack() : '';
-
-	          printWarning(
-	            'Failed ' + location + ' type: ' + error.message + (stack != null ? stack : '')
-	          );
-	        }
-	      }
-	    }
-	  }
-	}
-
-	/**
-	 * Resets warning cache when testing.
-	 *
-	 * @private
-	 */
-	checkPropTypes.resetWarningCache = function() {
-	  if (process.env.NODE_ENV !== 'production') {
-	    loggedTypeFailures = {};
-	  }
-	};
-
-	checkPropTypes_1 = checkPropTypes;
-	return checkPropTypes_1;
-}
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-var factoryWithTypeCheckers;
-var hasRequiredFactoryWithTypeCheckers;
-
-function requireFactoryWithTypeCheckers () {
-	if (hasRequiredFactoryWithTypeCheckers) return factoryWithTypeCheckers;
-	hasRequiredFactoryWithTypeCheckers = 1;
-
-	var ReactIs = requireReactIs();
-	var assign = requireObjectAssign();
-
-	var ReactPropTypesSecret = requireReactPropTypesSecret();
-	var has = requireHas();
-	var checkPropTypes = requireCheckPropTypes();
-
-	var printWarning = function() {};
-
-	if (process.env.NODE_ENV !== 'production') {
-	  printWarning = function(text) {
-	    var message = 'Warning: ' + text;
-	    if (typeof console !== 'undefined') {
-	      console.error(message);
-	    }
-	    try {
-	      // --- Welcome to debugging React ---
-	      // This error was thrown as a convenience so that you can use this stack
-	      // to find the callsite that caused this warning to fire.
-	      throw new Error(message);
-	    } catch (x) {}
-	  };
-	}
-
-	function emptyFunctionThatReturnsNull() {
-	  return null;
-	}
-
-	factoryWithTypeCheckers = function(isValidElement, throwOnDirectAccess) {
-	  /* global Symbol */
-	  var ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
-	  var FAUX_ITERATOR_SYMBOL = '@@iterator'; // Before Symbol spec.
-
-	  /**
-	   * Returns the iterator method function contained on the iterable object.
-	   *
-	   * Be sure to invoke the function with the iterable as context:
-	   *
-	   *     var iteratorFn = getIteratorFn(myIterable);
-	   *     if (iteratorFn) {
-	   *       var iterator = iteratorFn.call(myIterable);
-	   *       ...
-	   *     }
-	   *
-	   * @param {?object} maybeIterable
-	   * @return {?function}
-	   */
-	  function getIteratorFn(maybeIterable) {
-	    var iteratorFn = maybeIterable && (ITERATOR_SYMBOL && maybeIterable[ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL]);
-	    if (typeof iteratorFn === 'function') {
-	      return iteratorFn;
-	    }
-	  }
-
-	  /**
-	   * Collection of methods that allow declaration and validation of props that are
-	   * supplied to React components. Example usage:
-	   *
-	   *   var Props = require('ReactPropTypes');
-	   *   var MyArticle = React.createClass({
-	   *     propTypes: {
-	   *       // An optional string prop named "description".
-	   *       description: Props.string,
-	   *
-	   *       // A required enum prop named "category".
-	   *       category: Props.oneOf(['News','Photos']).isRequired,
-	   *
-	   *       // A prop named "dialog" that requires an instance of Dialog.
-	   *       dialog: Props.instanceOf(Dialog).isRequired
-	   *     },
-	   *     render: function() { ... }
-	   *   });
-	   *
-	   * A more formal specification of how these methods are used:
-	   *
-	   *   type := array|bool|func|object|number|string|oneOf([...])|instanceOf(...)
-	   *   decl := ReactPropTypes.{type}(.isRequired)?
-	   *
-	   * Each and every declaration produces a function with the same signature. This
-	   * allows the creation of custom validation functions. For example:
-	   *
-	   *  var MyLink = React.createClass({
-	   *    propTypes: {
-	   *      // An optional string or URI prop named "href".
-	   *      href: function(props, propName, componentName) {
-	   *        var propValue = props[propName];
-	   *        if (propValue != null && typeof propValue !== 'string' &&
-	   *            !(propValue instanceof URI)) {
-	   *          return new Error(
-	   *            'Expected a string or an URI for ' + propName + ' in ' +
-	   *            componentName
-	   *          );
-	   *        }
-	   *      }
-	   *    },
-	   *    render: function() {...}
-	   *  });
-	   *
-	   * @internal
-	   */
-
-	  var ANONYMOUS = '<<anonymous>>';
-
-	  // Important!
-	  // Keep this list in sync with production version in `./factoryWithThrowingShims.js`.
-	  var ReactPropTypes = {
-	    array: createPrimitiveTypeChecker('array'),
-	    bigint: createPrimitiveTypeChecker('bigint'),
-	    bool: createPrimitiveTypeChecker('boolean'),
-	    func: createPrimitiveTypeChecker('function'),
-	    number: createPrimitiveTypeChecker('number'),
-	    object: createPrimitiveTypeChecker('object'),
-	    string: createPrimitiveTypeChecker('string'),
-	    symbol: createPrimitiveTypeChecker('symbol'),
-
-	    any: createAnyTypeChecker(),
-	    arrayOf: createArrayOfTypeChecker,
-	    element: createElementTypeChecker(),
-	    elementType: createElementTypeTypeChecker(),
-	    instanceOf: createInstanceTypeChecker,
-	    node: createNodeChecker(),
-	    objectOf: createObjectOfTypeChecker,
-	    oneOf: createEnumTypeChecker,
-	    oneOfType: createUnionTypeChecker,
-	    shape: createShapeTypeChecker,
-	    exact: createStrictShapeTypeChecker,
-	  };
-
-	  /**
-	   * inlined Object.is polyfill to avoid requiring consumers ship their own
-	   * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
-	   */
-	  /*eslint-disable no-self-compare*/
-	  function is(x, y) {
-	    // SameValue algorithm
-	    if (x === y) {
-	      // Steps 1-5, 7-10
-	      // Steps 6.b-6.e: +0 != -0
-	      return x !== 0 || 1 / x === 1 / y;
-	    } else {
-	      // Step 6.a: NaN == NaN
-	      return x !== x && y !== y;
-	    }
-	  }
-	  /*eslint-enable no-self-compare*/
-
-	  /**
-	   * We use an Error-like object for backward compatibility as people may call
-	   * PropTypes directly and inspect their output. However, we don't use real
-	   * Errors anymore. We don't inspect their stack anyway, and creating them
-	   * is prohibitively expensive if they are created too often, such as what
-	   * happens in oneOfType() for any type before the one that matched.
-	   */
-	  function PropTypeError(message, data) {
-	    this.message = message;
-	    this.data = data && typeof data === 'object' ? data: {};
-	    this.stack = '';
-	  }
-	  // Make `instanceof Error` still work for returned errors.
-	  PropTypeError.prototype = Error.prototype;
-
-	  function createChainableTypeChecker(validate) {
-	    if (process.env.NODE_ENV !== 'production') {
-	      var manualPropTypeCallCache = {};
-	      var manualPropTypeWarningCount = 0;
-	    }
-	    function checkType(isRequired, props, propName, componentName, location, propFullName, secret) {
-	      componentName = componentName || ANONYMOUS;
-	      propFullName = propFullName || propName;
-
-	      if (secret !== ReactPropTypesSecret) {
-	        if (throwOnDirectAccess) {
-	          // New behavior only for users of `prop-types` package
-	          var err = new Error(
-	            'Calling PropTypes validators directly is not supported by the `prop-types` package. ' +
-	            'Use `PropTypes.checkPropTypes()` to call them. ' +
-	            'Read more at http://fb.me/use-check-prop-types'
-	          );
-	          err.name = 'Invariant Violation';
-	          throw err;
-	        } else if (process.env.NODE_ENV !== 'production' && typeof console !== 'undefined') {
-	          // Old behavior for people using React.PropTypes
-	          var cacheKey = componentName + ':' + propName;
-	          if (
-	            !manualPropTypeCallCache[cacheKey] &&
-	            // Avoid spamming the console because they are often not actionable except for lib authors
-	            manualPropTypeWarningCount < 3
-	          ) {
-	            printWarning(
-	              'You are manually calling a React.PropTypes validation ' +
-	              'function for the `' + propFullName + '` prop on `' + componentName + '`. This is deprecated ' +
-	              'and will throw in the standalone `prop-types` package. ' +
-	              'You may be seeing this warning due to a third-party PropTypes ' +
-	              'library. See https://fb.me/react-warning-dont-call-proptypes ' + 'for details.'
-	            );
-	            manualPropTypeCallCache[cacheKey] = true;
-	            manualPropTypeWarningCount++;
-	          }
-	        }
-	      }
-	      if (props[propName] == null) {
-	        if (isRequired) {
-	          if (props[propName] === null) {
-	            return new PropTypeError('The ' + location + ' `' + propFullName + '` is marked as required ' + ('in `' + componentName + '`, but its value is `null`.'));
-	          }
-	          return new PropTypeError('The ' + location + ' `' + propFullName + '` is marked as required in ' + ('`' + componentName + '`, but its value is `undefined`.'));
-	        }
-	        return null;
-	      } else {
-	        return validate(props, propName, componentName, location, propFullName);
-	      }
-	    }
-
-	    var chainedCheckType = checkType.bind(null, false);
-	    chainedCheckType.isRequired = checkType.bind(null, true);
-
-	    return chainedCheckType;
-	  }
-
-	  function createPrimitiveTypeChecker(expectedType) {
-	    function validate(props, propName, componentName, location, propFullName, secret) {
-	      var propValue = props[propName];
-	      var propType = getPropType(propValue);
-	      if (propType !== expectedType) {
-	        // `propValue` being instance of, say, date/regexp, pass the 'object'
-	        // check, but we can offer a more precise error message here rather than
-	        // 'of type `object`'.
-	        var preciseType = getPreciseType(propValue);
-
-	        return new PropTypeError(
-	          'Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + preciseType + '` supplied to `' + componentName + '`, expected ') + ('`' + expectedType + '`.'),
-	          {expectedType: expectedType}
-	        );
-	      }
-	      return null;
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createAnyTypeChecker() {
-	    return createChainableTypeChecker(emptyFunctionThatReturnsNull);
-	  }
-
-	  function createArrayOfTypeChecker(typeChecker) {
-	    function validate(props, propName, componentName, location, propFullName) {
-	      if (typeof typeChecker !== 'function') {
-	        return new PropTypeError('Property `' + propFullName + '` of component `' + componentName + '` has invalid PropType notation inside arrayOf.');
-	      }
-	      var propValue = props[propName];
-	      if (!Array.isArray(propValue)) {
-	        var propType = getPropType(propValue);
-	        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected an array.'));
-	      }
-	      for (var i = 0; i < propValue.length; i++) {
-	        var error = typeChecker(propValue, i, componentName, location, propFullName + '[' + i + ']', ReactPropTypesSecret);
-	        if (error instanceof Error) {
-	          return error;
-	        }
-	      }
-	      return null;
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createElementTypeChecker() {
-	    function validate(props, propName, componentName, location, propFullName) {
-	      var propValue = props[propName];
-	      if (!isValidElement(propValue)) {
-	        var propType = getPropType(propValue);
-	        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected a single ReactElement.'));
-	      }
-	      return null;
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createElementTypeTypeChecker() {
-	    function validate(props, propName, componentName, location, propFullName) {
-	      var propValue = props[propName];
-	      if (!ReactIs.isValidElementType(propValue)) {
-	        var propType = getPropType(propValue);
-	        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected a single ReactElement type.'));
-	      }
-	      return null;
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createInstanceTypeChecker(expectedClass) {
-	    function validate(props, propName, componentName, location, propFullName) {
-	      if (!(props[propName] instanceof expectedClass)) {
-	        var expectedClassName = expectedClass.name || ANONYMOUS;
-	        var actualClassName = getClassName(props[propName]);
-	        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + actualClassName + '` supplied to `' + componentName + '`, expected ') + ('instance of `' + expectedClassName + '`.'));
-	      }
-	      return null;
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createEnumTypeChecker(expectedValues) {
-	    if (!Array.isArray(expectedValues)) {
-	      if (process.env.NODE_ENV !== 'production') {
-	        if (arguments.length > 1) {
-	          printWarning(
-	            'Invalid arguments supplied to oneOf, expected an array, got ' + arguments.length + ' arguments. ' +
-	            'A common mistake is to write oneOf(x, y, z) instead of oneOf([x, y, z]).'
-	          );
-	        } else {
-	          printWarning('Invalid argument supplied to oneOf, expected an array.');
-	        }
-	      }
-	      return emptyFunctionThatReturnsNull;
-	    }
-
-	    function validate(props, propName, componentName, location, propFullName) {
-	      var propValue = props[propName];
-	      for (var i = 0; i < expectedValues.length; i++) {
-	        if (is(propValue, expectedValues[i])) {
-	          return null;
-	        }
-	      }
-
-	      var valuesString = JSON.stringify(expectedValues, function replacer(key, value) {
-	        var type = getPreciseType(value);
-	        if (type === 'symbol') {
-	          return String(value);
-	        }
-	        return value;
-	      });
-	      return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of value `' + String(propValue) + '` ' + ('supplied to `' + componentName + '`, expected one of ' + valuesString + '.'));
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createObjectOfTypeChecker(typeChecker) {
-	    function validate(props, propName, componentName, location, propFullName) {
-	      if (typeof typeChecker !== 'function') {
-	        return new PropTypeError('Property `' + propFullName + '` of component `' + componentName + '` has invalid PropType notation inside objectOf.');
-	      }
-	      var propValue = props[propName];
-	      var propType = getPropType(propValue);
-	      if (propType !== 'object') {
-	        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected an object.'));
-	      }
-	      for (var key in propValue) {
-	        if (has(propValue, key)) {
-	          var error = typeChecker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
-	          if (error instanceof Error) {
-	            return error;
-	          }
-	        }
-	      }
-	      return null;
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createUnionTypeChecker(arrayOfTypeCheckers) {
-	    if (!Array.isArray(arrayOfTypeCheckers)) {
-	      process.env.NODE_ENV !== 'production' ? printWarning('Invalid argument supplied to oneOfType, expected an instance of array.') : void 0;
-	      return emptyFunctionThatReturnsNull;
-	    }
-
-	    for (var i = 0; i < arrayOfTypeCheckers.length; i++) {
-	      var checker = arrayOfTypeCheckers[i];
-	      if (typeof checker !== 'function') {
-	        printWarning(
-	          'Invalid argument supplied to oneOfType. Expected an array of check functions, but ' +
-	          'received ' + getPostfixForTypeWarning(checker) + ' at index ' + i + '.'
-	        );
-	        return emptyFunctionThatReturnsNull;
-	      }
-	    }
-
-	    function validate(props, propName, componentName, location, propFullName) {
-	      var expectedTypes = [];
-	      for (var i = 0; i < arrayOfTypeCheckers.length; i++) {
-	        var checker = arrayOfTypeCheckers[i];
-	        var checkerResult = checker(props, propName, componentName, location, propFullName, ReactPropTypesSecret);
-	        if (checkerResult == null) {
-	          return null;
-	        }
-	        if (checkerResult.data && has(checkerResult.data, 'expectedType')) {
-	          expectedTypes.push(checkerResult.data.expectedType);
-	        }
-	      }
-	      var expectedTypesMessage = (expectedTypes.length > 0) ? ', expected one of type [' + expectedTypes.join(', ') + ']': '';
-	      return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` supplied to ' + ('`' + componentName + '`' + expectedTypesMessage + '.'));
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createNodeChecker() {
-	    function validate(props, propName, componentName, location, propFullName) {
-	      if (!isNode(props[propName])) {
-	        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` supplied to ' + ('`' + componentName + '`, expected a ReactNode.'));
-	      }
-	      return null;
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function invalidValidatorError(componentName, location, propFullName, key, type) {
-	    return new PropTypeError(
-	      (componentName || 'React class') + ': ' + location + ' type `' + propFullName + '.' + key + '` is invalid; ' +
-	      'it must be a function, usually from the `prop-types` package, but received `' + type + '`.'
-	    );
-	  }
-
-	  function createShapeTypeChecker(shapeTypes) {
-	    function validate(props, propName, componentName, location, propFullName) {
-	      var propValue = props[propName];
-	      var propType = getPropType(propValue);
-	      if (propType !== 'object') {
-	        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type `' + propType + '` ' + ('supplied to `' + componentName + '`, expected `object`.'));
-	      }
-	      for (var key in shapeTypes) {
-	        var checker = shapeTypes[key];
-	        if (typeof checker !== 'function') {
-	          return invalidValidatorError(componentName, location, propFullName, key, getPreciseType(checker));
-	        }
-	        var error = checker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
-	        if (error) {
-	          return error;
-	        }
-	      }
-	      return null;
-	    }
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function createStrictShapeTypeChecker(shapeTypes) {
-	    function validate(props, propName, componentName, location, propFullName) {
-	      var propValue = props[propName];
-	      var propType = getPropType(propValue);
-	      if (propType !== 'object') {
-	        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type `' + propType + '` ' + ('supplied to `' + componentName + '`, expected `object`.'));
-	      }
-	      // We need to check all keys in case some are required but missing from props.
-	      var allKeys = assign({}, props[propName], shapeTypes);
-	      for (var key in allKeys) {
-	        var checker = shapeTypes[key];
-	        if (has(shapeTypes, key) && typeof checker !== 'function') {
-	          return invalidValidatorError(componentName, location, propFullName, key, getPreciseType(checker));
-	        }
-	        if (!checker) {
-	          return new PropTypeError(
-	            'Invalid ' + location + ' `' + propFullName + '` key `' + key + '` supplied to `' + componentName + '`.' +
-	            '\nBad object: ' + JSON.stringify(props[propName], null, '  ') +
-	            '\nValid keys: ' + JSON.stringify(Object.keys(shapeTypes), null, '  ')
-	          );
-	        }
-	        var error = checker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
-	        if (error) {
-	          return error;
-	        }
-	      }
-	      return null;
-	    }
-
-	    return createChainableTypeChecker(validate);
-	  }
-
-	  function isNode(propValue) {
-	    switch (typeof propValue) {
-	      case 'number':
-	      case 'string':
-	      case 'undefined':
-	        return true;
-	      case 'boolean':
-	        return !propValue;
-	      case 'object':
-	        if (Array.isArray(propValue)) {
-	          return propValue.every(isNode);
-	        }
-	        if (propValue === null || isValidElement(propValue)) {
-	          return true;
-	        }
-
-	        var iteratorFn = getIteratorFn(propValue);
-	        if (iteratorFn) {
-	          var iterator = iteratorFn.call(propValue);
-	          var step;
-	          if (iteratorFn !== propValue.entries) {
-	            while (!(step = iterator.next()).done) {
-	              if (!isNode(step.value)) {
-	                return false;
-	              }
-	            }
-	          } else {
-	            // Iterator will provide entry [k,v] tuples rather than values.
-	            while (!(step = iterator.next()).done) {
-	              var entry = step.value;
-	              if (entry) {
-	                if (!isNode(entry[1])) {
-	                  return false;
-	                }
-	              }
-	            }
-	          }
-	        } else {
-	          return false;
-	        }
-
-	        return true;
-	      default:
-	        return false;
-	    }
-	  }
-
-	  function isSymbol(propType, propValue) {
-	    // Native Symbol.
-	    if (propType === 'symbol') {
-	      return true;
-	    }
-
-	    // falsy value can't be a Symbol
-	    if (!propValue) {
-	      return false;
-	    }
-
-	    // 19.4.3.5 Symbol.prototype[@@toStringTag] === 'Symbol'
-	    if (propValue['@@toStringTag'] === 'Symbol') {
-	      return true;
-	    }
-
-	    // Fallback for non-spec compliant Symbols which are polyfilled.
-	    if (typeof Symbol === 'function' && propValue instanceof Symbol) {
-	      return true;
-	    }
-
-	    return false;
-	  }
-
-	  // Equivalent of `typeof` but with special handling for array and regexp.
-	  function getPropType(propValue) {
-	    var propType = typeof propValue;
-	    if (Array.isArray(propValue)) {
-	      return 'array';
-	    }
-	    if (propValue instanceof RegExp) {
-	      // Old webkits (at least until Android 4.0) return 'function' rather than
-	      // 'object' for typeof a RegExp. We'll normalize this here so that /bla/
-	      // passes PropTypes.object.
-	      return 'object';
-	    }
-	    if (isSymbol(propType, propValue)) {
-	      return 'symbol';
-	    }
-	    return propType;
-	  }
-
-	  // This handles more types than `getPropType`. Only used for error messages.
-	  // See `createPrimitiveTypeChecker`.
-	  function getPreciseType(propValue) {
-	    if (typeof propValue === 'undefined' || propValue === null) {
-	      return '' + propValue;
-	    }
-	    var propType = getPropType(propValue);
-	    if (propType === 'object') {
-	      if (propValue instanceof Date) {
-	        return 'date';
-	      } else if (propValue instanceof RegExp) {
-	        return 'regexp';
-	      }
-	    }
-	    return propType;
-	  }
-
-	  // Returns a string that is postfixed to a warning about an invalid type.
-	  // For example, "undefined" or "of type array"
-	  function getPostfixForTypeWarning(value) {
-	    var type = getPreciseType(value);
-	    switch (type) {
-	      case 'array':
-	      case 'object':
-	        return 'an ' + type;
-	      case 'boolean':
-	      case 'date':
-	      case 'regexp':
-	        return 'a ' + type;
-	      default:
-	        return type;
-	    }
-	  }
-
-	  // Returns class name of the object, if any.
-	  function getClassName(propValue) {
-	    if (!propValue.constructor || !propValue.constructor.name) {
-	      return ANONYMOUS;
-	    }
-	    return propValue.constructor.name;
-	  }
-
-	  ReactPropTypes.checkPropTypes = checkPropTypes;
-	  ReactPropTypes.resetWarningCache = checkPropTypes.resetWarningCache;
-	  ReactPropTypes.PropTypes = ReactPropTypes;
-
-	  return ReactPropTypes;
-	};
-	return factoryWithTypeCheckers;
-}
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-var factoryWithThrowingShims;
-var hasRequiredFactoryWithThrowingShims;
-
-function requireFactoryWithThrowingShims () {
-	if (hasRequiredFactoryWithThrowingShims) return factoryWithThrowingShims;
-	hasRequiredFactoryWithThrowingShims = 1;
-
-	var ReactPropTypesSecret = requireReactPropTypesSecret();
-
-	function emptyFunction() {}
-	function emptyFunctionWithReset() {}
-	emptyFunctionWithReset.resetWarningCache = emptyFunction;
-
-	factoryWithThrowingShims = function() {
-	  function shim(props, propName, componentName, location, propFullName, secret) {
-	    if (secret === ReactPropTypesSecret) {
-	      // It is still safe when called from React.
-	      return;
-	    }
-	    var err = new Error(
-	      'Calling PropTypes validators directly is not supported by the `prop-types` package. ' +
-	      'Use PropTypes.checkPropTypes() to call them. ' +
-	      'Read more at http://fb.me/use-check-prop-types'
-	    );
-	    err.name = 'Invariant Violation';
-	    throw err;
-	  }	  shim.isRequired = shim;
-	  function getShim() {
-	    return shim;
-	  }	  // Important!
-	  // Keep this list in sync with production version in `./factoryWithTypeCheckers.js`.
-	  var ReactPropTypes = {
-	    array: shim,
-	    bigint: shim,
-	    bool: shim,
-	    func: shim,
-	    number: shim,
-	    object: shim,
-	    string: shim,
-	    symbol: shim,
-
-	    any: shim,
-	    arrayOf: getShim,
-	    element: shim,
-	    elementType: shim,
-	    instanceOf: getShim,
-	    node: shim,
-	    objectOf: getShim,
-	    oneOf: getShim,
-	    oneOfType: getShim,
-	    shape: getShim,
-	    exact: getShim,
-
-	    checkPropTypes: emptyFunctionWithReset,
-	    resetWarningCache: emptyFunction
-	  };
-
-	  ReactPropTypes.PropTypes = ReactPropTypes;
-
-	  return ReactPropTypes;
-	};
-	return factoryWithThrowingShims;
-}
-
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-if (process.env.NODE_ENV !== 'production') {
-  var ReactIs = requireReactIs();
-
-  // By explicitly using `prop-types` you are opting into new development behavior.
-  // http://fb.me/prop-types-in-prod
-  var throwOnDirectAccess = true;
-  propTypes.exports = requireFactoryWithTypeCheckers()(ReactIs.isElement, throwOnDirectAccess);
-} else {
-  // By explicitly using `prop-types` you are opting into new production behavior.
-  // http://fb.me/prop-types-in-prod
-  propTypes.exports = requireFactoryWithThrowingShims()();
-}
-
-var propTypesExports = propTypes.exports;
-var PropTypes = /*@__PURE__*/getDefaultExportFromCjs(propTypesExports);
-
-/**
- * Core Diagram Component
- * Framework-agnostic React component for rendering diagrams
- */
-
-
-/**
- * Diagram - Main diagram renderer component
- */
-function Diagram$1({
-  graph,
-  style = 'sleek',
-  activeNodes = [],
-  activeEdges = [],
-  className = '',
-  padding = 0,
-  onNodeClick,
-  onEdgeClick,
-  fullscreenTarget,
-  showControls = false,
-  animate = true,
-  children
-}) {
-  const containerRef = useRef(null);
-  const [resolved, setResolved] = useState(null);
-  const [svgElement, setSvgElement] = useState(null);
-
-  // Resolve and cache the graph
-  useEffect(() => {
-    if (!graph) return;
-    try {
-      const r = resolveGraph$1(graph);
-      setResolved(r);
-    } catch (e) {
-      console.error('Flow: Failed to resolve graph', e);
+function pairs(obj, keys) {
+  const out = [];
+  for (const k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
+      out.push(`${k}: ${quote(obj[k])}`);
     }
-  }, [graph]);
-  const styleObj = STYLES$1[style] || STYLES$1.sleek;
-
-  // Download handler
-  const handleDownload = useCallback(() => {
-    if (svgElement) {
-      downloadSVG$1(svgElement, `diagram-${Date.now()}.svg`);
-    }
-  }, [svgElement]);
-  const handleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
-    if (containerRef.current.requestFullscreen) {
-      containerRef.current.requestFullscreen();
-    }
-  }, []);
-  if (!resolved) {
-    return /*#__PURE__*/React.createElement("div", {
-      className: `flow-diagram flow-loading ${className}`
-    }, "Loading diagram...");
   }
-  const {
-    nodes,
-    edges,
-    canvas
-  } = resolved;
-  const width = canvas.w + padding * 2;
-  const height = canvas.h + padding * 2;
-  return /*#__PURE__*/React.createElement("div", {
-    ref: containerRef,
-    className: `flow-diagram ${className}`,
-    style: {
-      '--flow-bg': styleObj.tokens.bg,
-      '--flow-grid': styleObj.tokens.grid
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    ref: setSvgElement,
-    width: "100%",
-    height: "100%",
-    viewBox: `0 0 ${width} ${height}`,
-    preserveAspectRatio: "xMidYMid meet",
-    className: "flow-svg"
-  }, /*#__PURE__*/React.createElement("defs", null, styleObj.Defs && /*#__PURE__*/React.createElement(styleObj.Defs, null), /*#__PURE__*/React.createElement("marker", {
-    id: "flow-arrow-solid",
-    viewBox: "0 0 10 10",
-    refX: "9",
-    refY: "5",
-    markerWidth: "6",
-    markerHeight: "6",
-    orient: "auto"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M 0 0 L 10 5 L 0 10 z",
-    fill: styleObj.tokens.edge
-  })), /*#__PURE__*/React.createElement("marker", {
-    id: "flow-arrow-active",
-    viewBox: "0 0 10 10",
-    refX: "9",
-    refY: "5",
-    markerWidth: "6",
-    markerHeight: "6",
-    orient: "auto"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M 0 0 L 10 5 L 0 10 z",
-    fill: styleObj.tokens.edgeActive
-  })), /*#__PURE__*/React.createElement("filter", {
-    id: "flow-glow",
-    x: "-50%",
-    y: "-50%",
-    width: "200%",
-    height: "200%"
-  }, /*#__PURE__*/React.createElement("feGaussianBlur", {
-    stdDeviation: "2",
-    result: "coloredBlur"
-  }), /*#__PURE__*/React.createElement("feMerge", null, /*#__PURE__*/React.createElement("feMergeNode", {
-    in: "coloredBlur"
-  }), /*#__PURE__*/React.createElement("feMergeNode", {
-    in: "SourceGraphic"
-  })))), /*#__PURE__*/React.createElement("rect", {
-    width: width,
-    height: height,
-    fill: styleObj.tokens.bg
-  }), styleObj.renderGrid && /*#__PURE__*/React.createElement("g", {
-    className: "flow-grid"
-  }, styleObj.renderGrid({
-    width,
-    height,
-    canvas
-  })), /*#__PURE__*/React.createElement("g", {
-    className: "flow-edges"
-  }, edges.map(edge => {
-    const isActive = activeEdges.includes(edge.id);
-    return /*#__PURE__*/React.createElement("g", {
-      key: edge.id,
-      className: `flow-edge ${isActive ? 'is-active' : ''}`
-    }, styleObj.Edge ? /*#__PURE__*/React.createElement(styleObj.Edge, {
-      edge: edge,
-      active: isActive,
-      style: styleObj
-    }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
-      d: edge.d,
-      fill: "none",
-      stroke: isActive ? styleObj.tokens.edgeActive : styleObj.tokens.edge,
-      strokeWidth: edge.kind === 'dashed' ? 2 : 2.5,
-      strokeDasharray: edge.kind === 'dashed' ? '8,4' : 'none',
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      filter: isActive && animate ? 'url(#flow-glow)' : 'none'
-    }), edge.label && /*#__PURE__*/React.createElement("text", {
-      x: edge.points[1]?.x || 0,
-      y: edge.points[1]?.y || 0,
-      textAnchor: "middle",
-      dominantBaseline: "middle",
-      fontSize: "11",
-      fill: styleObj.tokens.edgeLabel,
-      fontFamily: "JetBrains Mono",
-      dx: edge.dx || 0,
-      dy: edge.dy || 18
-    }, edge.label)));
-  })), /*#__PURE__*/React.createElement("g", {
-    className: "flow-nodes"
-  }, nodes.map(node => {
-    const isActive = activeNodes.includes(node.id);
-    return /*#__PURE__*/React.createElement("g", {
-      key: node.id,
-      className: `flow-node ${isActive ? 'is-active' : ''}`,
-      transform: `translate(${node.x + padding}, ${node.y + padding})`,
-      onClick: () => onNodeClick?.(node),
-      style: {
-        cursor: onNodeClick ? 'pointer' : 'default'
+  return out;
+}
+function graphToDSL(graph, options) {
+  if (!graph || typeof graph !== 'object') return '';
+  const compact = options && options.compact === true;
+  const lines = [];
+  lines.push(compact ? '# Compact DSL — logical structure only (auto-layout will position nodes)' : '# Auto-generated DSL — round-trips through parseDSL()');
+  lines.push('');
+
+  // Top-level metadata: style, title.
+  if (graph.style) lines.push(`style: ${graph.style}`);
+  if (graph.title) lines.push(`title: ${quote(graph.title)}`);
+  if (graph.style || graph.title) lines.push('');
+
+  // Nodes
+  if (Array.isArray(graph.nodes) && graph.nodes.length) {
+    lines.push('nodes:');
+    const fullKeys = ['id', 'kind', 'label', 'sub', 'shape', 'x', 'y', 'w', 'h', 'src'];
+    const compactKeys = ['id', 'kind', 'label', 'sub', 'shape', 'src'];
+    const nodeKeys = compact ? compactKeys : fullKeys;
+    const skipExtras = compact ? new Set(['x', 'y', 'w', 'h']) : new Set();
+    for (const n of graph.nodes) {
+      const parts = pairs(n, nodeKeys);
+      // Include any extra custom keys not in our known list
+      for (const k of Object.keys(n)) {
+        if (!nodeKeys.includes(k) && !skipExtras.has(k) && typeof n[k] !== 'object') {
+          parts.push(`${k}: ${quote(n[k])}`);
+        }
       }
-    }, styleObj.Node ? /*#__PURE__*/React.createElement(styleObj.Node, {
-      node: node,
-      active: isActive,
-      style: styleObj
-    }) : /*#__PURE__*/React.createElement(React.Fragment, null, (() => {
-      const shape = shapePath$1(node.shape || 'rect', node.w, node.h);
-      return /*#__PURE__*/React.createElement("path", {
-        d: shape.d,
-        fill: styleObj.tokens.nodeBg,
-        stroke: styleObj.tokens.nodeBorder,
-        strokeWidth: 1.5
-      });
-    })(), /*#__PURE__*/React.createElement("text", {
-      x: node.w / 2,
-      y: node.h / 2 - 4,
-      textAnchor: "middle",
-      dominantBaseline: "middle",
-      fontSize: "13",
-      fontWeight: "600",
-      fill: styleObj.tokens.nodeInk,
-      fontFamily: "Inter Tight"
-    }, node.label), node.sub && /*#__PURE__*/React.createElement("text", {
-      x: node.w / 2,
-      y: node.h / 2 + 12,
-      textAnchor: "middle",
-      dominantBaseline: "middle",
-      fontSize: "9.5",
-      fill: styleObj.tokens.nodeSub,
-      fontFamily: "JetBrains Mono"
-    }, node.sub)));
-  }))), showControls && /*#__PURE__*/React.createElement("div", {
-    className: "flow-controls"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: handleDownload,
-    title: "Download SVG"
-  }, /*#__PURE__*/React.createElement(DownloadIcon, null)), /*#__PURE__*/React.createElement("button", {
-    onClick: handleFullscreen,
-    title: "Fullscreen"
-  }, /*#__PURE__*/React.createElement(FullscreenIcon, null))), children);
-}
-
-// PropTypes for better DX
-Diagram$1.propTypes = {
-  graph: PropTypes.shape({
-    nodes: PropTypes.arrayOf(PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      label: PropTypes.string.isRequired,
-      kind: PropTypes.string,
-      shape: PropTypes.string,
-      x: PropTypes.number,
-      y: PropTypes.number,
-      w: PropTypes.number,
-      h: PropTypes.number,
-      sub: PropTypes.string
-    })),
-    edges: PropTypes.arrayOf(PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      from: PropTypes.string.isRequired,
-      to: PropTypes.string.isRequired,
-      label: PropTypes.string,
-      kind: PropTypes.oneOf(['solid', 'dashed'])
-    })),
-    canvas: PropTypes.shape({
-      w: PropTypes.number,
-      h: PropTypes.number
-    })
-  }).isRequired,
-  style: PropTypes.oneOf(['sleek', 'sketch', 'iso', 'blueprint']),
-  activeNodes: PropTypes.arrayOf(PropTypes.string),
-  activeEdges: PropTypes.arrayOf(PropTypes.string),
-  className: PropTypes.string,
-  padding: PropTypes.number,
-  onNodeClick: PropTypes.func,
-  onEdgeClick: PropTypes.func,
-  fullscreenTarget: PropTypes.object,
-  showControls: PropTypes.bool,
-  animate: PropTypes.bool
-};
-
-// Icons
-function DownloadIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    width: "16",
-    height: "16",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
-  }));
-}
-function FullscreenIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    width: "16",
-    height: "16",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
-  }));
-}
-
-/**
- * Flow Diagram - Legacy renderers adapter
- * Exposes the existing renderers from renderers.jsx as modern modules
- */
-
-// Re-export styles from the legacy system
-const STYLES$2 = window.Flow?.STYLES || {};
-window.Flow?.Diagram || (() => null);
-const NodeIcon = window.Flow?.NodeIcon || (() => null);
-
-// Default export
-({
-  shapePath,
-  shapeAnchor
-});
-
-/**
- * Style definitions and registration system
- * Each style must export: Defs, Node, Edge, Background, tokens, motion
- */
-
-const STYLES$1 = {
-  ...STYLES$2
-};
-const registeredStyles = new Map();
-
-/**
- * Register a new diagram style
- * Style modules must export: { Defs, Node, Edge, Background, tokens, motion }
- */
-function registerStyle$1(name, styleModule) {
-  const requiredExports = ['Node', 'Edge', 'tokens'];
-  const missing = requiredExports.filter(exp => !styleModule[exp]);
-  if (missing.length > 0) {
-    throw new Error(`Cannot register style "${name}": missing required exports: ${missing.join(', ')}\n` + `Required: Node, Edge, tokens\n` + `Optional: Defs, Background, motion`);
+      lines.push(`  - ${parts.join(', ')}`);
+    }
+    lines.push('');
   }
-  if (registeredStyles.has(name)) {
-    console.warn(`Style "${name}" is being overwritten`);
-  }
-  registeredStyles.set(name, {
-    ...styleModule,
-    id: name
-  });
 
-  // Merge with built-in styles for backwards compatibility
-  if (!STYLES$1[name]) {
-    STYLES$1[name] = registeredStyles.get(name);
+  // Edges — prefer the arrow shorthand for kind "solid" / "dashed"
+  if (Array.isArray(graph.edges) && graph.edges.length) {
+    lines.push('edges:');
+    for (const e of graph.edges) {
+      const arrow = e.kind === 'dashed' ? '..>' : '->';
+      let line = `  - ${e.from} ${arrow} ${e.to}`;
+      const extras = [];
+      if (e.label) extras.push(`label: ${quote(e.label)}`);
+      if (e.kind && e.kind !== 'solid' && e.kind !== 'dashed') {
+        extras.push(`kind: ${e.kind}`);
+      }
+      if (extras.length) line += ', ' + extras.join(', ');
+      lines.push(line);
+    }
+    lines.push('');
   }
+
+  // Steps
+  if (Array.isArray(graph.steps) && graph.steps.length) {
+    lines.push('steps:');
+    for (const s of graph.steps) {
+      const parts = [];
+      if (s.title) parts.push(`title: ${quote(s.title)}`);
+      if (s.narration) parts.push(`narration: ${quote(s.narration)}`);
+      if (s.active) {
+        if (Array.isArray(s.active.nodes) && s.active.nodes.length) {
+          parts.push(`nodes: [${s.active.nodes.join(', ')}]`);
+        }
+        if (Array.isArray(s.active.edges) && s.active.edges.length) {
+          parts.push(`edges: [${s.active.edges.join(', ')}]`);
+        }
+      }
+      lines.push(`  - ${parts.join(', ')}`);
+    }
+  }
+  return lines.join('\n').trim() + '\n';
 }
 
-// Auto-register built-in styles
-Object.entries(STYLES$2).forEach(([name, style]) => {
-  registerStyle$1(name, style);
-});
+// -----------------------------------------------------------
+// Export utilities — SVG download, PNG export, embed helpers.
+// Zero dependencies. Works in any browser environment.
+// -----------------------------------------------------------
 
-/**
- * Export Utility - handles serialization of SVG for external use
- */
-
-function downloadSVG$1(svgElement, filename = "diagram.svg") {
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@500;600&family=Instrument+Serif:ital@0;1&display=swap');`;
+function downloadSVG(svgElement, filename = 'diagram.svg') {
   if (!svgElement) return;
-
-  // Clone to avoid mutating the live DOM
   const clone = svgElement.cloneNode(true);
-
-  // Ensure standard namespaces
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-
-  // Add font import
-  const style = document.createElement("style");
-  style.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap');
-    svg { font-family: 'Inter Tight', sans-serif; }
-  `;
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  const style = document.createElement('style');
+  style.textContent = FONT_IMPORT + '\nsvg { font-family: "Inter Tight", sans-serif; }';
   clone.insertBefore(style, clone.firstChild);
-
-  // Set explicit dimensions
-  const bbox = svgElement.getBBox();
-  const padding = 40;
-  clone.setAttribute("width", bbox.width + padding * 2);
-  clone.setAttribute("height", bbox.height + padding * 2);
-  clone.setAttribute("viewBox", `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
-
-  // Serialize to string
+  try {
+    const bbox = svgElement.getBBox();
+    const pad = 40;
+    clone.setAttribute('width', String(bbox.width + pad * 2));
+    clone.setAttribute('height', String(bbox.height + pad * 2));
+    clone.setAttribute('viewBox', `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad * 2} ${bbox.height + pad * 2}`);
+  } catch (_) {
+    // getBBox not available (e.g. offscreen) — skip
+  }
   const serializer = new XMLSerializer();
   let source = serializer.serializeToString(clone);
-
-  // Add XML declaration
   if (!source.startsWith('<?xml')) {
     source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
   }
-
-  // Create download link
-  const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
-  const link = document.createElement("a");
+  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(source);
+  const link = document.createElement('a');
   link.href = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+function svgToString(svgElement) {
+  if (!svgElement) return '';
+  const clone = svgElement.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const style = document.createElement('style');
+  style.textContent = FONT_IMPORT;
+  clone.insertBefore(style, clone.firstChild);
+  return new XMLSerializer().serializeToString(clone);
+}
+function downloadPNG(svgElement, filename = 'diagram.png', scale = 2) {
+  if (!svgElement) return;
+  const svgStr = svgToString(svgElement);
+  const blob = new Blob([svgStr], {
+    type: 'image/svg+xml'
+  });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth * scale;
+    canvas.height = img.naturalHeight * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  img.src = url;
 }
 
 function _extends() {
@@ -2586,6 +1143,3729 @@ function _extends() {
     }
     return n;
   }, _extends.apply(null, arguments);
+}
+
+// ---------- Shared helpers ----------
+
+function EdgeLabel({
+  text,
+  x,
+  y,
+  bg = '#faf7ef',
+  fg = '#6b6459',
+  mono = false
+}) {
+  if (!text) return null;
+  return /*#__PURE__*/React.createElement("g", {
+    transform: `translate(${x} ${y - 12})`
+  }, /*#__PURE__*/React.createElement("text", {
+    textAnchor: "middle",
+    dominantBaseline: "middle",
+    fontFamily: mono ? 'JetBrains Mono' : 'Inter Tight',
+    fontSize: "11",
+    fill: bg,
+    stroke: bg,
+    strokeWidth: "3.5",
+    strokeLinejoin: "round"
+  }, text), /*#__PURE__*/React.createElement("text", {
+    textAnchor: "middle",
+    dominantBaseline: "middle",
+    fontFamily: mono ? 'JetBrains Mono' : 'Inter Tight',
+    fontSize: "11",
+    fill: fg,
+    fontWeight: "600"
+  }, text));
+}
+function ShapeShell({
+  node,
+  fill,
+  stroke,
+  strokeWidth,
+  strokeDasharray
+}) {
+  const shape = shapeOf(node);
+  const s = shapePath(shape, node.w, node.h);
+  if (shape === 'rect') {
+    return /*#__PURE__*/React.createElement("rect", {
+      width: node.w,
+      height: node.h,
+      rx: s.rx ?? 10,
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: strokeWidth,
+      strokeDasharray: strokeDasharray
+    });
+  }
+  if (shape === 'square') {
+    const sz = Math.min(node.w, node.h),
+      ox = (node.w - sz) / 2,
+      oy = (node.h - sz) / 2;
+    return /*#__PURE__*/React.createElement("rect", {
+      x: ox,
+      y: oy,
+      width: sz,
+      height: sz,
+      rx: 4,
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: strokeWidth,
+      strokeDasharray: strokeDasharray
+    });
+  }
+  if (shape === 'pill') {
+    return /*#__PURE__*/React.createElement("rect", {
+      width: node.w,
+      height: node.h,
+      rx: node.h / 2,
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: strokeWidth,
+      strokeDasharray: strokeDasharray
+    });
+  }
+  if (shape === 'circle' && s.circle) {
+    return /*#__PURE__*/React.createElement("circle", {
+      cx: s.circle.cx,
+      cy: s.circle.cy,
+      r: s.circle.r,
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: strokeWidth,
+      strokeDasharray: strokeDasharray
+    });
+  }
+  if (shape === 'oval' && s.ellipse) {
+    return /*#__PURE__*/React.createElement("ellipse", {
+      cx: s.ellipse.cx,
+      cy: s.ellipse.cy,
+      rx: s.ellipse.rx,
+      ry: s.ellipse.ry,
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: strokeWidth,
+      strokeDasharray: strokeDasharray
+    });
+  }
+  if (shape === 'cylinder') {
+    return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
+      d: s.body,
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: strokeWidth
+    }), /*#__PURE__*/React.createElement("path", {
+      d: s.top,
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: strokeWidth
+    }));
+  }
+  return /*#__PURE__*/React.createElement("path", {
+    d: s.d,
+    fill: fill,
+    stroke: stroke,
+    strokeWidth: strokeWidth,
+    strokeDasharray: strokeDasharray
+  });
+}
+function NodeLabel({
+  node,
+  fill,
+  sub,
+  subFill,
+  fontFamily = 'Inter Tight',
+  fontWeight = 600,
+  fontSize = 13,
+  hand = false,
+  centerOffsetY = 0
+}) {
+  const shape = shapeOf(node);
+  if (['diamond', 'circle', 'oval', 'pill'].includes(shape)) {
+    return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("text", {
+      x: node.w / 2,
+      y: node.h / 2 + (sub ? -3 : 4) + centerOffsetY,
+      textAnchor: "middle",
+      dominantBaseline: "middle",
+      fontFamily: fontFamily,
+      fontWeight: fontWeight,
+      fontSize: fontSize,
+      fill: fill
+    }, node.label), sub && /*#__PURE__*/React.createElement("text", {
+      x: node.w / 2,
+      y: node.h / 2 + 12 + centerOffsetY,
+      textAnchor: "middle",
+      dominantBaseline: "middle",
+      fontFamily: "JetBrains Mono",
+      fontSize: "9.5",
+      fill: subFill
+    }, sub));
+  }
+  return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("text", {
+    x: node.w / 2,
+    y: node.h / 2 + 4,
+    textAnchor: "middle",
+    fontFamily: fontFamily,
+    fontWeight: fontWeight,
+    fontSize: hand ? 20 : fontSize,
+    fill: fill
+  }, node.label), sub && /*#__PURE__*/React.createElement("text", {
+    x: node.w / 2,
+    y: node.h - 12,
+    textAnchor: "middle",
+    fontFamily: hand ? 'Caveat' : 'JetBrains Mono',
+    fontSize: hand ? 13 : 9.5,
+    fill: subFill
+  }, sub));
+}
+
+// ---------- NodeIcon ----------
+
+function NodeIcon({
+  kind,
+  color = '#8f8779',
+  sketchy = false,
+  mono = false
+}) {
+  const s = 14;
+  const sw = mono ? 1 : 1.2;
+  const common = {
+    stroke: color,
+    strokeWidth: sw,
+    fill: 'none',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round'
+  };
+  const filter = sketchy ? {
+    filter: 'url(#sk-rough)'
+  } : {};
+  switch (kind) {
+    case 'actor':
+    case 'client':
+    case 'person':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("circle", _extends({
+        cx: s / 2,
+        cy: 4,
+        r: "2.5"
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M1 ${s} C 2 9, 5 9, ${s / 2} 9 C ${s - 5} 9, ${s - 2} 9, ${s - 1} ${s}`
+      }, common)));
+    case 'service':
+    case 'process':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("rect", _extends({
+        x: "1",
+        y: "2",
+        width: s - 2,
+        height: s - 4,
+        rx: "1.5"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "1",
+        y1: "6",
+        x2: s - 1,
+        y2: "6"
+      }, common)));
+    case 'gateway':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("path", _extends({
+        d: `M${s / 2} 1 L${s - 1} ${s / 2} L${s / 2} ${s - 1} L1 ${s / 2} Z`
+      }, common)));
+    case 'store':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("ellipse", _extends({
+        cx: s / 2,
+        cy: "3",
+        rx: "5.5",
+        ry: "1.8"
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M1 3 L1 ${s - 3} C 1 ${s - 1}, ${s - 1} ${s - 1}, ${s - 1} ${s - 3} L${s - 1} 3`
+      }, common)));
+    case 'cache':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("circle", _extends({
+        cx: s / 2,
+        cy: s / 2,
+        r: "5.5"
+      }, common)), /*#__PURE__*/React.createElement("circle", _extends({
+        cx: s / 2,
+        cy: s / 2,
+        r: "1.2"
+      }, common)));
+    case 'queue':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("rect", _extends({
+        x: "1",
+        y: "3",
+        width: s - 2,
+        height: "3"
+      }, common)), /*#__PURE__*/React.createElement("rect", _extends({
+        x: "1",
+        y: "7.5",
+        width: s - 2,
+        height: "3"
+      }, common)));
+    case 'external':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("path", _extends({
+        d: `M3 ${s / 2 + 2} C 1 ${s / 2 + 2}, 1 ${s / 2 - 1}, 3 ${s / 2 - 1} C 3 3, 8 2, 10 ${s / 2 - 2} C 13 ${s / 2 - 2}, 13 ${s / 2 + 2}, ${s - 2} ${s / 2 + 2} Z`
+      }, common)));
+    case 'boundary':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("rect", _extends({
+        x: "1",
+        y: "1",
+        width: s - 2,
+        height: s - 2,
+        rx: "1",
+        strokeDasharray: "2 1.5"
+      }, common)));
+    case 'start':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("path", {
+        d: "M4 2 L11 7 L4 12 Z",
+        fill: color,
+        stroke: "none"
+      }));
+    case 'stop':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("rect", {
+        x: "3",
+        y: "3",
+        width: "8",
+        height: "8",
+        fill: color,
+        stroke: "none"
+      }));
+    case 'decision':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("text", {
+        x: s / 2,
+        y: s - 3,
+        textAnchor: "middle",
+        fontSize: "11",
+        fontFamily: "Inter Tight",
+        fontWeight: "700",
+        fill: color
+      }, "?"));
+    case 'event':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("path", {
+        d: "M8 1 L3 8 H7 L6 13 L11 6 H7 L8 1 Z",
+        fill: color,
+        stroke: "none"
+      }));
+    case 'step':
+    case 'tree':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("circle", _extends({
+        cx: s / 2,
+        cy: s / 2,
+        r: "3"
+      }, common)));
+    case 'image':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("rect", _extends({
+        x: "1",
+        y: "2",
+        width: s - 2,
+        height: s - 4,
+        rx: "1"
+      }, common)), /*#__PURE__*/React.createElement("circle", _extends({
+        cx: "5",
+        cy: "6",
+        r: "1.2"
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M1 ${s - 4} L5 ${s - 7} L9 ${s - 5} L${s - 1} ${s - 2}`
+      }, common)));
+    case 'function':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("text", {
+        x: s / 2,
+        y: s - 2,
+        textAnchor: "middle",
+        fontSize: "13",
+        fontFamily: "Inter Tight",
+        fontWeight: "500",
+        fill: color
+      }, "\u03BB"));
+    case 'worker':
+      {
+        const teeth = [];
+        for (let i = 0; i < 6; i++) {
+          const a = i * Math.PI / 3;
+          teeth.push(/*#__PURE__*/React.createElement("line", _extends({
+            key: i,
+            x1: s / 2 + Math.cos(a) * 5,
+            y1: s / 2 + Math.sin(a) * 5,
+            x2: s / 2 + Math.cos(a) * 6.7,
+            y2: s / 2 + Math.sin(a) * 6.7
+          }, common)));
+        }
+        return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("circle", _extends({
+          cx: s / 2,
+          cy: s / 2,
+          r: "3.5"
+        }, common)), teeth);
+      }
+    case 'loadbalancer':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("circle", _extends({
+        cx: s / 2,
+        cy: "3",
+        r: "1.6"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: s / 2,
+        y1: "4.5",
+        x2: s / 2,
+        y2: s - 2
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "2",
+        y1: s - 2,
+        x2: s - 2,
+        y2: s - 2
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M2 ${s - 2} L${s / 2} 7 L${s - 2} ${s - 2}`
+      }, common)));
+    case 'cdn':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("circle", _extends({
+        cx: s / 2,
+        cy: s / 2,
+        r: "5.5"
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M1.5 ${s / 2} H${s - 1.5}`
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M${s / 2} 1.5 C 4 ${s / 2}, 4 ${s / 2}, ${s / 2} ${s - 1.5}`
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M${s / 2} 1.5 C 10 ${s / 2}, 10 ${s / 2}, ${s / 2} ${s - 1.5}`
+      }, common)));
+    case 'auth':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("circle", _extends({
+        cx: "4",
+        cy: s / 2,
+        r: "2.5"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "6",
+        y1: s / 2,
+        x2: s - 1,
+        y2: s / 2
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: s - 3,
+        y1: s / 2,
+        x2: s - 3,
+        y2: s / 2 + 2.5
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: s - 1,
+        y1: s / 2,
+        x2: s - 1,
+        y2: s / 2 + 2.5
+      }, common)));
+    case 'monitor':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("line", _extends({
+        x1: "1.5",
+        y1: "2",
+        x2: "1.5",
+        y2: s - 1.5
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "1.5",
+        y1: s - 1.5,
+        x2: s - 1,
+        y2: s - 1.5
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M3 ${s - 4} L6 ${s - 7} L9 ${s - 5} L12 ${s - 9}`
+      }, common)));
+    case 'bus':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("line", _extends({
+        x1: "1",
+        y1: s / 2,
+        x2: s - 1,
+        y2: s / 2
+      }, common)), /*#__PURE__*/React.createElement("circle", _extends({
+        cx: "3",
+        cy: s / 2 - 3,
+        r: "1.4"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "3",
+        y1: s / 2 - 1.6,
+        x2: "3",
+        y2: s / 2
+      }, common)), /*#__PURE__*/React.createElement("circle", _extends({
+        cx: s / 2,
+        cy: s / 2 + 3,
+        r: "1.4"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: s / 2,
+        y1: s / 2,
+        x2: s / 2,
+        y2: s / 2 + 1.6
+      }, common)), /*#__PURE__*/React.createElement("circle", _extends({
+        cx: s - 3,
+        cy: s / 2 - 3,
+        r: "1.4"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: s - 3,
+        y1: s / 2 - 1.6,
+        x2: s - 3,
+        y2: s / 2
+      }, common)));
+    case 'stream':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("path", _extends({
+        d: `M1 ${s / 2} Q 3 ${s / 2 - 3}, 5 ${s / 2} T 9 ${s / 2} T 13 ${s / 2}`
+      }, common)), /*#__PURE__*/React.createElement("path", _extends({
+        d: `M1 ${s / 2 + 3} Q 3 ${s / 2}, 5 ${s / 2 + 3} T 9 ${s / 2 + 3} T 13 ${s / 2 + 3}`
+      }, common, {
+        opacity: ".55"
+      })));
+    case 'firewall':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("rect", _extends({
+        x: "1",
+        y: "2",
+        width: s - 2,
+        height: "3"
+      }, common)), /*#__PURE__*/React.createElement("rect", _extends({
+        x: "1",
+        y: "5.5",
+        width: s - 2,
+        height: "3"
+      }, common)), /*#__PURE__*/React.createElement("rect", _extends({
+        x: "1",
+        y: "9",
+        width: s - 2,
+        height: "3"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "5",
+        y1: "2",
+        x2: "5",
+        y2: "5"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "9",
+        y1: "2",
+        x2: "9",
+        y2: "5"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "3",
+        y1: "5.5",
+        x2: "3",
+        y2: "8.5"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "7",
+        y1: "5.5",
+        x2: "7",
+        y2: "8.5"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "11",
+        y1: "5.5",
+        x2: "11",
+        y2: "8.5"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "5",
+        y1: "9",
+        x2: "5",
+        y2: "12"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "9",
+        y1: "9",
+        x2: "9",
+        y2: "12"
+      }, common)));
+    case 'mobile':
+      return /*#__PURE__*/React.createElement("g", filter, /*#__PURE__*/React.createElement("rect", _extends({
+        x: "3.5",
+        y: "1",
+        width: "7",
+        height: s - 2,
+        rx: "1.2"
+      }, common)), /*#__PURE__*/React.createElement("line", _extends({
+        x1: "6",
+        y1: s - 2.5,
+        x2: "8",
+        y2: s - 2.5
+      }, common)));
+    default:
+      return /*#__PURE__*/React.createElement("rect", _extends({
+        x: "2",
+        y: "2",
+        width: s - 4,
+        height: s - 4
+      }, common));
+  }
+}
+
+// ---------- sleekKindBody ----------
+
+function sleekKindBody(node, {
+  fill,
+  stroke,
+  strokeW,
+  ink,
+  muted,
+  accent,
+  active
+}) {
+  const {
+    w,
+    h
+  } = node;
+  const card = (rx = 10) => /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    rx: rx,
+    fill: fill,
+    stroke: stroke,
+    strokeWidth: strokeW
+  });
+  const centerLabel = (dy = 0) => /*#__PURE__*/React.createElement("text", {
+    x: w / 2,
+    y: h / 2 + 4 + dy,
+    textAnchor: "middle",
+    fontFamily: "Inter Tight",
+    fontWeight: 600,
+    fontSize: 13,
+    fill: ink
+  }, node.label);
+  switch (node.kind) {
+    case 'service':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+            x: 8,
+            y: 8,
+            width: 16,
+            height: 16,
+            rx: 4,
+            fill: active ? accent : '#faf3dc',
+            stroke: active ? accent : '#e4decd',
+            strokeWidth: ".8"
+          }), /*#__PURE__*/React.createElement("line", {
+            x1: 11,
+            y1: 16,
+            x2: 21,
+            y2: 16,
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1.3",
+            strokeLinecap: "round"
+          }), /*#__PURE__*/React.createElement("line", {
+            x1: 11,
+            y1: 19,
+            x2: 18,
+            y2: 19,
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1.3",
+            strokeLinecap: "round"
+          })),
+          label: centerLabel()
+        };
+      }
+    case 'store':
+      {
+        const ry = 6;
+        return {
+          noShadow: true,
+          body: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
+            d: `M0 ${ry} a${w / 2} ${ry} 0 1 0 ${w} 0 a${w / 2} ${ry} 0 1 0 ${-w} 0 M0 ${ry} V${h - ry} a${w / 2} ${ry} 0 0 0 ${w} 0 V${ry}`,
+            fill: fill,
+            stroke: stroke,
+            strokeWidth: strokeW
+          }), /*#__PURE__*/React.createElement("path", {
+            d: `M0 ${ry} a${w / 2} ${ry} 0 1 0 ${w} 0 a${w / 2} ${ry} 0 1 0 ${-w} 0`,
+            fill: active ? '#fffbea' : '#fff',
+            stroke: stroke,
+            strokeWidth: strokeW
+          })),
+          decor: /*#__PURE__*/React.createElement("g", null, [1, 2, 3].map(i => /*#__PURE__*/React.createElement("path", {
+            key: i,
+            d: `M4 ${ry + i * 9} a${w / 2 - 4} ${ry * 0.5} 0 0 0 ${w - 8} 0`,
+            stroke: active ? accent : '#e4decd',
+            strokeWidth: ".8",
+            fill: "none"
+          }))),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: h / 2 + ry + 4,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 13,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'cache':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("circle", {
+            cx: w / 2,
+            cy: h / 2,
+            r: Math.min(w, h) / 2 - 8,
+            fill: "none",
+            stroke: active ? accent : '#e4decd',
+            strokeWidth: ".8",
+            strokeDasharray: "3 2"
+          }), /*#__PURE__*/React.createElement("circle", {
+            cx: w / 2,
+            cy: h / 2,
+            r: 4,
+            fill: active ? accent : '#d9c98b'
+          })),
+          label: centerLabel()
+        };
+      }
+    case 'queue':
+      {
+        const pw = (w - 24) / 3;
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", null, [0, 1, 2].map(i => /*#__PURE__*/React.createElement("rect", {
+            key: i,
+            x: 10 + i * (pw + 2),
+            y: h / 2 - 8,
+            width: pw,
+            height: 16,
+            rx: 4,
+            fill: active && i === 2 ? accent : '#faf3dc',
+            stroke: active ? accent : '#e4decd',
+            strokeWidth: ".8"
+          })), /*#__PURE__*/React.createElement("path", {
+            d: `M${w - 14} ${h / 2 - 5} L${w - 6} ${h / 2} L${w - 14} ${h / 2 + 5}`,
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1.5",
+            fill: "none",
+            strokeLinecap: "round",
+            strokeLinejoin: "round"
+          })),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: h / 2 - 16,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'actor':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("circle", {
+            cx: w / 2,
+            cy: h / 2 - 10,
+            r: 7,
+            fill: active ? '#fef3c7' : '#f5f0e8',
+            stroke: active ? accent : '#e4decd',
+            strokeWidth: "1"
+          }), /*#__PURE__*/React.createElement("path", {
+            d: `M${w / 2 - 12} ${h / 2 + 8} Q${w / 2} ${h / 2 - 2} ${w / 2 + 12} ${h / 2 + 8}`,
+            fill: active ? '#fef3c7' : '#f5f0e8',
+            stroke: active ? accent : '#e4decd',
+            strokeWidth: "1"
+          })),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: h - 8,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'gateway':
+      {
+        const i = Math.min(w * 0.18, 18);
+        return {
+          body: /*#__PURE__*/React.createElement("path", {
+            d: `M${i} 0 L${w - i} 0 L${w} ${h / 2} L${w - i} ${h} L${i} ${h} L0 ${h / 2} Z`,
+            fill: fill,
+            stroke: stroke,
+            strokeWidth: strokeW
+          }),
+          decor: /*#__PURE__*/React.createElement("g", null, [{
+            cx: w / 2,
+            cy: h / 2,
+            r: 5
+          }, {
+            cx: w / 2 - 10,
+            cy: h / 2,
+            r: 3
+          }, {
+            cx: w / 2 + 10,
+            cy: h / 2,
+            r: 3
+          }].map((c, j) => /*#__PURE__*/React.createElement("circle", {
+            key: j,
+            cx: c.cx,
+            cy: c.cy,
+            r: c.r,
+            fill: active ? accent : '#e4decd'
+          }))),
+          label: centerLabel()
+        };
+      }
+    case 'external':
+      {
+        const d = `M${w * 0.18} ${h * 0.6} C ${w * 0.02} ${h * 0.6}, ${w * 0.02} ${h * 0.2}, ${w * 0.22} ${h * 0.25} C ${w * 0.28} ${h * 0.02}, ${w * 0.58} ${h * 0.02}, ${w * 0.62} ${h * 0.22} C ${w * 0.85} ${h * 0.15}, ${w * 0.98} ${h * 0.35}, ${w * 0.9} ${h * 0.6} C ${w * 0.98} ${h * 0.82}, ${w * 0.75} ${h * 0.98}, ${w * 0.6} ${h * 0.88} C ${w * 0.4} ${h * 1.02}, ${w * 0.1} ${h * 0.95}, ${w * 0.18} ${h * 0.6} Z`;
+        return {
+          body: /*#__PURE__*/React.createElement("path", {
+            d: d,
+            fill: fill,
+            stroke: stroke,
+            strokeWidth: strokeW
+          }),
+          decor: null,
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: h * 0.6,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12.5,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'boundary':
+      {
+        return {
+          body: /*#__PURE__*/React.createElement("rect", {
+            width: w,
+            height: h,
+            rx: 14,
+            fill: "transparent",
+            stroke: active ? accent : '#d9c98b',
+            strokeWidth: 1.5,
+            strokeDasharray: "8 5"
+          }),
+          decor: null,
+          label: /*#__PURE__*/React.createElement("text", {
+            x: 16,
+            y: 22,
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12,
+            fill: active ? '#7a5a00' : muted,
+            letterSpacing: ".05em"
+          }, node.label.toUpperCase())
+        };
+      }
+    case 'start':
+      {
+        return {
+          body: /*#__PURE__*/React.createElement("rect", {
+            width: w,
+            height: h,
+            rx: h / 2,
+            fill: active ? '#fef3c7' : '#26231d',
+            stroke: active ? accent : '#26231d',
+            strokeWidth: strokeW
+          }),
+          decor: null,
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: h / 2 + 4.5,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 13,
+            fill: active ? '#7a5a00' : '#fff'
+          }, node.label)
+        };
+      }
+    case 'stop':
+      {
+        return {
+          body: /*#__PURE__*/React.createElement("rect", {
+            width: w,
+            height: h,
+            rx: h / 2,
+            fill: active ? '#fef3c7' : '#fdecec',
+            stroke: active ? accent : '#ecc7c7',
+            strokeWidth: strokeW
+          }),
+          decor: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("circle", {
+            cx: 18,
+            cy: h / 2,
+            r: "8",
+            fill: active ? accent : '#d57a7a'
+          }), /*#__PURE__*/React.createElement("rect", {
+            x: 18 - 3.5,
+            y: h / 2 - 3.5,
+            width: "7",
+            height: "7",
+            rx: "1",
+            fill: "#fff"
+          })),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2 + 6,
+            y: h / 2 + 4.5,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 13,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'decision':
+      {
+        return {
+          body: /*#__PURE__*/React.createElement("path", {
+            d: `M${w / 2} 0 L${w} ${h / 2} L${w / 2} ${h} L0 ${h / 2} Z`,
+            fill: fill,
+            stroke: stroke,
+            strokeWidth: strokeW
+          }),
+          decor: null,
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: h / 2 + 4,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 13,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'event':
+      {
+        const r = Math.min(w, h) / 2 - 2;
+        return {
+          body: /*#__PURE__*/React.createElement("circle", {
+            cx: w / 2,
+            cy: h / 2,
+            r: r,
+            fill: active ? '#fef3c7' : '#fdf8e4',
+            stroke: active ? accent : '#d9c98b',
+            strokeWidth: strokeW
+          }),
+          decor: /*#__PURE__*/React.createElement("path", {
+            d: `M ${w / 2 + 2} ${h / 2 - 8} L ${w / 2 - 4} ${h / 2 + 1} H ${w / 2} L ${w / 2 - 2} ${h / 2 + 8} L ${w / 2 + 4} ${h / 2 - 1} H ${w / 2} Z`,
+            fill: active ? '#7a5a00' : '#b79414'
+          }),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: h + 14,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12.5,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'function':
+      {
+        return {
+          body: card(12),
+          decor: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+            x: 1,
+            y: 1,
+            width: w - 2,
+            height: 4,
+            rx: 2,
+            fill: active ? accent : '#e4decd'
+          }), /*#__PURE__*/React.createElement("g", {
+            transform: `translate(${w - 26} 8)`
+          }, /*#__PURE__*/React.createElement("rect", {
+            width: "20",
+            height: "14",
+            rx: "3",
+            fill: active ? '#fef3c7' : '#faf3dc',
+            stroke: active ? accent : '#d9c98b',
+            strokeWidth: ".8"
+          }), /*#__PURE__*/React.createElement("text", {
+            x: "10",
+            y: "11",
+            textAnchor: "middle",
+            fontFamily: "JetBrains Mono",
+            fontWeight: 700,
+            fontSize: "10",
+            fill: active ? '#7a5a00' : muted
+          }, "\u03BB"))),
+          label: centerLabel()
+        };
+      }
+    case 'worker':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("g", {
+            transform: `translate(${w - 22} 10)`,
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1.1",
+            fill: "none"
+          }, /*#__PURE__*/React.createElement("circle", {
+            cx: "6",
+            cy: "6",
+            r: "3.6"
+          }), /*#__PURE__*/React.createElement("circle", {
+            cx: "6",
+            cy: "6",
+            r: "1.2",
+            fill: active ? '#7a5a00' : muted
+          }), [0, 45, 90, 135, 180, 225, 270, 315].map(a => /*#__PURE__*/React.createElement("line", {
+            key: a,
+            x1: "6",
+            y1: "1.5",
+            x2: "6",
+            y2: "2.5",
+            transform: `rotate(${a} 6 6)`
+          }))), /*#__PURE__*/React.createElement("g", {
+            transform: `translate(12 ${h - 12})`
+          }, [0, 1, 2].map(i => /*#__PURE__*/React.createElement("circle", {
+            key: i,
+            cx: i * 7,
+            cy: "0",
+            r: "2",
+            fill: active ? accent : '#d9c98b',
+            opacity: 1 - i * 0.25
+          })))),
+          label: centerLabel(-2)
+        };
+      }
+    case 'loadbalancer':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", {
+            transform: `translate(${w - 30} ${h / 2})`,
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1.3",
+            fill: "none",
+            strokeLinecap: "round"
+          }, /*#__PURE__*/React.createElement("circle", {
+            cx: "0",
+            cy: "0",
+            r: "3",
+            fill: active ? accent : '#fbf6e7'
+          }), /*#__PURE__*/React.createElement("line", {
+            x1: "3",
+            y1: "0",
+            x2: "14",
+            y2: "-7"
+          }), /*#__PURE__*/React.createElement("line", {
+            x1: "3",
+            y1: "0",
+            x2: "16",
+            y2: "0"
+          }), /*#__PURE__*/React.createElement("line", {
+            x1: "3",
+            y1: "0",
+            x2: "14",
+            y2: "7"
+          }), /*#__PURE__*/React.createElement("circle", {
+            cx: "14",
+            cy: "-7",
+            r: "1.5",
+            fill: active ? '#7a5a00' : muted
+          }), /*#__PURE__*/React.createElement("circle", {
+            cx: "16",
+            cy: "0",
+            r: "1.5",
+            fill: active ? '#7a5a00' : muted
+          }), /*#__PURE__*/React.createElement("circle", {
+            cx: "14",
+            cy: "7",
+            r: "1.5",
+            fill: active ? '#7a5a00' : muted
+          })),
+          label: centerLabel()
+        };
+      }
+    case 'auth':
+      {
+        const r = Math.min(w * 0.18, 14);
+        const d = `M${r} 0 H${w - r} Q${w} 0 ${w} ${r} V${h * 0.55} Q${w} ${h * 0.85} ${w / 2} ${h} Q0 ${h * 0.85} 0 ${h * 0.55} V${r} Q0 0 ${r} 0 Z`;
+        return {
+          body: /*#__PURE__*/React.createElement("path", {
+            d: d,
+            fill: fill,
+            stroke: stroke,
+            strokeWidth: strokeW
+          }),
+          decor: /*#__PURE__*/React.createElement("g", {
+            transform: `translate(${w / 2} ${h * 0.34})`,
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1.4",
+            fill: "none"
+          }, /*#__PURE__*/React.createElement("rect", {
+            x: "-4",
+            y: "-1",
+            width: "8",
+            height: "7",
+            rx: "1.2",
+            fill: active ? '#fef3c7' : '#faf3dc'
+          }), /*#__PURE__*/React.createElement("path", {
+            d: "M-2.5 -1 V-3.5 Q0 -5.5 2.5 -3.5 V-1"
+          })),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: h * 0.74,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12.5,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'monitor':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", {
+            transform: `translate(10 ${h / 2 - 6})`
+          }, /*#__PURE__*/React.createElement("rect", {
+            width: w - 20,
+            height: "24",
+            rx: "3",
+            fill: active ? '#fef3c7' : '#faf3dc',
+            stroke: active ? accent : '#d9c98b',
+            strokeWidth: ".7"
+          }), /*#__PURE__*/React.createElement("polyline", {
+            points: `4,18 ${(w - 20) * 0.25},10 ${(w - 20) * 0.45},14 ${(w - 20) * 0.7},6 ${w - 24},12`,
+            fill: "none",
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1.4"
+          })),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: 14,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12.5,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'bus':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+            x: 10,
+            y: h / 2 - 4,
+            width: w - 20,
+            height: "8",
+            rx: "3",
+            fill: active ? accent : '#e8deb5',
+            stroke: active ? '#7a5a00' : '#b79414',
+            strokeWidth: ".7"
+          }), [0.2, 0.5, 0.8].map((p, i) => /*#__PURE__*/React.createElement("g", {
+            key: i,
+            transform: `translate(${10 + (w - 20) * p} ${h / 2})`
+          }, /*#__PURE__*/React.createElement("line", {
+            x1: "0",
+            y1: "-4",
+            x2: "0",
+            y2: "-9",
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1"
+          }), /*#__PURE__*/React.createElement("circle", {
+            cx: "0",
+            cy: "-11",
+            r: "2",
+            fill: active ? '#7a5a00' : muted
+          }), /*#__PURE__*/React.createElement("line", {
+            x1: "0",
+            y1: "4",
+            x2: "0",
+            y2: "9",
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: "1"
+          }), /*#__PURE__*/React.createElement("circle", {
+            cx: "0",
+            cy: "11",
+            r: "2",
+            fill: active ? '#7a5a00' : muted
+          })))),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: 14,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12.5,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'stream':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", null, [0, 1, 2].map(row => /*#__PURE__*/React.createElement("path", {
+            key: row,
+            d: `M10 ${20 + row * 10} Q ${(w - 20) * 0.25 + 10} ${14 + row * 10}, ${(w - 20) * 0.5 + 10} ${20 + row * 10} T ${w - 10} ${20 + row * 10}`,
+            fill: "none",
+            stroke: active ? row === 0 ? accent : '#e0c870' : row === 0 ? '#b79414' : '#d9c98b',
+            strokeWidth: row === 0 ? '1.6' : '1',
+            strokeLinecap: "round",
+            opacity: 1 - row * 0.25
+          }, active && row === 0 && /*#__PURE__*/React.createElement("animate", {
+            attributeName: "d",
+            values: `M10 ${20} Q ${(w - 20) * 0.25 + 10} ${14}, ${(w - 20) * 0.5 + 10} ${20} T ${w - 10} ${20};M10 ${20} Q ${(w - 20) * 0.25 + 10} ${26}, ${(w - 20) * 0.5 + 10} ${20} T ${w - 10} ${20};M10 ${20} Q ${(w - 20) * 0.25 + 10} ${14}, ${(w - 20) * 0.5 + 10} ${20} T ${w - 10} ${20}`,
+            dur: "2s",
+            repeatCount: "indefinite"
+          })))),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: 14,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12.5,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'firewall':
+      {
+        return {
+          body: card(10),
+          decor: /*#__PURE__*/React.createElement("g", {
+            stroke: active ? '#7a5a00' : muted,
+            strokeWidth: ".7",
+            fill: "none"
+          }, [0, 1, 2].map(row => {
+            const y = 22 + row * 8;
+            const offset = row % 2 === 0 ? 0 : (w - 20) / 4;
+            return /*#__PURE__*/React.createElement("g", {
+              key: row
+            }, /*#__PURE__*/React.createElement("line", {
+              x1: 10,
+              y1: y,
+              x2: w - 10,
+              y2: y
+            }), [0, 1, 2, 3].map(c => /*#__PURE__*/React.createElement("line", {
+              key: c,
+              x1: 10 + offset + c * (w - 20) / 2,
+              y1: y - 8,
+              x2: 10 + offset + c * (w - 20) / 2,
+              y2: y
+            })));
+          })),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: w / 2,
+            y: 14,
+            textAnchor: "middle",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12,
+            fill: ink
+          }, node.label)
+        };
+      }
+    case 'mobile':
+      {
+        const pw = Math.min(w * 0.45, 44),
+          ph = h - 12;
+        const px = (w - pw) / 2,
+          py = 6;
+        return {
+          body: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+            width: w,
+            height: h,
+            rx: 12,
+            fill: "transparent"
+          }), /*#__PURE__*/React.createElement("rect", {
+            x: px,
+            y: py,
+            width: pw,
+            height: ph,
+            rx: "6",
+            fill: fill,
+            stroke: stroke,
+            strokeWidth: strokeW
+          }), /*#__PURE__*/React.createElement("rect", {
+            x: px + 4,
+            y: py + 8,
+            width: pw - 8,
+            height: ph - 16,
+            rx: "2",
+            fill: active ? '#fef3c7' : '#faf3dc'
+          })),
+          decor: /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("circle", {
+            cx: w / 2,
+            cy: py + 4,
+            r: "1",
+            fill: muted
+          }), /*#__PURE__*/React.createElement("rect", {
+            x: w / 2 - 4,
+            y: py + ph - 4,
+            width: "8",
+            height: "1.5",
+            rx: ".5",
+            fill: muted
+          })),
+          label: /*#__PURE__*/React.createElement("text", {
+            x: px - 4,
+            y: h / 2 + 4,
+            textAnchor: "end",
+            fontFamily: "Inter Tight",
+            fontWeight: 600,
+            fontSize: 12.5,
+            fill: ink
+          }, node.label)
+        };
+      }
+    default:
+      return null;
+  }
+}
+
+// ===========================================================
+// SLEEK
+// ===========================================================
+const SleekStyle = {
+  id: 'sleek',
+  name: 'Sleek',
+  tagline: 'Soft whites, yellow accent, calm.',
+  tokens: {
+    bg: '#fffcf3',
+    ink: '#26231d',
+    muted: '#8f8779',
+    accent: '#f5c518',
+    line: '#e4decd'
+  },
+  Defs: () => /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("filter", {
+    id: "sleek-soft",
+    x: "-20%",
+    y: "-20%",
+    width: "140%",
+    height: "140%"
+  }, /*#__PURE__*/React.createElement("feGaussianBlur", {
+    in: "SourceAlpha",
+    stdDeviation: "4"
+  }), /*#__PURE__*/React.createElement("feOffset", {
+    dy: "3"
+  }), /*#__PURE__*/React.createElement("feComponentTransfer", null, /*#__PURE__*/React.createElement("feFuncA", {
+    type: "linear",
+    slope: "0.15"
+  })), /*#__PURE__*/React.createElement("feMerge", null, /*#__PURE__*/React.createElement("feMergeNode", null), /*#__PURE__*/React.createElement("feMergeNode", {
+    in: "SourceGraphic"
+  }))), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "sleek-node",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#ffffff"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#fbf6e7"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "sleek-node-a",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#fffbea"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#fef3c7"
+  })), /*#__PURE__*/React.createElement("radialGradient", {
+    id: "sleek-glow",
+    cx: ".5",
+    cy: ".5",
+    r: ".55"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#f5c518",
+    stopOpacity: ".28"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#f5c518",
+    stopOpacity: "0"
+  })), /*#__PURE__*/React.createElement("marker", {
+    id: "sleek-arrow",
+    viewBox: "0 0 10 10",
+    refX: "8",
+    refY: "5",
+    markerWidth: "7",
+    markerHeight: "7",
+    orient: "auto-start-reverse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0 0 L10 5 L0 10 z",
+    fill: "#8f8779"
+  })), /*#__PURE__*/React.createElement("marker", {
+    id: "sleek-arrow-a",
+    viewBox: "0 0 10 10",
+    refX: "8",
+    refY: "5",
+    markerWidth: "7",
+    markerHeight: "7",
+    orient: "auto-start-reverse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0 0 L10 5 L0 10 z",
+    fill: "#f5c518"
+  })), /*#__PURE__*/React.createElement("marker", {
+    id: "sleek-arrow-err",
+    viewBox: "0 0 10 10",
+    refX: "8",
+    refY: "5",
+    markerWidth: "7",
+    markerHeight: "7",
+    orient: "auto-start-reverse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0 0 L10 5 L0 10 z",
+    fill: "#c0392b"
+  })), /*#__PURE__*/React.createElement("pattern", {
+    id: "sleek-dots",
+    width: "20",
+    height: "20",
+    patternUnits: "userSpaceOnUse"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "10",
+    cy: "10",
+    r: ".8",
+    fill: "#d9d3c6"
+  }))),
+  Background: ({
+    w,
+    h
+  }) => /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    fill: "#fffcf3"
+  }), /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    fill: "url(#sleek-dots)",
+    opacity: ".6"
+  })),
+  Node: ({
+    node,
+    active
+  }) => {
+    const ink = '#26231d',
+      muted = '#8f8779';
+    const fill = active ? 'url(#sleek-node-a)' : 'url(#sleek-node)';
+    const stroke = active ? '#f5c518' : '#e4decd';
+    const strokeW = active ? 1.5 : 1;
+    const shape = shapeOf(node);
+    const isImg = node.kind === 'image' && node.src;
+    const useKind = !node.shape && node.kind;
+    const kindBody = useKind ? sleekKindBody(node, {
+      fill,
+      stroke,
+      strokeW,
+      ink,
+      muted,
+      accent: '#f5c518',
+      active
+    }) : null;
+    return /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${node.x} ${node.y})`
+    }, active && shape !== 'cylinder' && /*#__PURE__*/React.createElement("rect", {
+      x: -10,
+      y: -10,
+      width: node.w + 20,
+      height: node.h + 20,
+      rx: 18,
+      fill: "url(#sleek-glow)"
+    }), kindBody ? /*#__PURE__*/React.createElement("g", {
+      filter: kindBody.noShadow ? undefined : 'url(#sleek-soft)'
+    }, kindBody.body) : /*#__PURE__*/React.createElement("g", {
+      filter: "url(#sleek-soft)"
+    }, /*#__PURE__*/React.createElement(ShapeShell, {
+      node: node,
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: strokeW
+    })), kindBody && kindBody.decor, isImg && /*#__PURE__*/React.createElement("image", {
+      href: node.src,
+      x: node.w / 2 - 16,
+      y: node.h / 2 - 22,
+      width: "32",
+      height: "32"
+    }), kindBody && kindBody.label !== undefined ? kindBody.label : /*#__PURE__*/React.createElement(NodeLabel, {
+      node: node,
+      fill: ink,
+      sub: node.sub,
+      subFill: muted
+    }));
+  },
+  Edge: ({
+    edge,
+    active
+  }) => {
+    const kind = edge.kind || 'solid';
+    const isDashed = kind === 'dashed',
+      isDotted = kind === 'dotted',
+      isBold = kind === 'bold';
+    const isAsync = kind === 'async',
+      isBidir = kind === 'bidir',
+      isError = kind === 'error';
+    const isSecure = kind === 'secure',
+      isRealtime = kind === 'realtime';
+    const errorColor = '#c0392b',
+      secureColor = '#3a6b3a';
+    const baseStroke = isError ? errorColor : isSecure ? secureColor : active ? '#f5c518' : '#b8b0a1';
+    const dashAttr = isDashed ? '5 4' : isDotted ? '1 5' : isAsync ? '8 4 1 4' : isRealtime ? '6 3' : undefined;
+    const sw = isBold ? active ? 3 : 2.4 : active ? 2 : 1.4;
+    const mid = edgeMidpoint(edge.points);
+    const arrowEnd = isError ? 'url(#sleek-arrow-err)' : active ? 'url(#sleek-arrow-a)' : 'url(#sleek-arrow)';
+    const arrowStart = isBidir ? active ? 'url(#sleek-arrow-a)' : 'url(#sleek-arrow)' : undefined;
+    return /*#__PURE__*/React.createElement("g", null, isBold && /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: baseStroke,
+      opacity: ".18",
+      strokeWidth: sw + 6,
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }), isRealtime && /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: "#f5c518",
+      opacity: ".35",
+      strokeWidth: sw + 3,
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: isRealtime ? '#b8860b' : baseStroke,
+      strokeWidth: sw,
+      strokeDasharray: dashAttr,
+      strokeLinecap: isDotted ? 'round' : 'butt',
+      markerEnd: arrowEnd,
+      markerStart: arrowStart,
+      strokeLinejoin: "round"
+    }, isRealtime && /*#__PURE__*/React.createElement("animate", {
+      attributeName: "stroke-dashoffset",
+      from: "0",
+      to: "-18",
+      dur: ".5s",
+      repeatCount: "indefinite"
+    })), active && !isRealtime && /*#__PURE__*/React.createElement("circle", {
+      r: "3.5",
+      fill: isError ? errorColor : '#f5c518'
+    }, /*#__PURE__*/React.createElement("animateMotion", {
+      dur: "1.4s",
+      repeatCount: "indefinite",
+      path: edge.d,
+      rotate: "auto"
+    })), isSecure && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 14})`
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "-7",
+      y: "-8",
+      width: "14",
+      height: "13",
+      rx: "2.5",
+      fill: "#fffcf3",
+      stroke: secureColor,
+      strokeWidth: "1"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-3",
+      y: "-3",
+      width: "6",
+      height: "6",
+      rx: ".8",
+      fill: secureColor
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M-2 -3 V-5 Q0 -7 2 -5 V-3",
+      fill: "none",
+      stroke: secureColor,
+      strokeWidth: "1"
+    })), isError && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 12})`,
+      stroke: errorColor,
+      strokeWidth: "1.4",
+      fill: "#fffcf3"
+    }, /*#__PURE__*/React.createElement("circle", {
+      r: "6"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "-3",
+      y1: "-3",
+      x2: "3",
+      y2: "3"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "3",
+      y1: "-3",
+      x2: "-3",
+      y2: "3"
+    })), /*#__PURE__*/React.createElement(EdgeLabel, {
+      text: edge.label,
+      x: mid.x,
+      y: mid.y,
+      bg: "#fffcf3",
+      fg: isError ? errorColor : isSecure ? secureColor : active ? '#7a5a00' : '#8f8779',
+      mono: true
+    }));
+  }
+};
+
+// ===========================================================
+// SKETCH
+// ===========================================================
+const SketchStyle = {
+  id: 'sketch',
+  name: 'Sketch',
+  tagline: 'Like a whiteboard photo — warm and honest.',
+  tokens: {
+    bg: '#fbf7ec',
+    ink: '#2b2a26',
+    muted: '#5a5148',
+    accent: '#d97757',
+    line: '#3a362d'
+  },
+  Defs: () => /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("filter", {
+    id: "sk-rough"
+  }, /*#__PURE__*/React.createElement("feTurbulence", {
+    type: "fractalNoise",
+    baseFrequency: "0.9",
+    numOctaves: "2",
+    seed: "3"
+  }), /*#__PURE__*/React.createElement("feDisplacementMap", {
+    in: "SourceGraphic",
+    scale: "0.9"
+  })), /*#__PURE__*/React.createElement("pattern", {
+    id: "sk-paper",
+    width: "160",
+    height: "160",
+    patternUnits: "userSpaceOnUse"
+  }, /*#__PURE__*/React.createElement("rect", {
+    width: "160",
+    height: "160",
+    fill: "#fbf7ec"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "30",
+    cy: "40",
+    r: ".6",
+    fill: "#c6bfae"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "110",
+    cy: "90",
+    r: ".5",
+    fill: "#c6bfae"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "60",
+    cy: "130",
+    r: ".7",
+    fill: "#c6bfae"
+  })), /*#__PURE__*/React.createElement("marker", {
+    id: "sk-arrow",
+    viewBox: "0 0 10 10",
+    refX: "8",
+    refY: "5",
+    markerWidth: "8",
+    markerHeight: "8",
+    orient: "auto-start-reverse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0 1 L10 5 L0 9 L3 5 Z",
+    fill: "#3a362d"
+  })), /*#__PURE__*/React.createElement("marker", {
+    id: "sk-arrow-a",
+    viewBox: "0 0 10 10",
+    refX: "8",
+    refY: "5",
+    markerWidth: "8",
+    markerHeight: "8",
+    orient: "auto-start-reverse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0 1 L10 5 L0 9 L3 5 Z",
+    fill: "#d97757"
+  }))),
+  Background: ({
+    w,
+    h
+  }) => /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    fill: "url(#sk-paper)"
+  }), Array.from({
+    length: Math.ceil(h / 28)
+  }).map((_, i) => /*#__PURE__*/React.createElement("line", {
+    key: i,
+    x1: "0",
+    x2: w,
+    y1: i * 28 + 14,
+    y2: i * 28 + 14,
+    stroke: "#ded6c2",
+    strokeWidth: ".6",
+    strokeDasharray: "2 3"
+  }))),
+  Node: ({
+    node,
+    active
+  }) => {
+    const seed = node.id.charCodeAt(0) + node.id.length;
+    const jitter = n => seed * (n + 1) % 7 * 0.35 - 1;
+    const ink = active ? '#d97757' : '#2b2a26';
+    const fill = active ? '#fce7d6' : '#ffffff';
+    const shape = shapeOf(node);
+    const isImg = node.kind === 'image' && node.src;
+    return /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${node.x} ${node.y})`
+    }, /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${jitter(0)} ${jitter(1) + 3})`,
+      opacity: ".55"
+    }, /*#__PURE__*/React.createElement(ShapeShell, {
+      node: node,
+      fill: "#f0e9d6",
+      stroke: "none",
+      strokeWidth: 0
+    })), /*#__PURE__*/React.createElement("g", {
+      filter: "url(#sk-rough)"
+    }, /*#__PURE__*/React.createElement(ShapeShell, {
+      node: node,
+      fill: fill,
+      stroke: ink,
+      strokeWidth: 1.8
+    })), /*#__PURE__*/React.createElement("g", {
+      filter: "url(#sk-rough)",
+      opacity: ".5"
+    }, /*#__PURE__*/React.createElement(ShapeShell, {
+      node: node,
+      fill: "none",
+      stroke: ink,
+      strokeWidth: 1
+    })), isImg && /*#__PURE__*/React.createElement("image", {
+      href: node.src,
+      x: node.w / 2 - 16,
+      y: node.h / 2 - 22,
+      width: "32",
+      height: "32"
+    }), !isImg && !['diamond', 'circle', 'oval', 'pill'].includes(shape) && /*#__PURE__*/React.createElement("g", {
+      transform: "translate(12, 10)"
+    }, /*#__PURE__*/React.createElement(NodeIcon, {
+      kind: node.kind,
+      color: ink,
+      sketchy: true
+    })), !isImg && ['diamond', 'circle', 'oval', 'pill'].includes(shape) && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${node.w / 2 - 7} ${node.h / 2 - 18})`
+    }, /*#__PURE__*/React.createElement(NodeIcon, {
+      kind: node.kind,
+      color: ink,
+      sketchy: true
+    })), /*#__PURE__*/React.createElement(NodeLabel, {
+      node: node,
+      fill: ink,
+      sub: node.sub,
+      subFill: "#5a5148",
+      fontFamily: "Caveat",
+      fontWeight: 600,
+      fontSize: 18,
+      hand: true,
+      centerOffsetY: ['diamond', 'circle', 'oval', 'pill'].includes(shape) ? 8 : 0
+    }));
+  },
+  Edge: ({
+    edge,
+    active
+  }) => {
+    const kind = edge.kind || 'solid';
+    const isDashed = kind === 'dashed',
+      isDotted = kind === 'dotted',
+      isBold = kind === 'bold';
+    const isAsync = kind === 'async',
+      isBidir = kind === 'bidir',
+      isError = kind === 'error';
+    const isSecure = kind === 'secure',
+      isRealtime = kind === 'realtime';
+    const errorColor = '#c14a3a',
+      secureColor = '#3d6b3d';
+    const baseStroke = isError ? errorColor : isSecure ? secureColor : active ? '#d97757' : '#3a362d';
+    const dashAttr = isDashed ? '6 5' : isDotted ? '1.5 5' : isAsync ? '9 4 1.5 4' : isRealtime ? '7 4' : undefined;
+    const sw = isBold ? active ? 3 : 2.6 : active ? 2.2 : 1.5;
+    const d1 = roughPath(edge.points, 1.6, edge.id.charCodeAt(0) * 7);
+    const d2 = roughPath(edge.points, 1.2, edge.id.charCodeAt(0) * 13 + 1);
+    const mid = edgeMidpoint(edge.points);
+    return /*#__PURE__*/React.createElement("g", null, isRealtime && /*#__PURE__*/React.createElement("path", {
+      d: d1,
+      fill: "none",
+      stroke: "#d97757",
+      opacity: ".25",
+      strokeWidth: sw + 3,
+      strokeLinecap: "round",
+      filter: "url(#sk-rough)"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: d1,
+      fill: "none",
+      stroke: isRealtime ? '#b85a3a' : baseStroke,
+      strokeWidth: sw,
+      strokeDasharray: dashAttr,
+      strokeLinecap: "round",
+      markerEnd: active ? 'url(#sk-arrow-a)' : 'url(#sk-arrow)',
+      markerStart: isBidir ? active ? 'url(#sk-arrow-a)' : 'url(#sk-arrow)' : undefined,
+      filter: "url(#sk-rough)"
+    }, isRealtime && /*#__PURE__*/React.createElement("animate", {
+      attributeName: "stroke-dashoffset",
+      from: "0",
+      to: "-22",
+      dur: ".55s",
+      repeatCount: "indefinite"
+    })), /*#__PURE__*/React.createElement("path", {
+      d: d2,
+      fill: "none",
+      stroke: baseStroke,
+      strokeWidth: isBold ? 1.4 : .7,
+      strokeDasharray: dashAttr,
+      opacity: ".4",
+      strokeLinecap: "round"
+    }), active && !isRealtime && /*#__PURE__*/React.createElement("circle", {
+      r: "4",
+      fill: isError ? errorColor : '#d97757',
+      stroke: "#fbf7ec",
+      strokeWidth: "1.5"
+    }, /*#__PURE__*/React.createElement("animateMotion", {
+      dur: "1.6s",
+      repeatCount: "indefinite",
+      path: edge.d,
+      rotate: "auto"
+    })), isSecure && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 14}) rotate(-2)`,
+      fill: "#fbf7ec",
+      stroke: secureColor,
+      strokeWidth: "1.4",
+      filter: "url(#sk-rough)"
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "-7",
+      y: "-7",
+      width: "14",
+      height: "13",
+      rx: "2"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M-2.5 -7 V-10 Q0 -12 2.5 -10 V-7",
+      fill: "none"
+    })), isError && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 13}) rotate(-3)`,
+      stroke: errorColor,
+      strokeWidth: "1.6",
+      fill: "#fbf7ec",
+      filter: "url(#sk-rough)"
+    }, /*#__PURE__*/React.createElement("circle", {
+      r: "7"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "-3.5",
+      y1: "-3.5",
+      x2: "3.5",
+      y2: "3.5"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "3.5",
+      y1: "-3.5",
+      x2: "-3.5",
+      y2: "3.5"
+    })), edge.label && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 2}) rotate(-3)`
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: -edge.label.length * 4.5 - 4,
+      y: -10,
+      width: edge.label.length * 9 + 8,
+      height: 18,
+      rx: 3,
+      fill: "#fbf7ec"
+    }), /*#__PURE__*/React.createElement("text", {
+      textAnchor: "middle",
+      dominantBaseline: "middle",
+      fontFamily: "Caveat",
+      fontSize: "15",
+      fill: isError ? errorColor : isSecure ? secureColor : active ? '#d97757' : '#5a5148'
+    }, edge.label)));
+  }
+};
+
+// ===========================================================
+// ISO
+// ===========================================================
+const IsoStyle = {
+  id: 'iso',
+  name: 'Iso',
+  tagline: 'Flat isometric with pipe-style edges.',
+  tokens: {
+    bg: '#f3f4f6',
+    ink: '#1e293b',
+    muted: '#64748b',
+    accent: '#f5c518',
+    line: '#cbd5e1'
+  },
+  Defs: () => /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+    id: "iso-top",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#ffffff"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#eef1f6"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "iso-top-a",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#ffe28a"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#f5c518"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "iso-right",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#dde2ea"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#c7cfda"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "iso-front",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#e7ebf1"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#d2d8e1"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "iso-pipe",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#2563eb"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#60a5fa"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "iso-pipe-a",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#f59e0b"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#fde68a"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "iso-pipe-err",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#b91c1c"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#ef4444"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "iso-pipe-sec",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#15803d"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#4ade80"
+  })), /*#__PURE__*/React.createElement("pattern", {
+    id: "iso-grid",
+    width: "24",
+    height: "14",
+    patternUnits: "userSpaceOnUse",
+    patternTransform: "skewX(-30)"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0 0 L24 0 M0 0 L0 14",
+    stroke: "#dbe0e7",
+    strokeWidth: ".6"
+  }))),
+  Background: ({
+    w,
+    h
+  }) => /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    fill: "#f3f4f6"
+  }), /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    fill: "url(#iso-grid)",
+    opacity: ".9"
+  })),
+  Node: ({
+    node,
+    active
+  }) => {
+    const depth = 12;
+    const w = node.w,
+      h = node.h;
+    const shape = shapeOf(node);
+    const topFill = active ? 'url(#iso-top-a)' : 'url(#iso-top)';
+    const isImg = node.kind === 'image' && node.src;
+    return /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${node.x} ${node.y})`
+    }, /*#__PURE__*/React.createElement("ellipse", {
+      cx: w / 2 + 4,
+      cy: h + depth + 6,
+      rx: w * .4,
+      ry: "3.5",
+      fill: "#000",
+      opacity: ".07"
+    }), (shape === 'rect' || shape === 'square') && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
+      d: `M 0 ${h} L ${w} ${h} L ${w} ${h + depth} L 0 ${h + depth} Z`,
+      fill: "url(#iso-front)",
+      stroke: "#c7cfda",
+      strokeWidth: ".8"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M ${w} 0 L ${w + depth * 0.6} ${-depth * 0.5} L ${w + depth * 0.6} ${h - depth * 0.5} L ${w} ${h} Z`,
+      fill: "url(#iso-right)",
+      stroke: "#c7cfda",
+      strokeWidth: ".8"
+    })), /*#__PURE__*/React.createElement(ShapeShell, {
+      node: node,
+      fill: topFill,
+      stroke: active ? '#f59e0b' : '#cfd6e0',
+      strokeWidth: 1
+    }), isImg && /*#__PURE__*/React.createElement("image", {
+      href: node.src,
+      x: w / 2 - 16,
+      y: h / 2 - 22,
+      width: "32",
+      height: "32"
+    }), !isImg && !['diamond', 'circle', 'oval', 'pill'].includes(shape) && /*#__PURE__*/React.createElement("g", {
+      transform: "translate(10, 8)"
+    }, /*#__PURE__*/React.createElement(NodeIcon, {
+      kind: node.kind,
+      color: active ? '#7a5a00' : '#475569'
+    })), !isImg && ['diamond', 'circle', 'oval', 'pill'].includes(shape) && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${w / 2 - 7} ${h / 2 - 18})`
+    }, /*#__PURE__*/React.createElement(NodeIcon, {
+      kind: node.kind,
+      color: active ? '#7a5a00' : '#475569'
+    })), /*#__PURE__*/React.createElement(NodeLabel, {
+      node: node,
+      fill: active ? '#3a2a00' : '#1e293b',
+      sub: node.sub,
+      subFill: active ? '#7a5a00' : '#64748b',
+      fontSize: 12.5,
+      centerOffsetY: ['diamond', 'circle', 'oval', 'pill'].includes(shape) ? 8 : 0
+    }));
+  },
+  Edge: ({
+    edge,
+    active
+  }) => {
+    const kind = edge.kind || 'solid';
+    const isDashed = kind === 'dashed',
+      isDotted = kind === 'dotted',
+      isBold = kind === 'bold';
+    const isAsync = kind === 'async',
+      isBidir = kind === 'bidir',
+      isError = kind === 'error';
+    const isSecure = kind === 'secure',
+      isRealtime = kind === 'realtime';
+    const mid = edgeMidpoint(edge.points);
+    const stroke = isError ? 'url(#iso-pipe-err)' : isSecure ? 'url(#iso-pipe-sec)' : active ? 'url(#iso-pipe-a)' : 'url(#iso-pipe)';
+    const dashAttr = isDashed ? '10 6' : isDotted ? '2 7' : isAsync ? '12 5 2 5' : isRealtime ? '8 5' : undefined;
+    const sw = isBold ? active ? 8 : 6 : active ? 6 : 4;
+    const labelFg = isError ? '#7a1a1a' : isSecure ? '#1f4d1f' : active ? '#7a5a00' : '#475569';
+    return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: "rgba(0,0,0,.08)",
+      strokeWidth: sw + 2,
+      transform: "translate(1,2)",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }), isRealtime && /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: "#f59e0b",
+      opacity: ".35",
+      strokeWidth: sw + 4,
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: stroke,
+      strokeWidth: sw,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      strokeDasharray: dashAttr
+    }, isRealtime && /*#__PURE__*/React.createElement("animate", {
+      attributeName: "stroke-dashoffset",
+      from: "0",
+      to: "-26",
+      dur: ".6s",
+      repeatCount: "indefinite"
+    })), active && !isRealtime && /*#__PURE__*/React.createElement("circle", {
+      r: "3",
+      fill: "#fff"
+    }, /*#__PURE__*/React.createElement("animateMotion", {
+      dur: "1.4s",
+      repeatCount: "indefinite",
+      path: edge.d,
+      rotate: "auto"
+    })), isBidir && /*#__PURE__*/React.createElement("circle", {
+      r: "3",
+      fill: "#fff"
+    }, /*#__PURE__*/React.createElement("animateMotion", {
+      dur: "1.6s",
+      repeatCount: "indefinite",
+      path: edge.d,
+      rotate: "auto",
+      keyPoints: "1;0",
+      keyTimes: "0;1"
+    })), isSecure && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 14})`
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "-8",
+      y: "-9",
+      width: "16",
+      height: "14",
+      rx: "3",
+      fill: "#fff",
+      stroke: "#1f4d1f",
+      strokeWidth: "1.2"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-3",
+      y: "-3",
+      width: "6",
+      height: "6",
+      rx: ".8",
+      fill: "#1f4d1f"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M-2.5 -3 V-6 Q0 -8 2.5 -6 V-3",
+      fill: "none",
+      stroke: "#1f4d1f",
+      strokeWidth: "1.2"
+    })), isError && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 14})`,
+      stroke: "#7a1a1a",
+      strokeWidth: "1.5",
+      fill: "#fff"
+    }, /*#__PURE__*/React.createElement("circle", {
+      r: "7"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "-3.5",
+      y1: "-3.5",
+      x2: "3.5",
+      y2: "3.5"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "3.5",
+      y1: "-3.5",
+      x2: "-3.5",
+      y2: "3.5"
+    })), /*#__PURE__*/React.createElement(EdgeLabel, {
+      text: edge.label,
+      x: mid.x,
+      y: mid.y,
+      bg: "#f3f4f6",
+      fg: labelFg,
+      mono: true
+    }));
+  }
+};
+
+// ===========================================================
+// BLUEPRINT
+// ===========================================================
+const BlueprintStyle = {
+  id: 'blueprint',
+  name: 'Blueprint',
+  tagline: 'Cyan on navy. Technical drawing.',
+  tokens: {
+    bg: '#0b2545',
+    ink: '#e0fbfc',
+    muted: '#8bb5d4',
+    accent: '#ffd166',
+    line: '#3b82a0'
+  },
+  Defs: () => /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("pattern", {
+    id: "bp-grid",
+    width: "20",
+    height: "20",
+    patternUnits: "userSpaceOnUse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M 20 0 L 0 0 0 20",
+    fill: "none",
+    stroke: "#1e3a62",
+    strokeWidth: ".6"
+  })), /*#__PURE__*/React.createElement("pattern", {
+    id: "bp-grid-hi",
+    width: "100",
+    height: "100",
+    patternUnits: "userSpaceOnUse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M 100 0 L 0 0 0 100",
+    fill: "none",
+    stroke: "#2a4d80",
+    strokeWidth: ".8"
+  })), /*#__PURE__*/React.createElement("marker", {
+    id: "bp-arrow",
+    viewBox: "0 0 10 10",
+    refX: "9",
+    refY: "5",
+    markerWidth: "6",
+    markerHeight: "6",
+    orient: "auto-start-reverse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0 1 L10 5 L0 9",
+    fill: "none",
+    stroke: "#80d0e0",
+    strokeWidth: "1.3"
+  })), /*#__PURE__*/React.createElement("marker", {
+    id: "bp-arrow-a",
+    viewBox: "0 0 10 10",
+    refX: "9",
+    refY: "5",
+    markerWidth: "6",
+    markerHeight: "6",
+    orient: "auto-start-reverse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0 1 L10 5 L0 9",
+    fill: "none",
+    stroke: "#ffd166",
+    strokeWidth: "1.5"
+  }))),
+  Background: ({
+    w,
+    h
+  }) => /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    fill: "#0b2545"
+  }), /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    fill: "url(#bp-grid)"
+  }), /*#__PURE__*/React.createElement("rect", {
+    width: w,
+    height: h,
+    fill: "url(#bp-grid-hi)"
+  })),
+  Node: ({
+    node,
+    active
+  }) => {
+    const stroke = active ? '#ffd166' : '#80d0e0';
+    const shape = shapeOf(node);
+    const isImg = node.kind === 'image' && node.src;
+    return /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${node.x} ${node.y})`
+    }, /*#__PURE__*/React.createElement(ShapeShell, {
+      node: node,
+      fill: "none",
+      stroke: stroke,
+      strokeWidth: active ? 1.6 : 1,
+      strokeDasharray: node.kind === 'external' ? '4 3' : undefined
+    }), isImg && /*#__PURE__*/React.createElement("image", {
+      href: node.src,
+      x: node.w / 2 - 16,
+      y: node.h / 2 - 22,
+      width: "32",
+      height: "32",
+      opacity: ".9"
+    }), !isImg && !['diamond', 'circle', 'oval', 'pill'].includes(shape) && /*#__PURE__*/React.createElement("g", {
+      transform: "translate(10, 8)"
+    }, /*#__PURE__*/React.createElement(NodeIcon, {
+      kind: node.kind,
+      color: stroke,
+      mono: true
+    })), !isImg && ['diamond', 'circle', 'oval', 'pill'].includes(shape) && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${node.w / 2 - 7} ${node.h / 2 - 18})`
+    }, /*#__PURE__*/React.createElement(NodeIcon, {
+      kind: node.kind,
+      color: stroke,
+      mono: true
+    })), /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("text", {
+      x: node.w / 2,
+      y: node.h / 2 + 4 + (['diamond', 'circle', 'oval', 'pill'].includes(shape) ? 8 : 0),
+      textAnchor: "middle",
+      fontFamily: "JetBrains Mono",
+      fontWeight: "600",
+      fontSize: "11",
+      fill: active ? '#ffd166' : '#e0fbfc',
+      letterSpacing: ".04em"
+    }, node.label.toUpperCase()), node.sub && /*#__PURE__*/React.createElement("text", {
+      x: node.w / 2,
+      y: node.h - 8,
+      textAnchor: "middle",
+      fontFamily: "JetBrains Mono",
+      fontSize: "8.5",
+      fill: "#8bb5d4"
+    }, node.sub)));
+  },
+  Edge: ({
+    edge,
+    active
+  }) => {
+    const kind = edge.kind || 'solid';
+    const isDashed = kind === 'dashed',
+      isDotted = kind === 'dotted',
+      isBold = kind === 'bold';
+    const isAsync = kind === 'async',
+      isBidir = kind === 'bidir',
+      isError = kind === 'error';
+    const isSecure = kind === 'secure',
+      isRealtime = kind === 'realtime';
+    const errorColor = '#ff6b6b',
+      secureColor = '#7eea9c';
+    const stroke = isError ? errorColor : isSecure ? secureColor : active ? '#ffd166' : '#80d0e0';
+    const dashAttr = isDashed ? '4 3' : isDotted ? '1 4' : isAsync ? '7 3 1 3' : isRealtime ? '5 3' : undefined;
+    const sw = isBold ? active ? 2.2 : 1.8 : active ? 1.4 : 1;
+    const mid = edgeMidpoint(edge.points);
+    const arrowEnd = active ? 'url(#bp-arrow-a)' : 'url(#bp-arrow)';
+    return /*#__PURE__*/React.createElement("g", null, isRealtime && /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: "#ffd166",
+      opacity: ".3",
+      strokeWidth: sw + 2.5
+    }), /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: isRealtime ? '#ffd166' : stroke,
+      strokeWidth: sw,
+      strokeDasharray: dashAttr,
+      strokeLinecap: isDotted ? 'round' : 'butt',
+      markerEnd: arrowEnd,
+      markerStart: isBidir ? arrowEnd : undefined
+    }, isRealtime && /*#__PURE__*/React.createElement("animate", {
+      attributeName: "stroke-dashoffset",
+      from: "0",
+      to: "-16",
+      dur: ".5s",
+      repeatCount: "indefinite"
+    })), active && !isRealtime && /*#__PURE__*/React.createElement("circle", {
+      r: "2.5",
+      fill: isError ? errorColor : '#ffd166'
+    }, /*#__PURE__*/React.createElement("animateMotion", {
+      dur: "1.5s",
+      repeatCount: "indefinite",
+      path: edge.d,
+      rotate: "auto"
+    })), isSecure && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 13})`,
+      fill: "#0b2545",
+      stroke: secureColor,
+      strokeWidth: "1"
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "-6",
+      y: "-7",
+      width: "12",
+      height: "11",
+      rx: "1.5"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M-2 -7 V-9.5 Q0 -11 2 -9.5 V-7",
+      fill: "none"
+    })), isError && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 12})`,
+      stroke: errorColor,
+      strokeWidth: "1.2",
+      fill: "#0b2545"
+    }, /*#__PURE__*/React.createElement("circle", {
+      r: "6"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "-3",
+      y1: "-3",
+      x2: "3",
+      y2: "3"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "3",
+      y1: "-3",
+      x2: "-3",
+      y2: "3"
+    })), edge.label && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y})`
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: -edge.label.length * 3.3 - 4,
+      y: -7,
+      width: edge.label.length * 6.6 + 8,
+      height: 14,
+      fill: "#0b2545",
+      stroke: stroke,
+      strokeWidth: ".5"
+    }), /*#__PURE__*/React.createElement("text", {
+      textAnchor: "middle",
+      dominantBaseline: "middle",
+      fontFamily: "JetBrains Mono",
+      fontSize: "9",
+      fill: stroke,
+      letterSpacing: ".05em"
+    }, edge.label.toUpperCase())));
+  }
+};
+
+// ===========================================================
+// CITY — True Isometric 3D Map
+// ===========================================================
+const CityStyle = {
+  id: 'city',
+  name: 'City',
+  tagline: 'True 3D Map. City blocks, isometric projection.',
+  tokens: {
+    bg: '#F9FAFB',
+    ink: '#0f172a',
+    muted: '#64748b',
+    accent: '#007AFF',
+    line: '#D1D5DB'
+  },
+  isometric: true,
+  Defs: () => /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("radialGradient", {
+    id: "grid-fade",
+    cx: "50%",
+    cy: "50%",
+    r: "60%"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0%",
+    stopColor: "white",
+    stopOpacity: "1"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "100%",
+    stopColor: "white",
+    stopOpacity: "0"
+  })), /*#__PURE__*/React.createElement("mask", {
+    id: "grid-fade-mask"
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "-2000",
+    y: "-2000",
+    width: "6000",
+    height: "6000",
+    fill: "url(#grid-fade)"
+  })), /*#__PURE__*/React.createElement("pattern", {
+    id: "clay-iso-grid",
+    width: "40",
+    height: "40",
+    patternUnits: "userSpaceOnUse"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M 40 0 L 0 0 0 40",
+    fill: "none",
+    stroke: "#EEEEEE",
+    strokeWidth: "1.5",
+    vectorEffect: "non-scaling-stroke"
+  })), /*#__PURE__*/React.createElement("filter", {
+    id: "clay-ao",
+    x: "-30%",
+    y: "-30%",
+    width: "160%",
+    height: "160%"
+  }, /*#__PURE__*/React.createElement("feGaussianBlur", {
+    in: "SourceAlpha",
+    stdDeviation: "12",
+    result: "blur1"
+  }), /*#__PURE__*/React.createElement("feOffset", {
+    in: "blur1",
+    dy: "16",
+    result: "offset1"
+  }), /*#__PURE__*/React.createElement("feComponentTransfer", {
+    in: "offset1",
+    result: "ao"
+  }, /*#__PURE__*/React.createElement("feFuncA", {
+    type: "linear",
+    slope: ".06"
+  })), /*#__PURE__*/React.createElement("feGaussianBlur", {
+    in: "SourceAlpha",
+    stdDeviation: "3",
+    result: "blur2"
+  }), /*#__PURE__*/React.createElement("feOffset", {
+    in: "blur2",
+    dy: "2",
+    result: "offset2"
+  }), /*#__PURE__*/React.createElement("feComponentTransfer", {
+    in: "offset2",
+    result: "contact"
+  }, /*#__PURE__*/React.createElement("feFuncA", {
+    type: "linear",
+    slope: ".15"
+  })), /*#__PURE__*/React.createElement("feMerge", null, /*#__PURE__*/React.createElement("feMergeNode", {
+    in: "ao"
+  }), /*#__PURE__*/React.createElement("feMergeNode", {
+    in: "contact"
+  }), /*#__PURE__*/React.createElement("feMergeNode", {
+    in: "SourceGraphic"
+  }))), /*#__PURE__*/React.createElement("filter", {
+    id: "clay-ao-sm",
+    x: "-30%",
+    y: "-30%",
+    width: "160%",
+    height: "160%"
+  }, /*#__PURE__*/React.createElement("feGaussianBlur", {
+    in: "SourceAlpha",
+    stdDeviation: "4"
+  }), /*#__PURE__*/React.createElement("feOffset", {
+    dy: "3"
+  }), /*#__PURE__*/React.createElement("feComponentTransfer", null, /*#__PURE__*/React.createElement("feFuncA", {
+    type: "linear",
+    slope: ".15"
+  })), /*#__PURE__*/React.createElement("feMerge", null, /*#__PURE__*/React.createElement("feMergeNode", null), /*#__PURE__*/React.createElement("feMergeNode", {
+    in: "SourceGraphic"
+  }))), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-top",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#ffffff"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#fdfdfd"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-right",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#f2f2f2"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#e0e0e0"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-front",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#e0e0e0"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#cccccc"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-wall-left",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#e4e4e7"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#d4d4d8"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-wall-right",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#ffffff"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#f4f4f5"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-pipe-cool",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#005bb5"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: ".5",
+    stopColor: "#4da6ff"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#007AFF"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-pipe-warm",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#cc9300"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: ".5",
+    stopColor: "#ffdb4d"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#FFB800"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-packet-warm",
+    x1: "1",
+    y1: "0.5",
+    x2: "0",
+    y2: "0.5"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0%",
+    stopColor: "#FFBB0C",
+    stopOpacity: "1"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "50%",
+    stopColor: "#FFDD86",
+    stopOpacity: "0.6"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "100%",
+    stopColor: "#fef3c7",
+    stopOpacity: "0"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "clay-packet-cool",
+    x1: "1",
+    y1: "0.5",
+    x2: "0",
+    y2: "0.5"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0%",
+    stopColor: "#3b82f6",
+    stopOpacity: "1"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "50%",
+    stopColor: "#93c5fd",
+    stopOpacity: "0.6"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "100%",
+    stopColor: "#dbeafe",
+    stopOpacity: "0"
+  })), /*#__PURE__*/React.createElement("filter", {
+    id: "clay-packet-glow",
+    x: "-100%",
+    y: "-100%",
+    width: "300%",
+    height: "300%"
+  }, /*#__PURE__*/React.createElement("feGaussianBlur", {
+    stdDeviation: "2.5",
+    result: "blur"
+  }), /*#__PURE__*/React.createElement("feComposite", {
+    in: "SourceGraphic",
+    in2: "blur",
+    operator: "over"
+  }))),
+  Background: ({
+    w,
+    h
+  }) => /*#__PURE__*/React.createElement("rect", {
+    width: w * 2,
+    height: h * 2,
+    x: -w / 2,
+    y: -h / 2,
+    fill: "url(#clay-iso-grid)",
+    mask: "url(#grid-fade-mask)"
+  }),
+  Node: ({
+    node,
+    active
+  }) => {
+    const {
+      w,
+      h
+    } = node;
+    const kind = node.kind;
+    const isBoundary = kind === 'boundary';
+    if (kind === 'store') {
+      const r = Math.min(w, h) / 2;
+      const cx = r,
+        cy = h / 2,
+        Z = 56,
+        E = 1.225 * Z;
+      const tan1 = {
+        x: cx + r / Math.sqrt(2),
+        y: cy + r / Math.sqrt(2)
+      };
+      const tan2 = {
+        x: cx - r / Math.sqrt(2),
+        y: cy - r / Math.sqrt(2)
+      };
+      const pSplit = {
+        x: cx - r / Math.sqrt(2),
+        y: cy + r / Math.sqrt(2)
+      };
+      return /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${node.x} ${node.y})`
+      }, active && /*#__PURE__*/React.createElement("ellipse", {
+        cx: 0,
+        cy: cy,
+        rx: r + 8,
+        ry: 28,
+        fill: "none",
+        stroke: "#007AFF",
+        strokeWidth: "3",
+        opacity: "0.6"
+      }, /*#__PURE__*/React.createElement("animate", {
+        attributeName: "opacity",
+        values: "0.6;0.1;0.6",
+        dur: "2s",
+        repeatCount: "indefinite"
+      })), /*#__PURE__*/React.createElement("ellipse", {
+        cx: cx + 8,
+        cy: cy + 10,
+        rx: r,
+        ry: r * 0.577,
+        fill: "rgba(0,0,0,0.35)",
+        filter: "url(#clay-ao)"
+      }), /*#__PURE__*/React.createElement("path", {
+        d: `M ${tan2.x} ${tan2.y} L ${tan2.x + E} ${tan2.y - E} A ${r} ${r} 0 0 0 ${pSplit.x + E} ${pSplit.y - E} L ${pSplit.x} ${pSplit.y} A ${r} ${r} 0 0 1 ${tan2.x} ${tan2.y} Z`,
+        fill: "url(#clay-wall-left)"
+      }), /*#__PURE__*/React.createElement("path", {
+        d: `M ${pSplit.x} ${pSplit.y} L ${pSplit.x + E} ${pSplit.y - E} A ${r} ${r} 0 0 0 ${tan1.x + E} ${tan1.y - E} L ${tan1.x} ${tan1.y} A ${r} ${r} 0 0 1 ${pSplit.x} ${pSplit.y} Z`,
+        fill: "url(#clay-wall-right)"
+      }), [0.33, 0.66].map((f, i) => /*#__PURE__*/React.createElement("path", {
+        key: i,
+        d: `M ${tan2.x + E * f} ${tan2.y - E * f} A ${r} ${r} 0 0 0 ${tan1.x + E * f} ${tan1.y - E * f}`,
+        fill: "none",
+        stroke: "#a1a1aa",
+        strokeWidth: "1",
+        strokeDasharray: "2 2",
+        opacity: "0.55"
+      })), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${E} ${-E})`
+      }, /*#__PURE__*/React.createElement("circle", {
+        cx: cx,
+        cy: cy,
+        r: r,
+        fill: "url(#clay-top)",
+        stroke: "#e4e4e7",
+        strokeWidth: "1"
+      }), /*#__PURE__*/React.createElement("circle", {
+        cx: cx,
+        cy: cy,
+        r: r - 4,
+        fill: "none",
+        stroke: "rgba(0,0,0,0.06)",
+        strokeWidth: "1"
+      }), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${cx} ${cy})`
+      }, /*#__PURE__*/React.createElement("g", {
+        transform: "translate(-7 -16)"
+      }, /*#__PURE__*/React.createElement(NodeIcon, {
+        kind: "store",
+        color: "#475569",
+        mono: true
+      })), /*#__PURE__*/React.createElement("text", {
+        y: 12,
+        textAnchor: "middle",
+        fill: "#334155",
+        fontSize: "14",
+        fontWeight: "600",
+        fontFamily: "Inter Tight"
+      }, node.label), node.sub && /*#__PURE__*/React.createElement("text", {
+        y: 26,
+        textAnchor: "middle",
+        fill: "#64748b",
+        fontSize: "11",
+        fontFamily: "JetBrains Mono"
+      }, node.sub))), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${E * 0.06} ${cy - E * 0.06})`
+      }, /*#__PURE__*/React.createElement("rect", {
+        x: "-2",
+        y: "-10",
+        width: E * 0.08,
+        height: "20",
+        rx: "3",
+        fill: "#1e293b",
+        transform: "skewY(-45)"
+      }), /*#__PURE__*/React.createElement("rect", {
+        x: "-1",
+        y: "-8",
+        width: E * 0.04,
+        height: "16",
+        rx: "2",
+        fill: "#007AFF",
+        filter: "url(#clay-ao-sm)",
+        transform: "skewY(-45)"
+      })));
+    }
+    if (kind === 'gateway') {
+      const i = Math.min(w * 0.14, 16);
+      const Z = 42,
+        E = 1.225 * Z;
+      const p0 = {
+          x: i,
+          y: 0
+        },
+        p1 = {
+          x: w - i,
+          y: 0
+        },
+        p2 = {
+          x: w,
+          y: h / 2
+        },
+        p3 = {
+          x: w - i,
+          y: h
+        },
+        p4 = {
+          x: i,
+          y: h
+        },
+        p5 = {
+          x: 0,
+          y: h / 2
+        };
+      const t0 = {
+          x: i + E,
+          y: -E
+        },
+        t1 = {
+          x: w - i + E,
+          y: -E
+        },
+        t2 = {
+          x: w + E,
+          y: h / 2 - E
+        },
+        t3 = {
+          x: w - i + E,
+          y: h - E
+        },
+        t4 = {
+          x: i + E,
+          y: h - E
+        },
+        t5 = {
+          x: E,
+          y: h / 2 - E
+        };
+      const poly = pts => pts.map(p => `${p.x},${p.y}`).join(' ');
+      return /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${node.x} ${node.y})`
+      }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+        id: `gw-wall-1-${node.id}`,
+        x1: "0",
+        y1: "0",
+        x2: "0",
+        y2: "1"
+      }, /*#__PURE__*/React.createElement("stop", {
+        offset: "0",
+        stopColor: "#cbd5e1"
+      }), /*#__PURE__*/React.createElement("stop", {
+        offset: "1",
+        stopColor: "#94a3b8"
+      })), /*#__PURE__*/React.createElement("linearGradient", {
+        id: `gw-wall-2-${node.id}`,
+        x1: "0",
+        y1: "0",
+        x2: "0",
+        y2: "1"
+      }, /*#__PURE__*/React.createElement("stop", {
+        offset: "0",
+        stopColor: "#e4e4e7"
+      }), /*#__PURE__*/React.createElement("stop", {
+        offset: "1",
+        stopColor: "#d4d4d8"
+      }))), active && /*#__PURE__*/React.createElement("path", {
+        d: `M ${poly([p0, p1, p2, p3, p4, p5])} Z`,
+        fill: "none",
+        stroke: "#007AFF",
+        strokeWidth: "3",
+        opacity: "0.6",
+        transform: "scale(1.05) translate(-2 1)"
+      }, /*#__PURE__*/React.createElement("animate", {
+        attributeName: "opacity",
+        values: "0.6;0.1;0.6",
+        dur: "2s",
+        repeatCount: "indefinite"
+      })), /*#__PURE__*/React.createElement("path", {
+        d: `M ${poly([p0, p1, p2, p3, p4, p5])} Z`,
+        fill: "rgba(0,0,0,0.35)",
+        filter: "url(#clay-ao)"
+      }), /*#__PURE__*/React.createElement("path", {
+        d: `M ${p0.x},${p0.y} L ${p5.x},${p5.y} L ${t5.x},${t5.y} L ${t0.x},${t0.y} Z`,
+        fill: `url(#gw-wall-1-${node.id})`
+      }), /*#__PURE__*/React.createElement("path", {
+        d: `M ${p5.x},${p5.y} L ${p4.x},${p4.y} L ${t4.x},${t4.y} L ${t5.x},${t5.y} Z`,
+        fill: `url(#gw-wall-2-${node.id})`
+      }), /*#__PURE__*/React.createElement("path", {
+        d: `M ${p4.x},${p4.y} L ${p3.x},${p3.y} L ${t3.x},${t3.y} L ${t4.x},${t4.y} Z`,
+        fill: "url(#clay-wall-right)"
+      }), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${p5.x * 0.7 + p4.x * 0.3} ${p5.y * 0.7 + p4.y * 0.3})`
+      }, /*#__PURE__*/React.createElement("ellipse", {
+        cx: E * 0.2,
+        cy: -E * 0.2 - 8,
+        rx: "1.5",
+        ry: "3.5",
+        fill: "#fcd34d",
+        filter: "url(#clay-ao-sm)"
+      }), /*#__PURE__*/React.createElement("ellipse", {
+        cx: E * 0.2,
+        cy: -E * 0.2 + 8,
+        rx: "1.5",
+        ry: "3.5",
+        fill: "#f59e0b",
+        filter: "url(#clay-ao-sm)"
+      })), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${p5.x + E * 0.06} ${p5.y - E * 0.06})`
+      }, /*#__PURE__*/React.createElement("rect", {
+        x: "-2",
+        y: "-10",
+        width: E * 0.08,
+        height: "20",
+        rx: "3",
+        fill: "#1e293b",
+        transform: "skewY(-45)"
+      }), /*#__PURE__*/React.createElement("rect", {
+        x: "-1",
+        y: "-8",
+        width: E * 0.04,
+        height: "16",
+        rx: "2",
+        fill: "#007AFF",
+        filter: "url(#clay-ao-sm)",
+        transform: "skewY(-45)"
+      })), /*#__PURE__*/React.createElement("path", {
+        d: `M ${poly([t0, t1, t2, t3, t4, t5])} Z`,
+        fill: "url(#clay-top)",
+        stroke: "none"
+      }), /*#__PURE__*/React.createElement("path", {
+        d: `M ${poly([t0, t1, t2, t3, t4, t5])} Z`,
+        fill: "none",
+        stroke: "rgba(0,0,0,0.06)",
+        strokeWidth: "2.5",
+        transform: "scale(0.9) translate(4 2)",
+        style: {
+          pointerEvents: 'none'
+        }
+      }), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${w / 2 + E} ${h / 2 - E})`
+      }, /*#__PURE__*/React.createElement("g", {
+        transform: "translate(-7 -16)"
+      }, /*#__PURE__*/React.createElement(NodeIcon, {
+        kind: "gateway",
+        color: "#007AFF",
+        mono: true
+      })), /*#__PURE__*/React.createElement("text", {
+        y: 12,
+        textAnchor: "middle",
+        fill: "#334155",
+        fontSize: "14",
+        fontWeight: "600",
+        fontFamily: "Inter Tight"
+      }, node.label), node.sub && /*#__PURE__*/React.createElement("text", {
+        y: 26,
+        textAnchor: "middle",
+        fill: "#64748b",
+        fontSize: "11",
+        fontFamily: "JetBrains Mono"
+      }, node.sub)));
+    }
+    const Z = isBoundary ? 6 : kind === 'client' || kind === 'actor' ? 32 : 42;
+    const E = 1.225 * Z;
+    const R = isBoundary ? 0 : 16;
+    const topFill = isBoundary ? 'transparent' : 'url(#clay-top)';
+    const wallStroke = isBoundary ? '#cbd5e1' : 'none';
+    const layout = node.layout || 'center';
+    const icons = node.icons || [node.kind];
+    return /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${node.x} ${node.y})`
+    }, /*#__PURE__*/React.createElement("rect", {
+      width: w,
+      height: h,
+      rx: R,
+      fill: isBoundary ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.5)',
+      filter: "url(#clay-ao)"
+    }), active && !isBoundary && /*#__PURE__*/React.createElement("rect", {
+      width: w,
+      height: h,
+      rx: R,
+      fill: "none",
+      stroke: "#007AFF",
+      strokeWidth: "3",
+      opacity: "0.6",
+      transform: "scale(1.06) translate(-2 -2)"
+    }, /*#__PURE__*/React.createElement("animate", {
+      attributeName: "opacity",
+      values: "0.6;0.1;0.6",
+      dur: "2s",
+      repeatCount: "indefinite"
+    })), isBoundary ? /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
+      d: `M 0 0 L 0 ${h} L ${E} ${h - E} L ${E} ${-E} Z`,
+      fill: "transparent",
+      stroke: wallStroke,
+      strokeWidth: 1,
+      strokeLinejoin: "round"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M 0 ${h} L ${w} ${h} L ${w + E} ${h - E} L ${E} ${h - E} Z`,
+      fill: "transparent",
+      stroke: wallStroke,
+      strokeWidth: 1,
+      strokeLinejoin: "round"
+    })) : /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+      id: `corner-grad-${node.id}`,
+      gradientUnits: "userSpaceOnUse",
+      x1: 0,
+      y1: h - R,
+      x2: R,
+      y2: h
+    }, /*#__PURE__*/React.createElement("stop", {
+      offset: "0",
+      stopColor: "#d4d4d8"
+    }), /*#__PURE__*/React.createElement("stop", {
+      offset: "1",
+      stopColor: "#f4f4f5"
+    }))), /*#__PURE__*/React.createElement("path", {
+      d: `M 0 ${R} L 0 ${h - R} L ${E} ${h - R - E} L ${E} ${R - E} Z`,
+      fill: "url(#clay-wall-left)"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M 0 ${h - R} A ${R} ${R} 0 0 0 ${R} ${h} L ${R + E} ${h - E} A ${R} ${R} 0 0 1 ${E} ${h - R - E} Z`,
+      fill: `url(#corner-grad-${node.id})`
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M ${R} ${h} L ${w - R} ${h} L ${w - R + E} ${h - E} L ${R + E} ${h - E} Z`,
+      fill: "url(#clay-wall-right)"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M ${w - R} ${h} A ${R} ${R} 0 0 0 ${w} ${h - R} L ${w + E} ${h - R - E} A ${R} ${R} 0 0 1 ${w - R + E} ${h - E} Z`,
+      fill: "url(#clay-wall-right)"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M 0 ${R} A ${R} ${R} 0 0 1 ${R} 0 L ${R + E} ${-E} A ${R} ${R} 0 0 0 ${E} ${R - E} Z`,
+      fill: "url(#clay-wall-left)"
+    })), !isBoundary && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${E * 0.06} ${h / 2 - E * 0.06})`
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "-2",
+      y: "-10",
+      width: E * 0.08,
+      height: "20",
+      rx: "3",
+      fill: "#1e293b",
+      transform: "skewY(-45)"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-1",
+      y: "-8",
+      width: E * 0.04,
+      height: "16",
+      rx: "2",
+      fill: "#007AFF",
+      filter: "url(#clay-ao-sm)",
+      transform: "skewY(-45)"
+    })), /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${w / 2 + 2} ${h - 2})`
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "-10",
+      y: "-2",
+      width: "20",
+      height: E * 0.08,
+      rx: "3",
+      fill: "#1e293b",
+      transform: "skewX(-45)"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-8",
+      y: "-1",
+      width: "16",
+      height: E * 0.04,
+      rx: "2",
+      fill: "#007AFF",
+      filter: "url(#clay-ao-sm)",
+      transform: "skewX(-45)"
+    }))), /*#__PURE__*/React.createElement("rect", {
+      x: E,
+      y: -E,
+      width: w,
+      height: h,
+      rx: R,
+      fill: topFill,
+      stroke: isBoundary ? '#cbd5e1' : 'none',
+      strokeWidth: isBoundary ? 1 : 0
+    }), !isBoundary && /*#__PURE__*/React.createElement("rect", {
+      x: E + 3,
+      y: -E + 3,
+      width: w - 6,
+      height: h - 6,
+      rx: Math.max(2, R - 3),
+      fill: "transparent",
+      stroke: "rgba(0,0,0,0.06)",
+      strokeWidth: "2"
+    }), /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${E} ${-E})`
+    }, layout === 'multi-row' && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("line", {
+      x1: 0,
+      y1: h / 2,
+      x2: w,
+      y2: h / 2,
+      stroke: "#e2e8f0",
+      strokeWidth: 1.5
+    }), icons.map((ic, idx) => {
+      const cellW = w / icons.length;
+      return /*#__PURE__*/React.createElement("g", {
+        key: idx
+      }, idx > 0 && /*#__PURE__*/React.createElement("line", {
+        x1: idx * cellW,
+        y1: 0,
+        x2: idx * cellW,
+        y2: h / 2,
+        stroke: "#e2e8f0",
+        strokeWidth: 1.5
+      }), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${idx * cellW + cellW / 2} ${h / 4})`
+      }, /*#__PURE__*/React.createElement(NodeIcon, {
+        kind: ic,
+        color: "#475569",
+        mono: true
+      })));
+    }), /*#__PURE__*/React.createElement("text", {
+      x: w / 2,
+      y: h * 0.75 + 4,
+      textAnchor: "middle",
+      fill: "#334155",
+      fontSize: "13",
+      fontWeight: "600",
+      fontFamily: "Inter Tight"
+    }, node.label)), layout === 'inline' && /*#__PURE__*/React.createElement("g", null, icons.map((ic, idx) => {
+      const cellW = w / icons.length;
+      return /*#__PURE__*/React.createElement("g", {
+        key: idx
+      }, idx > 0 && /*#__PURE__*/React.createElement("line", {
+        x1: idx * cellW,
+        y1: 0,
+        x2: idx * cellW,
+        y2: h,
+        stroke: "#e2e8f0",
+        strokeWidth: 1.5
+      }), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${idx * cellW + cellW / 2} ${h / 2})`
+      }, /*#__PURE__*/React.createElement(NodeIcon, {
+        kind: ic,
+        color: "#475569",
+        mono: true
+      })));
+    })), layout === 'center' && /*#__PURE__*/React.createElement("g", null, isBoundary ? /*#__PURE__*/React.createElement("text", {
+      x: 18,
+      y: 28,
+      fill: "#94a3b8",
+      fontSize: "18",
+      fontWeight: "600",
+      fontFamily: "Inter Tight",
+      letterSpacing: "0.05em"
+    }, node.label.toUpperCase()) : /*#__PURE__*/React.createElement("g", null, kind === 'queue' && /*#__PURE__*/React.createElement("g", null, [0, 1, 2].map(qi => {
+      const pw = (w - 28) / 3,
+        px = 10 + qi * (pw + 4);
+      return /*#__PURE__*/React.createElement("rect", {
+        key: qi,
+        x: px,
+        y: 8,
+        width: pw,
+        height: 14,
+        rx: "3",
+        fill: qi === 2 ? '#FFB800' : '#fde68a',
+        stroke: "#b45309",
+        strokeWidth: "1"
+      });
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M ${w - 14} 15 L ${w - 6} 15 M ${w - 10} 11 L ${w - 6} 15 L ${w - 10} 19`,
+      stroke: "#b45309",
+      strokeWidth: "1.5",
+      fill: "none",
+      strokeLinecap: "round"
+    })), kind === 'cache' && /*#__PURE__*/React.createElement("g", null, [0, 1, 2, 3].map(ci => {
+      const cw = (w - 24) / 4,
+        cx2 = 10 + ci * (cw + 1);
+      return /*#__PURE__*/React.createElement("rect", {
+        key: ci,
+        x: cx2,
+        y: 10,
+        width: cw - 1,
+        height: 10,
+        rx: "1.5",
+        fill: "#0f172a",
+        stroke: "#334155",
+        strokeWidth: "0.5"
+      });
+    })), (kind === 'client' || kind === 'actor') && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("circle", {
+      cx: w / 2,
+      cy: 12,
+      r: "6",
+      fill: "#cbd5e1",
+      stroke: "#64748b",
+      strokeWidth: "1"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M ${w / 2 - 10} 22 Q ${w / 2} 14, ${w / 2 + 10} 22`,
+      fill: "none",
+      stroke: "#64748b",
+      strokeWidth: "1"
+    })), kind === 'external' && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${w / 2} 16)`
+    }, /*#__PURE__*/React.createElement("path", {
+      d: "M -8 4 Q 0 -6, 8 4",
+      fill: "none",
+      stroke: "#64748b",
+      strokeWidth: "1.5"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M -5 4 Q 0 -2, 5 4",
+      fill: "none",
+      stroke: "#64748b",
+      strokeWidth: "1.5"
+    }), /*#__PURE__*/React.createElement("circle", {
+      cx: "0",
+      cy: "4",
+      r: "1.5",
+      fill: "#64748b"
+    })), kind === 'event' && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("circle", {
+      cx: w / 2,
+      cy: 14,
+      r: "8",
+      fill: "#fef3c7",
+      stroke: "#f59e0b",
+      strokeWidth: "1"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: `M ${w / 2 + 1} 9 L ${w / 2 - 2} 15 L ${w / 2 + 1} 15 L ${w / 2 - 1} 19 L ${w / 2 + 3} 13 L ${w / 2} 13 Z`,
+      fill: "#f59e0b"
+    })), /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${w / 2} ${['queue', 'cache', 'gateway', 'client', 'actor', 'external', 'event'].includes(kind) ? h / 2 + 8 : h / 2})`
+    }, node.kind === 'image' && node.src ? /*#__PURE__*/React.createElement("image", {
+      href: node.src,
+      x: -16,
+      y: -16,
+      width: "32",
+      height: "32"
+    }) : !['queue', 'cache', 'gateway', 'client', 'actor', 'external', 'event'].includes(kind) ? /*#__PURE__*/React.createElement("g", {
+      transform: "translate(-7 -16)"
+    }, /*#__PURE__*/React.createElement(NodeIcon, {
+      kind: icons[0],
+      color: "#475569",
+      mono: true
+    })) : null, /*#__PURE__*/React.createElement("text", {
+      y: 12,
+      textAnchor: "middle",
+      fill: "#334155",
+      fontSize: "14",
+      fontWeight: "600",
+      fontFamily: "Inter Tight"
+    }, node.label), node.sub && /*#__PURE__*/React.createElement("text", {
+      y: 26,
+      textAnchor: "middle",
+      fill: "#64748b",
+      fontSize: "11",
+      fontFamily: "JetBrains Mono"
+    }, node.sub))))), layout === 'inline' && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${w / 2 + E / 2} ${h - E / 2}) rotate(45) scale(1, 1.732)`
+    }, /*#__PURE__*/React.createElement("text", {
+      textAnchor: "middle",
+      dominantBaseline: "middle",
+      fill: "#64748b",
+      fontSize: "12",
+      fontWeight: "600",
+      fontFamily: "Inter Tight"
+    }, node.label)));
+  },
+  Edge: ({
+    edge,
+    active
+  }) => {
+    const kind = edge.kind || 'solid';
+    const isDashed = kind === 'dashed',
+      isDotted = kind === 'dotted';
+    const isBold = kind === 'bold',
+      isAsync = kind === 'async';
+    const isBidir = kind === 'bidir',
+      isError = kind === 'error';
+    const isSecure = kind === 'secure',
+      isRealtime = kind === 'realtime';
+    const warm = active || kind === 'warm' || isError || isRealtime;
+    const errorPipe = '#dc2626',
+      securePipe = '#16a34a';
+    const pipeFill = isError ? errorPipe : isSecure ? securePipe : warm ? 'url(#clay-pipe-warm)' : 'url(#clay-pipe-cool)';
+    const dash = isDashed ? '16 10' : isDotted ? '2 9' : isAsync ? '14 5 2 5' : isRealtime ? '10 6' : undefined;
+    const coreSw = isBold ? 8 : 6,
+      outerSw = isBold ? 11 : 8;
+    const mid = edgeMidpoint(edge.points);
+    return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: "rgba(0,0,0,.15)",
+      strokeWidth: "14",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      filter: "url(#clay-ao-sm)"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: isError ? '#7f1d1d' : isSecure ? '#14532d' : '#64748b',
+      strokeWidth: outerSw,
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: pipeFill,
+      strokeWidth: coreSw,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      strokeDasharray: dash
+    }, isRealtime && /*#__PURE__*/React.createElement("animate", {
+      attributeName: "stroke-dashoffset",
+      from: "0",
+      to: "-32",
+      dur: ".7s",
+      repeatCount: "indefinite"
+    })), /*#__PURE__*/React.createElement("path", {
+      d: edge.d,
+      fill: "none",
+      stroke: "rgba(255,255,255,0.4)",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      transform: "translate(-1, -1)"
+    }), active && !isRealtime && /*#__PURE__*/React.createElement("g", null, [0, 1, 2, 3].map(i => /*#__PURE__*/React.createElement("g", {
+      key: i
+    }, /*#__PURE__*/React.createElement("animateMotion", {
+      dur: "1.8s",
+      repeatCount: "indefinite",
+      path: edge.d,
+      begin: `${i * -0.45}s`,
+      rotate: "auto"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M -24 0 L -6 -3.5 L 6 0 L -6 3.5 Z",
+      fill: isError ? errorPipe : warm ? 'url(#clay-packet-warm)' : 'url(#clay-packet-cool)',
+      filter: "url(#clay-packet-glow)"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M -8 0 L 0 -4.5 L 8 0 L 0 4.5 Z",
+      fill: "#ffffff",
+      filter: "url(#clay-packet-glow)",
+      opacity: "0.9"
+    }), /*#__PURE__*/React.createElement("circle", {
+      r: "1.5",
+      fill: "white"
+    })))), isBidir && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("animateMotion", {
+      dur: "2s",
+      repeatCount: "indefinite",
+      path: edge.d,
+      keyPoints: "1;0",
+      keyTimes: "0;1",
+      rotate: "auto"
+    }), /*#__PURE__*/React.createElement("circle", {
+      r: "3.5",
+      fill: "#fff",
+      filter: "url(#clay-packet-glow)"
+    })), isSecure && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 30}) rotate(45) scale(1, 1.732)`,
+      fill: "#fff",
+      stroke: "#16a34a",
+      strokeWidth: "1.5",
+      filter: "url(#clay-ao-sm)"
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "-9",
+      y: "-10",
+      width: "18",
+      height: "16",
+      rx: "3"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M-3 -10 V-13.5 Q0 -16 3 -13.5 V-10",
+      fill: "none"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-3.5",
+      y: "-5",
+      width: "7",
+      height: "7",
+      rx: "1",
+      fill: "#16a34a"
+    })), isError && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y - 30}) rotate(45) scale(1, 1.732)`,
+      fill: "#fff",
+      stroke: "#dc2626",
+      strokeWidth: "2",
+      filter: "url(#clay-ao-sm)"
+    }, /*#__PURE__*/React.createElement("circle", {
+      r: "9"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "-4.5",
+      y1: "-4.5",
+      x2: "4.5",
+      y2: "4.5"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "4.5",
+      y1: "-4.5",
+      x2: "-4.5",
+      y2: "4.5"
+    })), edge.label && /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${mid.x} ${mid.y}) translate(0 -36) rotate(45) scale(1, 1.732)`
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: -edge.label.length * 3.6 - 8,
+      y: -10,
+      width: edge.label.length * 7.2 + 16,
+      height: 20,
+      rx: "4",
+      fill: "#ffffff",
+      stroke: "#e2e8f0",
+      strokeWidth: "1.5",
+      filter: "url(#clay-ao-sm)"
+    }), /*#__PURE__*/React.createElement("text", {
+      textAnchor: "middle",
+      dominantBaseline: "middle",
+      fontFamily: "JetBrains Mono",
+      fontSize: "10.5",
+      fontWeight: "600",
+      fill: warm ? '#b45309' : '#1d4ed8'
+    }, edge.label)));
+  }
+};
+const BUILTIN_STYLES = {
+  sleek: SleekStyle,
+  sketch: SketchStyle,
+  iso: IsoStyle,
+  city: CityStyle,
+  blueprint: BlueprintStyle
+};
+
+const STYLES = {
+  ...BUILTIN_STYLES
+};
+const _registry = new Map(Object.entries(BUILTIN_STYLES));
+function registerStyle(name, styleModule) {
+  const required = ['Node', 'Edge', 'tokens'];
+  const missing = required.filter(k => !styleModule[k]);
+  if (missing.length > 0) {
+    throw new Error(`registerStyle("${name}"): missing required exports: ${missing.join(', ')}`);
+  }
+  if (_registry.has(name)) {
+    console.warn(`flow-diagram: style "${name}" is being overwritten`);
+  }
+  const entry = {
+    ...styleModule,
+    id: name
+  };
+  _registry.set(name, entry);
+  STYLES[name] = entry;
+}
+function getStyle(name) {
+  return _registry.get(name) || BUILTIN_STYLES.sleek;
+}
+function listStyles() {
+  return Array.from(_registry.keys());
+}
+
+function Diagram({
+  graph,
+  style = 'sleek',
+  activeNodes = [],
+  activeEdges = [],
+  padding = 28,
+  className,
+  fullscreenTarget = null,
+  onNodeClick,
+  onEdgeClick
+}) {
+  const Style = getStyle(style) || STYLES.sleek;
+  const G = useMemo(() => resolveGraph(graph), [graph]);
+  const bounds = useMemo(() => {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    G.nodes.forEach(n => {
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + n.w);
+      maxY = Math.max(maxY, n.y + n.h);
+    });
+    G.edges.forEach(e => e.points.forEach(p => {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }));
+    if (!isFinite(minX)) {
+      minX = 0;
+      minY = 0;
+      maxX = 800;
+      maxY = 600;
+    }
+    return {
+      minX: minX - 10,
+      minY: minY - 15,
+      w: maxX - minX + 20,
+      h: maxY - minY + 40
+    };
+  }, [G]);
+  const containerRef = useRef(null);
+  const svgRef = useRef(null);
+  const dragRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({
+    x: 0,
+    y: 0
+  });
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const baseW = bounds.w + padding * 2;
+  const baseH = bounds.h + padding * 2;
+  const vbW = baseW / zoom,
+    vbH = baseH / zoom;
+  const cx = bounds.minX - padding + baseW / 2 + pan.x;
+  const cy = bounds.minY - padding + baseH / 2 + pan.y;
+  const handleMouseDown = e => {
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    dragRef.current = {
+      mx: e.clientX,
+      my: e.clientY,
+      px: pan.x,
+      py: pan.y
+    };
+  };
+  const handleMouseMove = e => {
+    if (!isDragging || !dragRef.current) return;
+    const dx = e.clientX - dragRef.current.mx;
+    const dy = e.clientY - dragRef.current.my;
+    const rect = containerRef.current?.getBoundingClientRect();
+    const scale = rect ? Math.min(rect.width / vbW, rect.height / vbH) : 1;
+    setPan({
+      x: dragRef.current.px - dx / scale,
+      y: dragRef.current.py - dy / scale
+    });
+  };
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    dragRef.current = null;
+  };
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = e => {
+      e.preventDefault();
+      setZoom(z => Math.max(0.2, Math.min(4, z * (e.deltaY > 0 ? 0.9 : 1.1))));
+    };
+    el.addEventListener('wheel', onWheel, {
+      passive: false
+    });
+    return () => el.removeEventListener('wheel', onWheel);
+  });
+  const btnBase = {
+    background: 'transparent',
+    border: 'none',
+    padding: '7px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#64748b'
+  };
+  const showControls = isHovered || isDragging || isFullscreen;
+  return /*#__PURE__*/React.createElement("div", {
+    ref: containerRef,
+    className: className,
+    onMouseEnter: () => setIsHovered(true),
+    onMouseLeave: () => {
+      setIsHovered(false);
+      handleMouseUp();
+    },
+    style: {
+      width: '100%',
+      height: '100%',
+      position: 'relative',
+      background: Style.tokens.bg,
+      overflow: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    ref: svgRef,
+    viewBox: `${cx - vbW / 2} ${cy - vbH / 2} ${vbW} ${vbH}`,
+    preserveAspectRatio: "xMidYMid meet",
+    onMouseDown: handleMouseDown,
+    onMouseMove: handleMouseMove,
+    onMouseUp: handleMouseUp,
+    onMouseLeave: handleMouseUp,
+    style: {
+      width: '100%',
+      height: '100%',
+      display: 'block',
+      cursor: isDragging ? 'grabbing' : 'grab'
+    }
+  }, Style.Defs && /*#__PURE__*/React.createElement(Style.Defs, null), /*#__PURE__*/React.createElement(Style.Background, {
+    w: G.canvas.w,
+    h: G.canvas.h,
+    grid: G.canvas.grid
+  }), G.edges.map(e => /*#__PURE__*/React.createElement("g", {
+    key: e.id,
+    onClick: onEdgeClick ? () => onEdgeClick(e) : undefined,
+    style: onEdgeClick ? {
+      cursor: 'pointer'
+    } : undefined
+  }, /*#__PURE__*/React.createElement(Style.Edge, {
+    edge: e,
+    active: activeEdges.includes(e.id)
+  }))), G.nodes.map(n => /*#__PURE__*/React.createElement("g", {
+    key: n.id,
+    onClick: onNodeClick ? () => onNodeClick(n) : undefined,
+    style: onNodeClick ? {
+      cursor: 'pointer'
+    } : undefined
+  }, /*#__PURE__*/React.createElement(Style.Node, {
+    node: n,
+    active: activeNodes.includes(n.id)
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      bottom: 12,
+      right: 12,
+      display: 'flex',
+      gap: 6,
+      zIndex: 10,
+      opacity: showControls ? 1 : 0,
+      pointerEvents: showControls ? 'auto' : 'none',
+      transition: 'opacity 0.2s'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: '#fff',
+      border: '1px solid #e2e8f0',
+      borderRadius: 8,
+      display: 'flex',
+      overflow: 'hidden',
+      boxShadow: '0 2px 8px rgba(0,0,0,.08)'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setZoom(z => Math.max(0.2, z / 1.25)),
+    style: btnBase,
+    title: "Zoom out"
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "15",
+    height: "15",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "11",
+    cy: "11",
+    r: "8"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "21",
+    y1: "21",
+    x2: "16.65",
+    y2: "16.65"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "8",
+    y1: "11",
+    x2: "14",
+    y2: "11"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 1,
+      background: '#e2e8f0'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setZoom(1);
+      setPan({
+        x: 0,
+        y: 0
+      });
+    },
+    style: {
+      ...btnBase,
+      fontSize: 10,
+      fontFamily: 'monospace',
+      fontWeight: 700,
+      width: 44
+    },
+    title: "Reset"
+  }, Math.round(zoom * 100), "%"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 1,
+      background: '#e2e8f0'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setZoom(z => Math.min(4, z * 1.25)),
+    style: btnBase,
+    title: "Zoom in"
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "15",
+    height: "15",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "11",
+    cy: "11",
+    r: "8"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "21",
+    y1: "21",
+    x2: "16.65",
+    y2: "16.65"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "11",
+    y1: "8",
+    x2: "11",
+    y2: "14"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "8",
+    y1: "11",
+    x2: "14",
+    y2: "11"
+  })))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const target = fullscreenTarget?.current || containerRef.current;
+      if (document.fullscreenElement) document.exitFullscreen();else target?.requestFullscreen?.();
+    },
+    style: {
+      ...btnBase,
+      padding: 8,
+      background: '#fff',
+      border: '1px solid #e2e8f0',
+      borderRadius: 8,
+      boxShadow: '0 2px 8px rgba(0,0,0,.08)'
+    },
+    title: "Toggle fullscreen"
+  }, isFullscreen ? /*#__PURE__*/React.createElement("svg", {
+    width: "15",
+    height: "15",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"
+  })) : /*#__PURE__*/React.createElement("svg", {
+    width: "15",
+    height: "15",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+  }))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => downloadSVG(svgRef.current, `diagram-${style}.svg`),
+    style: {
+      ...btnBase,
+      padding: 8,
+      background: '#fff',
+      border: '1px solid #e2e8f0',
+      borderRadius: 8,
+      boxShadow: '0 2px 8px rgba(0,0,0,.08)'
+    },
+    title: "Download SVG"
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "15",
+    height: "15",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+  }), /*#__PURE__*/React.createElement("polyline", {
+    points: "7 10 12 15 17 10"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "15",
+    x2: "12",
+    y2: "3"
+  })))));
 }
 
 /**
@@ -2606,7 +4886,7 @@ function FlowDiagram$1({
     }
     if (dsl) {
       try {
-        return parseDSL$1(dsl);
+        return parseDSL(dsl);
       } catch (e) {
         console.error('Flow: Failed to parse DSL', e);
         return null;
@@ -2621,7 +4901,7 @@ function FlowDiagram$1({
       className: "flow-error-content"
     }, /*#__PURE__*/React.createElement("h3", null, "Flow Diagram Error"), /*#__PURE__*/React.createElement("p", null, "No valid graph configuration provided."), /*#__PURE__*/React.createElement("p", null, "Provide either:", /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("code", null, "config"), " - a graph object"), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("code", null, "dsl"), " - a DSL/YAML string")))));
   }
-  return /*#__PURE__*/React.createElement(Diagram$1, _extends({
+  return /*#__PURE__*/React.createElement(Diagram, _extends({
     className: `flow-react-diagram ${className}`,
     graph: graph,
     style: style
@@ -2680,7 +4960,7 @@ const FlowDiagram = defineComponent({
         graph.value = props.config;
       } else if (props.dsl) {
         try {
-          graph.value = parseDSL$1(props.dsl);
+          graph.value = parseDSL(props.dsl);
         } catch (e) {
           console.error('Flow: Failed to parse DSL', e);
           graph.value = null;
@@ -2697,7 +4977,7 @@ const FlowDiagram = defineComponent({
           class: 'flow-diagram-error'
         }, [h('p', 'No valid graph configuration provided.')]);
       }
-      return h(Diagram$1, {
+      return h(Diagram, {
         graph: graph.value,
         style: props.style,
         activeNodes: props.activeNodes,
@@ -2711,143 +4991,83 @@ const FlowDiagram = defineComponent({
   }
 });
 
-/**
- * Angular Wrapper Module & Directive
- * 
- * Note: This is a conceptual wrapper since Angular typically
- * uses TypeScript components with proper DI. In a real Angular
- * app, you would create a proper Angular component that mounts
- * the Flow diagram.
- * 
- * Usage:
- * 
- * import { FlowDiagramModule } from 'flow-diagram'
- * 
- * // Create an Angular component that uses FlowDiagram
- * @Component({
- *   selector: 'app-diagram',
- *   template: '<div #diagramContainer></div>'
- * })
- * export class DiagramComponent implements AfterViewInit {
- *   @ViewChild('diagramContainer', {static: true}) container: ElementRef;
- *   
- *   ngAfterViewInit() {
- *     // Use FlowDiagram with the container
- *   }
- * }
- */
-
-// The wrapper provides the conceptual structure for Angular integration
-// since actual Angular components require TypeScript compilation
-
-const FlowDiagramModule = {
-  name: 'FlowDiagramModule',
-  description: 'Angular wrapper for Flow Diagram (conceptual - see docs for implementation)',
-  // Configuration helpers
-  withConfig(config) {
-    return {
-      provide: 'FLOW_DIAGRAM_CONFIG',
-      useValue: config
-    };
+const OBSERVED = ['dsl', 'config', 'style', 'active-nodes', 'active-edges', 'height'];
+class FlowDiagramElement extends HTMLElement {
+  static get observedAttributes() {
+    return OBSERVED;
   }
-};
-
-// For actual Angular usage, users should:
-// 1. Install flow-diagram: npm install flow-diagram
-// 2. Create an Angular component that mounts the diagram
-// 3. Use the Diagram component directly or via the FlowDiagram component
-// See the README for Angular integration examples
-
-/**
- * DSL Utilities - Create graphs from configuration
- */
-
-
-/**
- * Create a graph from a configuration object
- * Supports multiple input formats:
- * - DSL string
- * - Graph object
- * - URL to DSL
- */
-async function createGraphFromConfig$1(config, options = {}) {
-  if (!config) {
-    throw new Error('No configuration provided');
+  constructor() {
+    super();
+    this._root = null;
+    this._reactRoot = null;
   }
-  let graph = null;
-
-  // Case 1: DSL string
-  if (typeof config === 'string') {
+  connectedCallback() {
+    if (!this._root) {
+      this._root = document.createElement('div');
+      this._root.style.cssText = 'width:100%;height:100%;display:block;';
+      this.appendChild(this._root);
+    }
+    this._mount();
+  }
+  disconnectedCallback() {
+    if (this._reactRoot) {
+      this._reactRoot.unmount();
+      this._reactRoot = null;
+    }
+  }
+  attributeChangedCallback() {
+    if (this._root) this._mount();
+  }
+  _mount() {
+    const dsl = this.getAttribute('dsl');
+    const style = this.getAttribute('style') || this.getAttribute('diagram-style') || 'sleek';
+    const height = this.getAttribute('height') || '400px';
+    const rawAN = this.getAttribute('active-nodes') || '';
+    const rawAE = this.getAttribute('active-edges') || '';
+    const activeNodes = rawAN ? rawAN.split(',').map(s => s.trim()) : [];
+    const activeEdges = rawAE ? rawAE.split(',').map(s => s.trim()) : [];
+    let graph = null;
     try {
-      graph = parseDSL$1(config);
-    } catch (e) {
-      // Maybe it's JSON?
-      try {
-        graph = JSON.parse(config);
-      } catch (e2) {
-        throw new Error('Failed to parse configuration: not valid DSL or JSON');
+      const configAttr = this.getAttribute('config');
+      if (configAttr) {
+        graph = JSON.parse(configAttr);
+      } else if (this._configProp) {
+        graph = this._configProp;
+      } else if (dsl) {
+        graph = parseDSL(dsl);
       }
-    }
-  }
-  // Case 2: URL
-  else if (typeof config === 'object' && config.url) {
-    const response = await fetch(config.url);
-    const text = await response.text();
-    try {
-      graph = parseDSL$1(text);
     } catch (e) {
-      graph = JSON.parse(text);
+      console.error('[flow-diagram] Failed to parse config/dsl:', e);
     }
+    if (!graph) return;
+    this._root.style.height = height;
+    const el = /*#__PURE__*/React.createElement(Diagram, {
+      graph,
+      style,
+      activeNodes,
+      activeEdges,
+      onNodeClick: n => this.dispatchEvent(new CustomEvent('node-click', {
+        detail: n,
+        bubbles: true
+      })),
+      onEdgeClick: e => this.dispatchEvent(new CustomEvent('edge-click', {
+        detail: e,
+        bubbles: true
+      }))
+    });
+    if (!this._reactRoot) {
+      this._reactRoot = ReactDOM.createRoot(this._root);
+    }
+    this._reactRoot.render(el);
   }
-  // Case 3: Graph object
-  else if (typeof config === 'object') {
-    graph = config;
+  set config(val) {
+    this._configProp = val;
+    if (this._root) this._mount();
   }
-  if (!graph) {
-    throw new Error('Could not create graph from configuration');
-  }
-
-  // Auto-resolve unless disabled
-  if (options.resolve !== false) {
-    graph = resolveGraph$1(graph);
-  }
-  return graph;
+}
+if (typeof customElements !== 'undefined' && !customElements.get('flow-diagram')) {
+  customElements.define('flow-diagram', FlowDiagramElement);
 }
 
-/**
- * Flow Diagram Library - Main Entry Point
- * Versatile diagram system for React, Vue, Angular, or plain HTML
- */
-
-
-/**
- * Default export with everything
- */
-const FlowDiagramLib = {
-  // Core
-  NODE_KINDS,
-  SHAPES,
-  EXAMPLE_GRAPH,
-  EXAMPLE_GRAPH_FLAT,
-  HERO_GRAPH,
-  // Functions
-  shapePath,
-  shapeAnchor,
-  parseDSL,
-  resolveGraph,
-  routeEdge,
-  pathFromPoints,
-  roughPath,
-  downloadSVG,
-  // Components
-  Diagram,
-  FlowDiagram: FlowDiagramLib,
-  // Styles
-  STYLES,
-  registerStyle,
-  // Utils
-  createGraphFromConfig
-};
-
-export { Diagram$1 as Diagram, EXAMPLE_GRAPH$1 as EXAMPLE_GRAPH, EXAMPLE_GRAPH_FLAT$1 as EXAMPLE_GRAPH_FLAT, FlowDiagram$1 as FlowDiagram, FlowDiagramModule, HERO_GRAPH$1 as HERO_GRAPH, NODE_KINDS$1 as NODE_KINDS, NodeIcon, SHAPES$1 as SHAPES, STYLES$1 as STYLES, FlowDiagram as VueFlowDiagram, createGraphFromConfig$1 as createGraphFromConfig, FlowDiagramLib as default, downloadSVG$1 as downloadSVG, parseDSL$1 as parseDSL, pathFromPoints$1 as pathFromPoints, registerStyle$1 as registerStyle, resolveGraph$1 as resolveGraph, roughPath$1 as roughPath, routeEdge$1 as routeEdge, shapeAnchor$1 as shapeAnchor, shapePath$1 as shapePath };
+export { BUILTIN_STYLES, BlueprintStyle, CityStyle, Diagram, EXAMPLE_GRAPH, FlowDiagram$1 as FlowDiagram, FlowDiagramElement, IsoStyle, NODE_KINDS, NodeIcon, SHAPES, STYLES, SketchStyle, SleekStyle, FlowDiagram as VueFlowDiagram, downloadPNG, downloadSVG, edgeMidpoint, getStyle, graphToDSL, listStyles, parseDSL, pathFromPoints, registerStyle, resolveGraph, roughPath, routeEdge, shapeAnchor, shapePath, svgToString };
 //# sourceMappingURL=index.mjs.map

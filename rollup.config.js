@@ -34,48 +34,53 @@ const minifyPlugin = terser({
   }
 })
 
+// For framework bundles — React/Vue are peer deps, not bundled in
+const external = ['react', 'react-dom', 'react-dom/client', 'vue'];
+const globals = { react: 'React', 'react-dom': 'ReactDOM', 'react-dom/client': 'ReactDOM', vue: 'Vue' };
+
 export default [
-  // UMD bundle for browsers (standalone)
+  // ESM bundle — for React, Vue, modern bundlers (React is peer dep)
   {
-    input: 'src/bundle-entry.jsx',
+    input: 'src/index.jsx',
+    output: { file: 'dist/index.mjs', format: 'es', sourcemap: true },
+    plugins: sharedPlugins,
+    external,
+  },
+
+  // CommonJS bundle — Node.js / legacy bundlers (React is peer dep)
+  {
+    input: 'src/index.jsx',
+    output: { file: 'dist/index.js', format: 'cjs', sourcemap: true },
+    plugins: sharedPlugins,
+    external,
+  },
+
+  // UMD bundle — requires React on window.React (like CDN users)
+  {
+    input: 'src/bundle-entry.js',
     output: {
       file: 'dist/flow-diagram.umd.js',
       format: 'umd',
       name: 'FlowDiagram',
       sourcemap: true,
-      globals: {
-        react: 'React',
-        'react-dom': 'ReactDOM'
-      }
-    },
-    plugins: [
-      ...sharedPlugins,
-      minifyPlugin
-    ],
-    external: ['react', 'react-dom']
-  },
-
-  // ESM bundle for modern frameworks
-  {
-    input: 'src/index.jsx',
-    output: {
-      file: 'dist/index.mjs',
-      format: 'es',
-      sourcemap: true
+      globals,
     },
     plugins: sharedPlugins,
-    external: ['react', 'react-dom']
+    external,
   },
 
-  // CommonJS bundle for Node/legacy
+  // Standalone bundle — React BUNDLED IN. Intended for pages that do NOT
+  // already use React (Confluence, wikis, static HTML, Notion embeds).
+  // For React/Vue apps, use the ESM package (index.mjs) instead — React
+  // is a peer dep there and only one copy ever exists.
   {
-    input: 'src/index.jsx',
+    input: 'src/standalone-entry.js',
     output: {
-      file: 'dist/index.js',
-      format: 'cjs',
-      sourcemap: true
+      file: 'dist/flow-diagram.standalone.js',
+      format: 'iife',
+      name: 'FlowDiagram',
+      sourcemap: false,
     },
-    plugins: sharedPlugins,
-    external: ['react', 'react-dom']
-  }
+    plugins: [...sharedPlugins, minifyPlugin],
+  },
 ]

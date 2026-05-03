@@ -4,25 +4,20 @@
  */
 
 import { defineConfig } from 'vite'
-import react from '@babel-preset-react'
 
 export default defineConfig({
   root: '.',
   base: './',
-  publicDir: 'public',
+  esbuild: {
+    jsx: 'automatic',
+  },
   build: {
     outDir: 'dist-demo',
     assetsDir: 'assets',
     sourcemap: true,
-    rollupOptions: {
-      input: {
-        main: '/index.html',
-      }
-    }
   },
   server: {
     port: 3000,
-    open: true
   },
   resolve: {
     alias: {
@@ -30,10 +25,6 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['react', 'react-dom'],
-    exclude: ['flow-diagram']
+    exclude: ['react', 'react-dom'],
   },
-  define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
-  }
 })

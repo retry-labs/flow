@@ -4,7 +4,7 @@
 
 import { defineComponent, h, ref, watch, onMounted } from 'vue'
 import { Diagram } from '../diagram-component.jsx'
-import { parseDSL } from '../parser.jsx'
+import { parseDSL } from '../parser.js'
 
 /**
  * VueFlowDiagram - Vue 3 component

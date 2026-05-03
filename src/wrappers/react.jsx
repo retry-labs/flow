@@ -4,9 +4,7 @@
 
 import React from 'react'
 import { Diagram } from '../diagram-component.jsx'
-import { parseDSL } from '../parser.jsx'
-import { STYLES } from '../styles/index.jsx'
-
+import { parseDSL } from '../parser.js'
 /**
  * FlowDiagram - React component with DSL support
  */

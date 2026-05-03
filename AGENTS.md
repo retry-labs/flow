@@ -7,6 +7,24 @@
 
 # Flow Diagram - Build Commands
 
+## ⚠️ Hard Rule for AI Agents — Never Use Terminal for Code Changes
+
+**ALL file creation and editing MUST go through dedicated editing tools
+(`write_to_file`, `edit`, `multi_edit`).** The terminal is never used to
+mutate files, not even for quick fixes.
+
+Forbidden in terminal commands:
+- `sed -i`, `awk -i`, `echo > file`, `cat > file`, `tee file`, `perl -i`,
+  heredocs that write files, inline `node -e "... fs.writeFileSync ..."`.
+
+Terminal is allowed only for:
+- Running build, test, lint scripts (e.g. `npm run build`, `node scripts/smoke-test.cjs`).
+- Read-only introspection (`ls`, `cat` to show output).
+- Starting dev servers / long-running processes.
+
+If a one-off verification needs a new script, create it as a real file
+with `write_to_file` first, then execute it via `run_command`.
+
 ## Quick Start
 
 ```bash
