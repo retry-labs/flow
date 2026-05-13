@@ -36,20 +36,19 @@
     display: flex; flex-direction: column;
   }
 
-  /* ── Nav (shared across site) ─────────────────────── */
+  /* ── Nav (shared) ─────────────────────────────────── */
   .nav {
     position: sticky; top: 0; z-index: 50;
     display: flex; align-items: center; gap: 8px;
-    padding: 14px 40px;
-    background: rgba(251, 247, 236, 0.85);
+    padding: 14px 32px;
+    background: rgba(251, 247, 236, 0.92);
     backdrop-filter: saturate(140%) blur(8px);
     border-bottom: 1px solid var(--line);
-    flex: 0 0 auto; /* keep nav at top inside the editor's flex-column body */
+    flex: 0 0 auto;
   }
   .nav .brand {
-    font-weight: 700; font-size: 17px; letter-spacing: -0.01em;
-    display: inline-flex; align-items: center; gap: 8px;
-    text-decoration: none; color: inherit;
+    font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
+    display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;
   }
   .nav .brand .logo {
     width: 22px; height: 22px; border-radius: 6px;
@@ -60,18 +59,16 @@
   .nav .links { margin-left: auto; display: flex; gap: 4px; align-items: center; }
   .nav .links a {
     text-decoration: none; color: var(--ink-2);
-    font-size: 13.5px; font-weight: 500;
+    font-size: 13px; font-weight: 500;
     padding: 7px 12px; border-radius: 8px;
     transition: background .15s;
   }
-  .nav .links a:hover { background: rgba(0,0,0,.04); color: var(--ink); }
-  .nav .links a.active { color: var(--ink); background: rgba(0,0,0,.06); }
-  .nav .links a.cta {
-    background: var(--ink); color: var(--paper);
-    font-family: "JetBrains Mono", monospace; font-size: 12px;
+  .nav .links a:hover, .nav .links a.active { background: rgba(0,0,0,.04); color: var(--ink); }
+  .nav .links .cta {
+    background: var(--ink); color: #fff;
     padding: 7px 14px;
   }
-  .nav .links a.cta:hover { background: #000; color: var(--accent); }
+  .nav .links .cta:hover { background: #2c2823; color: #fff; }
 
   /* ── Toolbar ──────────────────────────────────────── */
   .ed-toolbar {
