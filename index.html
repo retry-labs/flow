@@ -834,22 +834,31 @@ edges:
   const HERO_STYLES = ['sleek', 'sketch', 'iso', 'blueprint'];
   let heroStyleI = 0;
 
-  // The viewport now drives the timeline natively — autoplay rotates through
+  // The viewport drives the timeline natively — autoplay rotates through
   // HERO.steps, and onStepChange notifies us so we can also rotate the style
   // for visual variety. The play/pause/next/prev buttons appear automatically.
-  const heroVp = FD.mount(heroStage, {
+  //
+  // Note: onStepChange fires SYNCHRONOUSLY during mount() with the initial step,
+  // which is before the `heroVp` assignment completes. We therefore:
+  //   1. declare heroVp with `let` (hoisted, no TDZ),
+  //   2. track `prevHeroIdx` so we only rotate styles on a *real* wrap from the
+  //      last step back to 0, not on the first paint or on the initial fire.
+  let heroVp;
+  let prevHeroIdx = -1;
+  heroVp = FD.mount(heroStage, {
     graph: HERO,
     styleName: HERO_STYLES[0],
     autoplay: true,
     interval: 2200,
     fileName: 'flow-hero',
     onStepChange: function (i, step) {
-      // Cycle the style every full loop so visitors see all of them.
-      if (i === 0) {
+      // Cycle the style only when the player wraps from the last step → 0.
+      if (heroVp && prevHeroIdx === HERO.steps.length - 1 && i === 0) {
         heroStyleI = (heroStyleI + 1) % HERO_STYLES.length;
         heroVp.setStyle(HERO_STYLES[heroStyleI]);
         heroChromeStyle.textContent = HERO_STYLES[heroStyleI];
       }
+      prevHeroIdx = i;
       heroStepLabel.textContent = step.title;
       heroStepIdx.textContent = (i + 1) + '/' + HERO.steps.length;
     },
