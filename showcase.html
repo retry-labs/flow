@@ -28,14 +28,19 @@
     -webkit-font-smoothing: antialiased; line-height: 1.5;
   }
 
-  /* ── Nav (shared across site) ─────────────────────── */
+  /* ── Nav (scroll-aware: transparent at top, chromed when scrolled) ── */
   .nav {
     position: sticky; top: 0; z-index: 50;
     display: flex; align-items: center; gap: 8px;
     padding: 14px 40px;
+    background: transparent;
+    border-bottom: 1px solid transparent;
+    transition: background .2s ease, border-color .2s ease, backdrop-filter .2s ease;
+  }
+  .nav.scrolled {
     background: rgba(251, 247, 236, 0.85);
     backdrop-filter: saturate(140%) blur(8px);
-    border-bottom: 1px solid var(--line);
+    border-bottom-color: var(--line);
   }
   .nav .brand {
     font-weight: 700; font-size: 17px; letter-spacing: -0.01em;
@@ -236,6 +241,16 @@
   </div>
 </footer>
 
+<script>
+  // Scroll-aware nav: transparent at the top of the page, chromed once scrolled.
+  (function () {
+    const nav = document.querySelector('.nav');
+    if (!nav) return;
+    const update = () => nav.classList.toggle('scrolled', window.scrollY > 4);
+    addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+</script>
 <script src="./dist/flow-diagram.standalone.js?v=3"></script>
 <script>
 (function () {
