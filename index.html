@@ -39,7 +39,7 @@
   }
   a { color: var(--ink); }
 
-  /* ── Nav ─────────────────────────────────────────── */
+  /* ── Nav (shared across site) ─────────────────────── */
   .nav {
     position: sticky; top: 0; z-index: 50;
     display: flex; align-items: center; gap: 8px;
@@ -51,7 +51,7 @@
   .nav .brand {
     font-weight: 700; font-size: 17px; letter-spacing: -0.01em;
     display: inline-flex; align-items: center; gap: 8px;
-    text-decoration: none;
+    text-decoration: none; color: inherit;
   }
   .nav .brand .logo {
     width: 22px; height: 22px; border-radius: 6px;
@@ -67,6 +67,7 @@
     transition: background .15s;
   }
   .nav .links a:hover { background: rgba(0,0,0,.04); color: var(--ink); }
+  .nav .links a.active { color: var(--ink); background: rgba(0,0,0,.06); }
   .nav .links a.cta {
     background: var(--ink); color: var(--paper);
     font-family: "JetBrains Mono", monospace; font-size: 12px;
