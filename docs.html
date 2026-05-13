@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Flow — Documentation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="description" content="Flow Diagram documentation — DSL grammar, node/edge kinds, styles, playback steps, and the full JavaScript API."/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1814;
+    --ink-2: #3a362d;
+    --muted: #7a7060;
+    --line: #e4decd;
+    --line-2: #d5cdb4;
+    --bg: #fbf7ec;
+    --paper: #ffffff;
+    --accent: #f5c518;
+    --accent-2: #ffb020;
+    --term-bg: #141210;
+    --term-ink: #f1efe6;
+    --term-muted: #8a7f6b;
+    --term-key: #f5c518;
+    --term-str: #9eccff;
+    --term-num: #c0c0a8;
+    --term-cmt: #6f6a5d;
+    --term-tok: #ffb020;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; scroll-behavior: smooth; }
+  body {
+    font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink); background: var(--bg);
+    -webkit-font-smoothing: antialiased; line-height: 1.6;
+  }
+
+  /* ── Nav (shared) ─────────────────────────────────── */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 40px;
+    background: rgba(251, 247, 236, 0.85);
+    backdrop-filter: saturate(140%) blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav .brand {
+    font-weight: 700; font-size: 17px; letter-spacing: -0.01em;
+    display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none; color: inherit;
+  }
+  .nav .brand .logo {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--ink); color: var(--accent);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 12px;
+  }
+  .nav .links { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  .nav .links a {
+    text-decoration: none; color: var(--ink-2);
+    font-size: 13.5px; font-weight: 500;
+    padding: 7px 12px; border-radius: 8px; transition: background .15s;
+  }
+  .nav .links a:hover { background: rgba(0,0,0,.04); color: var(--ink); }
+  .nav .links a.active { color: var(--ink); background: rgba(0,0,0,.06); }
+  .nav .links a.cta {
+    background: var(--ink); color: var(--paper);
+    font-family: "JetBrains Mono", monospace; font-size: 12px; padding: 7px 14px;
+  }
+  .nav .links a.cta:hover { background: #000; color: var(--accent); }
+
+  /* ── Page layout ──────────────────────────────────── */
+  .wrap {
+    max-width: 1240px; margin: 0 auto;
+    padding: 40px 40px 80px;
+    display: grid; gap: 40px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 960px) {
+    .wrap { grid-template-columns: 220px minmax(0, 1fr); }
+  }
+  aside.toc {
+    position: sticky; top: 80px; align-self: start;
+    font-size: 13px; line-height: 1.8;
+    display: none;
+  }
+  @media (min-width: 960px) { aside.toc { display: block; } }
+  aside.toc h4 {
+    margin: 0 0 6px; font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+    font-family: "JetBrains Mono", monospace;
+  }
+  aside.toc ol { list-style: none; padding: 0; margin: 0 0 20px; }
+  aside.toc ol li a {
+    display: block; padding: 2px 0;
+    text-decoration: none; color: var(--ink-2);
+    border-left: 2px solid transparent; padding-left: 10px;
+  }
+  aside.toc ol li a:hover { color: var(--ink); border-color: var(--line-2); }
+  aside.toc ol ol { margin-left: 12px; font-size: 12.5px; }
+
+  /* ── Content ──────────────────────────────────────── */
+  main { min-width: 0; }
+  main > header {
+    padding-bottom: 24px; margin-bottom: 32px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-2); font-weight: 600;
+  }
+  main > header h1 {
+    margin: 6px 0 10px; font-size: 40px; font-weight: 600;
+    letter-spacing: -0.025em; line-height: 1.08;
+  }
+  main > header p {
+    margin: 0; color: var(--muted); font-size: 15px; max-width: 720px;
+  }
+
+  main section { scroll-margin-top: 90px; }
+  main h2 {
+    font-size: 24px; font-weight: 600; letter-spacing: -0.02em;
+    margin: 56px 0 8px; padding-top: 8px;
+  }
+  main h2 a.anchor {
+    font-family: "JetBrains Mono", monospace; color: var(--muted);
+    margin-right: 8px; font-weight: 400; font-size: 16px;
+    text-decoration: none; opacity: 0; transition: opacity .15s;
+  }
+  main h2:hover a.anchor { opacity: 1; }
+  main h3 {
+    font-size: 17px; font-weight: 600; margin: 28px 0 6px; letter-spacing: -0.01em;
+  }
+  main p { margin: 0 0 14px; color: var(--ink-2); max-width: 760px; }
+  main p.small { font-size: 13.5px; color: var(--muted); }
+  main ul { color: var(--ink-2); padding-left: 22px; margin: 0 0 14px; max-width: 760px; }
+  main ul li { margin-bottom: 4px; }
+  main code {
+    font-family: "JetBrains Mono", monospace; font-size: 13px;
+    background: #f3eed8; color: var(--ink); padding: 1px 6px; border-radius: 4px;
+  }
+  main a.inline {
+    color: var(--ink); border-bottom: 1px solid var(--line-2);
+    text-decoration: none; padding-bottom: 1px;
+  }
+  main a.inline:hover { border-color: var(--ink); }
+
+  /* ── Terminal-style code blocks ───────────────────── */
+  .term {
+    background: var(--term-bg); color: var(--term-ink);
+    border-radius: 10px; overflow: hidden; margin: 12px 0 20px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 20px -18px rgba(0,0,0,.3);
+  }
+  .term .bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 14px; background: #1d1a16; border-bottom: 1px solid #2a2620;
+    color: var(--term-muted); font-family: "JetBrains Mono", monospace; font-size: 11px;
+  }
+  .term .bar .dots { display: inline-flex; gap: 5px; margin-right: 6px; }
+  .term .bar .dots i { width: 9px; height: 9px; border-radius: 50%; background: #3a342a; }
+  .term .bar .spacer { flex: 1; }
+  .term .bar .copy {
+    border: 1px solid #2e2923; background: transparent; color: var(--term-muted);
+    font-family: inherit; font-size: 11px; padding: 3px 9px; border-radius: 6px;
+    cursor: pointer;
+  }
+  .term .bar .copy:hover { color: var(--term-ink); border-color: #4d4537; }
+  .term pre {
+    margin: 0; padding: 16px 18px;
+    font-family: "JetBrains Mono", monospace; font-size: 13px; line-height: 1.65;
+    white-space: pre; overflow: auto;
+  }
+  .term pre .prompt { color: #4ade80; user-select: none; }
+  .term pre .cmd    { color: var(--term-ink); }
+  .term pre .key    { color: var(--term-key); }
+  .term pre .str    { color: var(--term-str); }
+  .term pre .num    { color: var(--term-num); }
+  .term pre .cmt    { color: var(--term-cmt); font-style: italic; }
+  .term pre .tok    { color: var(--term-tok); }
+  .term pre .pkg    { color: #c5f18a; }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tbl {
+    width: 100%; border-collapse: collapse;
+    font-size: 13.5px; margin: 6px 0 20px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden;
+  }
+  .tbl th, .tbl td {
+    text-align: left; padding: 10px 14px;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  .tbl th {
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); background: #faf6e8; font-weight: 600;
+  }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl code { background: transparent; padding: 0; color: var(--ink); }
+
+  /* ── Gallery grids ────────────────────────────────── */
+  .gal {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    margin: 14px 0 20px;
+  }
+  .gal .cell {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .gal .cell .label {
+    padding: 7px 10px;
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+    color: var(--muted); background: #faf6e8; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between;
+  }
+  .gal .cell .label b { color: var(--ink); font-weight: 600; }
+  .gal .cell .canvas {
+    flex: 1; min-height: 110px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 4px;
+  }
+  .gal .cell .canvas svg { display: block; width: 100%; height: auto; }
+
+  /* Style previews are larger */
+  .style-gal {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    margin: 14px 0 20px;
+  }
+  .style-gal .cell { border: 1px solid var(--line); border-radius: 12px; background: var(--paper); overflow: hidden; }
+  .style-gal .cell .label {
+    padding: 10px 14px; font-family: "JetBrains Mono", monospace; font-size: 11px;
+    background: #faf6e8; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between;
+  }
+  .style-gal .cell .label b { color: var(--ink); font-weight: 600; }
+  .style-gal .cell .canvas { padding: 10px; }
+  .style-gal .cell .canvas svg { display: block; width: 100%; height: auto; }
+
+  /* ── Callouts ─────────────────────────────────────── */
+  .callout {
+    background: #fff6d6; border: 1px solid #f0e19a;
+    border-radius: 10px; padding: 14px 16px; margin: 16px 0 20px;
+    font-size: 13.5px; color: var(--ink-2);
+  }
+  .callout b { color: var(--ink); }
+
+  /* ── Footer ───────────────────────────────────────── */
+  footer {
+    padding: 40px 40px 60px;
+    border-top: 1px solid var(--line);
+    font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--muted);
+    display: flex; gap: 18px; flex-wrap: wrap;
+    align-items: center; justify-content: space-between;
+    max-width: 1240px; margin: 0 auto;
+  }
+  footer .links { display: flex; gap: 16px; }
+  footer a { text-decoration: none; color: inherit; }
+  footer a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="brand" href="./index.html">
+    <span class="logo">F</span> Flow
+  </a>
+  <div class="links">
+    <a href="./index.html">Home</a>
+    <a href="./showcase.html">Showcase</a>
+    <a href="./editor.html">Editor</a>
+    <a href="./docs.html" class="active">Docs</a>
+    <a class="cta" href="https://github.com/retry-labs/flow" target="_blank" rel="noopener">★ GitHub</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <aside class="toc">
+    <h4>Getting started</h4>
+    <ol>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#quickstart">Quickstart</a></li>
+    </ol>
+    <h4>DSL</h4>
+    <ol>
+      <li><a href="#dsl">Grammar overview</a></li>
+      <li><a href="#dsl-meta">Meta directives</a></li>
+      <li><a href="#dsl-nodes">Nodes</a></li>
+      <li><a href="#dsl-edges">Edges</a></li>
+      <li><a href="#dsl-steps">Steps</a></li>
+    </ol>
+    <h4>Primitives</h4>
+    <ol>
+      <li><a href="#kinds">Node kinds</a></li>
+      <li><a href="#edge-kinds">Edge kinds</a></li>
+      <li><a href="#styles">Styles</a></li>
+    </ol>
+    <h4>Interactivity</h4>
+    <ol>
+      <li><a href="#features">Zoom · Pan · Fullscreen</a></li>
+      <li><a href="#player">Step player</a></li>
+      <li><a href="#clicks">Click handlers</a></li>
+    </ol>
+    <h4>API</h4>
+    <ol>
+      <li><a href="#api">renderSVG / mount / parseDSL</a></li>
+      <li><a href="#api-player">Player methods</a></li>
+      <li><a href="#api-react">React wrapper</a></li>
+      <li><a href="#api-vue">Vue wrapper</a></li>
+      <li><a href="#api-angular">Angular / Web Component</a></li>
+    </ol>
+  </aside>
+
+  <main>
+    <header>
+      <div class="eyebrow">Documentation</div>
+      <h1>Flow reference.</h1>
+      <p>Everything you need to write, style, and integrate diagrams with Flow. If something's missing, <a class="inline" href="https://github.com/retry-labs/flow/issues" target="_blank" rel="noopener">open an issue</a>.</p>
+    </header>
+
+    <!-- ── Install ──────────────────────────────────── -->
+    <section id="install">
+      <h2><a class="anchor" href="#install">#</a>Install</h2>
+      <p>Flow ships as a single package that works in every major framework. See the <a class="inline" href="./index.html#install">landing page</a> for per-framework snippets.</p>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>zsh<span class="spacer"></span><button class="copy" data-copy="npm install flow-diagram">Copy</button></div>
+<pre><span class="prompt">$</span> <span class="cmd">npm install <span class="pkg">flow-diagram</span></span>
+
+<span class="cmt"># or, zero-install via CDN</span>
+<span class="prompt">$</span> <span class="cmd">curl -O https://unpkg.com/flow-diagram/dist/flow-diagram.standalone.js</span></pre>
+      </div>
+    </section>
+
+    <!-- ── Quickstart ───────────────────────────────── -->
+    <section id="quickstart">
+      <h2><a class="anchor" href="#quickstart">#</a>Quickstart</h2>
+      <p>Write a DSL string, pass it to <code>parseDSL</code>, then <code>renderSVG</code>. Done — no bundler, no peer deps, no canvas.</p>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>quickstart.js<span class="spacer"></span><button class="copy" data-copy="import { parseDSL, renderSVG } from 'flow-diagram'&#10;&#10;const graph = parseDSL(`&#10;nodes:&#10;  - id: client, kind: actor,   label: Client&#10;  - id: api,    kind: service, label: API&#10;  - id: db,     kind: store,   label: Postgres&#10;&#10;edges:&#10;  - client -&gt; api, label: HTTPS&#10;  - api    -&gt; db,  label: query&#10;`)&#10;&#10;const svg = renderSVG(graph, { styleName: 'sleek' })&#10;document.getElementById('arch').innerHTML = svg">Copy</button></div>
+<pre><span class="tok">import</span> { <span class="key">parseDSL</span>, <span class="key">renderSVG</span> } <span class="tok">from</span> <span class="str">'flow-diagram'</span>
+
+<span class="tok">const</span> graph = <span class="key">parseDSL</span>(<span class="str">`
+nodes:
+  - id: client, kind: actor,   label: Client
+  - id: api,    kind: service, label: API
+  - id: db,     kind: store,   label: Postgres
+
+edges:
+  - client -&gt; api, label: HTTPS
+  - api    -&gt; db,  label: query
+`</span>)
+
+<span class="tok">const</span> svg = <span class="key">renderSVG</span>(graph, { styleName: <span class="str">'sleek'</span> })
+document.getElementById(<span class="str">'arch'</span>).innerHTML = svg</pre>
+      </div>
+    </section>
+
+    <!-- ── DSL grammar ──────────────────────────────── -->
+    <section id="dsl">
+      <h2><a class="anchor" href="#dsl">#</a>DSL grammar</h2>
+      <p>Flow DSL is a YAML-ish format with four sections. All sections are optional except at least one of <code>nodes:</code>.</p>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>diagram.flow</div>
+<pre><span class="cmt"># Optional meta directives at the top</span>
+<span class="key">style</span>: sleek            <span class="cmt"># one of: sleek, sketch, iso, blueprint, city</span>
+<span class="key">title</span>: <span class="str">"My architecture"</span>
+
+<span class="cmt"># Nodes — `id` is required. Everything else is optional.</span>
+<span class="key">nodes</span>:
+  - <span class="key">id</span>: client,  <span class="key">kind</span>: actor,   <span class="key">label</span>: Client
+  - <span class="key">id</span>: api,     <span class="key">kind</span>: service, <span class="key">label</span>: API
+
+<span class="cmt"># Edges — arrow shorthand: "->" solid, "..>" dashed</span>
+<span class="key">edges</span>:
+  - client -&gt; api, <span class="key">label</span>: <span class="str">"HTTPS"</span>
+
+<span class="cmt"># Optional playback steps for animation / narration</span>
+<span class="key">steps</span>:
+  - <span class="key">title</span>: <span class="str">"Client request"</span>, <span class="key">nodes</span>: [client, api], <span class="key">edges</span>: [e-client-api-0]</pre>
+      </div>
+
+      <h3 id="dsl-meta">Meta directives</h3>
+      <table class="tbl">
+        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>style</code></td><td>string</td><td>Render style — <code>sleek</code>, <code>sketch</code>, <code>iso</code>, <code>blueprint</code>, or <code>city</code>.</td></tr>
+          <tr><td><code>title</code></td><td>string</td><td>Optional diagram title. Used by some styles and exported metadata.</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="dsl-nodes">Nodes</h3>
+      <p>Every node needs an <code>id</code>. Coordinates (<code>x</code>, <code>y</code>, <code>w</code>, <code>h</code>) are <b>optional</b> — if any node omits them, auto-layout positions every non-<code>boundary</code> node left-to-right by rank.</p>
+      <table class="tbl">
+        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>string</td><td>Required. Used for edge endpoints and step references.</td></tr>
+          <tr><td><code>kind</code></td><td>string</td><td>Semantic kind — see <a href="#kinds" class="inline">all 26 kinds</a>. Defaults to <code>service</code>.</td></tr>
+          <tr><td><code>label</code></td><td>string</td><td>Main label shown in the node.</td></tr>
+          <tr><td><code>sub</code></td><td>string</td><td>Optional sub-label (e.g. version, role).</td></tr>
+          <tr><td><code>shape</code></td><td>string</td><td>Override the default shape for this kind — <code>rect</code>, <code>pill</code>, <code>diamond</code>, <code>hex</code>, <code>circle</code>, <code>cylinder</code>, etc.</td></tr>
+          <tr><td><code>x</code>, <code>y</code></td><td>number</td><td>Optional absolute coordinates. Omit to trigger auto-layout.</td></tr>
+          <tr><td><code>w</code>, <code>h</code></td><td>number</td><td>Node dimensions. Defaults: <code>w: 140</code>, <code>h: 70</code>.</td></tr>
+          <tr><td><code>src</code></td><td>string</td><td>For <code>kind: image</code>, an image URL to embed.</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="dsl-edges">Edges</h3>
+      <p>Edges use an arrow shorthand: <code>-&gt;</code> (solid) or <code>..&gt;</code> (dashed). Extra keys follow after a comma.</p>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>edges.flow</div>
+<pre><span class="key">edges</span>:
+  <span class="cmt"># Simple solid</span>
+  - client -&gt; api
+  <span class="cmt"># Solid with a label</span>
+  - api -&gt; db, <span class="key">label</span>: <span class="str">"query"</span>
+  <span class="cmt"># Dashed (async / cache read)</span>
+  - api ..&gt; cache, <span class="key">label</span>: <span class="str">"read"</span>
+  <span class="cmt"># Explicit kind for special variants</span>
+  - user -&gt; login, <span class="key">kind</span>: secure, <span class="key">label</span>: <span class="str">"creds"</span>
+  - check -&gt; deny, <span class="key">kind</span>: error,  <span class="key">label</span>: <span class="str">"no"</span>
+  - edge -&gt; bus,   <span class="key">kind</span>: realtime, <span class="key">label</span>: <span class="str">"ws"</span></pre>
+      </div>
+      <p class="small">Auto-generated edge ids follow the pattern <code>e-&lt;from&gt;-&lt;to&gt;-&lt;index&gt;</code>. Use these in <code>steps</code> to light up specific edges.</p>
+
+      <h3 id="dsl-steps">Steps (playback)</h3>
+      <p>Steps drive the optional active-node / active-edge highlighting. Pass step ids via <code>activeNodes</code>/<code>activeEdges</code> at render time, or iterate through <code>graph.steps</code> for timeline playback.</p>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>steps.flow</div>
+<pre><span class="key">steps</span>:
+  - <span class="key">title</span>: <span class="str">"Client request"</span>,  <span class="key">nodes</span>: [client, gateway], <span class="key">edges</span>: [e-client-gateway-0]
+  - <span class="key">title</span>: <span class="str">"Gateway fan-out"</span>, <span class="key">nodes</span>: [gateway, orders],  <span class="key">edges</span>: [e-gateway-orders-0]</pre>
+      </div>
+    </section>
+
+    <!-- ── Node kinds ───────────────────────────────── -->
+    <section id="kinds">
+      <h2><a class="anchor" href="#kinds">#</a>Node kinds</h2>
+      <p>All 26 built-in kinds. Each maps to a semantic body rendered by the active style — use the right kind and the style layer handles the rest.</p>
+      <div class="gal" id="kinds-gallery"></div>
+      <p class="small">Need something off-menu? Use <code>kind: service</code> with an explicit <code>shape:</code> override for full control.</p>
+    </section>
+
+    <!-- ── Edge kinds ───────────────────────────────── -->
+    <section id="edge-kinds">
+      <h2><a class="anchor" href="#edge-kinds">#</a>Edge kinds</h2>
+      <p>Edge kind drives stroke style, arrow marker, inline badge (secure / error), and active animation.</p>
+      <div class="gal" id="edges-gallery"></div>
+    </section>
+
+    <!-- ── Styles ───────────────────────────────────── -->
+    <section id="styles">
+      <h2><a class="anchor" href="#styles">#</a>Render styles</h2>
+      <p>The same graph renders in five distinct styles. Set it globally with the <code>style:</code> directive or per-render with <code>renderSVG(graph, {&nbsp;styleName })</code>.</p>
+      <div class="style-gal" id="styles-gallery"></div>
+      <div class="callout">
+        <b>Tip:</b> <code>city</code> uses a true isometric projection and depth-sorts nodes + edges. It's beautiful but slightly slower — prefer <code>iso</code> for realtime-updating dashboards.
+      </div>
+    </section>
+
+    <!-- ── Interactive features ─────────────────────── -->
+    <section id="features">
+      <h2><a class="anchor" href="#features">#</a>Zoom · Pan · Fullscreen · Download</h2>
+      <p>Every mounted viewport ships with a floating control bar in the top-right corner. The same controls are available in every framework wrapper — they're <em>built into the viewport</em>, not bolted on at the page level. The controls only appear on hover so they don't compete with the content.</p>
+      <table class="tbl">
+        <thead><tr><th>Control</th><th>Mouse</th><th>Keyboard</th><th>API</th></tr></thead>
+        <tbody>
+          <tr><td>Zoom in / out</td><td>Scroll-wheel over the diagram (with the floating <code>+</code> / <code>−</code> buttons as fallback).</td><td>—</td><td><code>vp.setZoom(z)</code></td></tr>
+          <tr><td>Pan</td><td>Click-and-drag anywhere on the diagram.</td><td>—</td><td><code>vp.setPan(x, y)</code></td></tr>
+          <tr><td>Reset view</td><td>Floating <code>⊙</code> button.</td><td>—</td><td><code>vp.resetView()</code></td></tr>
+          <tr><td>Fullscreen</td><td>Floating expand button (uses the native Fullscreen API).</td><td>Esc to exit</td><td><code>vp.toggleFullscreen()</code></td></tr>
+          <tr><td>Download SVG</td><td>Floating ⬇ button — exports a self-contained SVG with fonts inlined.</td><td>—</td><td><code>vp.download()</code></td></tr>
+        </tbody>
+      </table>
+      <p class="small">Pass <code>controls: false</code> to <code>mount()</code> (or omit the corresponding wrapper props) to hide the floating panel — useful for embeds.</p>
+    </section>
+
+    <!-- ── Step player ──────────────────────────────── -->
+    <section id="player">
+      <h2><a class="anchor" href="#player">#</a>Step player</h2>
+      <p>If your graph declares a <code>steps:</code> section, the viewport adds a <b>prev / play / step-counter / next</b> group to the floating panel and renders a caption below the diagram. Active nodes and edges from the current step light up automatically — no extra wiring needed.</p>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>steps + autoplay<span class="spacer"></span><button class="copy" data-copy="const vp = FlowDiagram.mount('#arch', {&#10;  graph: FlowDiagram.parseDSL(dsl),&#10;  styleName: 'sleek',&#10;  autoplay: true,         // start playing immediately&#10;  interval: 2200,         // ms between steps&#10;  showPlayer: true,       // default; false hides the prev/play/next group&#10;  onStepChange(i, step) {&#10;    console.log('step', i, step.title);&#10;  },&#10;})">Copy</button></div>
+<pre><span class="tok">const</span> vp = <span class="key">FlowDiagram</span>.<span class="key">mount</span>(<span class="str">'#arch'</span>, {
+  graph: <span class="key">FlowDiagram</span>.<span class="key">parseDSL</span>(dsl),
+  styleName: <span class="str">'sleek'</span>,
+  autoplay: <span class="tok">true</span>,         <span class="cmt">// start playing immediately</span>
+  interval: <span class="num">2200</span>,         <span class="cmt">// ms between steps</span>
+  showPlayer: <span class="tok">true</span>,       <span class="cmt">// default; false hides the prev/play/next group</span>
+  <span class="key">onStepChange</span>(i, step) {
+    console.<span class="key">log</span>(<span class="str">'step'</span>, i, step.title);
+  },
+})</pre>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Option</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>autoplay</code></td><td>boolean</td><td>Start the timer immediately on mount.</td></tr>
+          <tr><td><code>interval</code></td><td>number</td><td>Milliseconds between steps. Default <code>2000</code>.</td></tr>
+          <tr><td><code>showPlayer</code></td><td>boolean</td><td>Show the prev/play/next group. Default <code>true</code> when <code>graph.steps</code> exists.</td></tr>
+          <tr><td><code>stepIndex</code></td><td>number</td><td>Initial step index. Default <code>0</code>.</td></tr>
+          <tr><td><code>onStepChange</code></td><td>fn</td><td>Called with <code>(index, step)</code> on every step change.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ── Click handlers ───────────────────────────── -->
+    <section id="clicks">
+      <h2><a class="anchor" href="#clicks">#</a>Click handlers</h2>
+      <p>Every node is rendered with a <code>data-node-id</code> attribute, and edges with <code>data-edge-id</code>. The viewport wires these to <code>onNodeClick</code> / <code>onEdgeClick</code> callbacks — perfect for popovers, deep-links, or driving an external inspector.</p>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>click handlers<span class="spacer"></span><button class="copy" data-copy="FlowDiagram.mount('#arch', {&#10;  graph,&#10;  onNodeClick(id) { openInspector(id); },&#10;  onEdgeClick(id) { highlightEdge(id); },&#10;});">Copy</button></div>
+<pre><span class="key">FlowDiagram</span>.<span class="key">mount</span>(<span class="str">'#arch'</span>, {
+  graph,
+  <span class="key">onNodeClick</span>(id) { openInspector(id); },
+  <span class="key">onEdgeClick</span>(id) { highlightEdge(id); },
+});</pre>
+      </div>
+      <p class="small">The web-component dispatches matching <code>CustomEvent</code>s — <code>node-click</code>, <code>edge-click</code>, and <code>step-change</code> — bubbling up to your framework's listener of choice.</p>
+    </section>
+
+    <!-- ── JS API ───────────────────────────────────── -->
+    <section id="api">
+      <h2><a class="anchor" href="#api">#</a>JavaScript API</h2>
+      <p>Everything is tree-shakeable from the <code>flow-diagram</code> package.</p>
+
+      <h3><code>renderSVG(graph, options)</code> → <code>string</code></h3>
+      <p>Serializes a graph to a self-contained SVG string. Safe for SSR.</p>
+      <table class="tbl">
+        <thead><tr><th>Option</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>styleName</code></td><td>string</td><td>One of <code>sleek</code>, <code>sketch</code>, <code>iso</code>, <code>blueprint</code>, <code>city</code>. Graph's <code>style:</code> directive wins if set.</td></tr>
+          <tr><td><code>activeNodes</code></td><td>string[]</td><td>Node ids to highlight with active-state glow.</td></tr>
+          <tr><td><code>activeEdges</code></td><td>string[]</td><td>Edge ids to animate as "in flight".</td></tr>
+          <tr><td><code>padding</code></td><td>number</td><td>Extra padding around the canvas (default 0).</td></tr>
+        </tbody>
+      </table>
+
+      <h3><code>mount(target, options)</code> → <code>viewport</code></h3>
+      <p>Mounts an interactive viewport into a DOM element with built-in <b>zoom, pan, fullscreen,</b> and <b>SVG download</b> controls. Use this on plain HTML pages — the React / Vue / Angular wrappers ship the same controls automatically. The web-component <code>&lt;flow-diagram&gt;</code> uses <code>mount</code> internally.</p>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>vanilla.js<span class="spacer"></span><button class="copy" data-copy="const vp = FlowDiagram.mount('#arch', {&#10;  graph: FlowDiagram.parseDSL(dsl),&#10;  styleName: 'sleek',&#10;  // optional: activeNodes, activeEdges, padding,&#10;  //           controls (default true), fileName,&#10;  //           onNodeClick(id), onEdgeClick(id)&#10;})&#10;&#10;vp.setStyle('city')                       // swap render style&#10;vp.setActive(['client'], ['e1'])          // highlight nodes/edges&#10;vp.update({ graph: nextGraph })           // replace graph entirely&#10;vp.setZoom(1.5); vp.resetView()           // programmatic zoom&#10;vp.toggleFullscreen(); vp.download()      // controls API&#10;vp.destroy()                              // clean up the DOM">Copy</button></div>
+<pre><span class="tok">const</span> vp = <span class="key">FlowDiagram</span>.<span class="key">mount</span>(<span class="str">'#arch'</span>, {
+  graph: <span class="key">FlowDiagram</span>.<span class="key">parseDSL</span>(dsl),
+  styleName: <span class="str">'sleek'</span>,
+  <span class="cmt">// optional: activeNodes, activeEdges, padding,</span>
+  <span class="cmt">//           controls (default true), fileName,</span>
+  <span class="cmt">//           onNodeClick(id), onEdgeClick(id)</span>
+})
+
+vp.<span class="key">setStyle</span>(<span class="str">'city'</span>)                       <span class="cmt">// swap render style</span>
+vp.<span class="key">setActive</span>([<span class="str">'client'</span>], [<span class="str">'e1'</span>])          <span class="cmt">// highlight nodes/edges</span>
+vp.<span class="key">update</span>({ graph: nextGraph })           <span class="cmt">// replace graph entirely</span>
+vp.<span class="key">setZoom</span>(<span class="num">1.5</span>); vp.<span class="key">resetView</span>()           <span class="cmt">// programmatic zoom</span>
+vp.<span class="key">toggleFullscreen</span>(); vp.<span class="key">download</span>()      <span class="cmt">// controls API</span>
+vp.<span class="key">destroy</span>()                              <span class="cmt">// clean up the DOM</span></pre>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Option</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>graph</code></td><td>object</td><td>Resolved graph object (from <code>parseDSL</code> or hand-written).</td></tr>
+          <tr><td><code>styleName</code></td><td>string</td><td>Initial render style. Falls back to <code>graph.style</code>, then <code>'sleek'</code>.</td></tr>
+          <tr><td><code>activeNodes</code></td><td>string[]</td><td>Initial active-node ids.</td></tr>
+          <tr><td><code>activeEdges</code></td><td>string[]</td><td>Initial active-edge ids.</td></tr>
+          <tr><td><code>controls</code></td><td>boolean</td><td>Show the floating control bar (default <code>true</code>).</td></tr>
+          <tr><td><code>fileName</code></td><td>string</td><td>Stem used for the downloaded SVG (default <code>flow-diagram</code>).</td></tr>
+          <tr><td><code>onNodeClick</code></td><td>fn</td><td>Called with the clicked node id (when nodes carry <code>data-node-id</code>).</td></tr>
+          <tr><td><code>onEdgeClick</code></td><td>fn</td><td>Called with the clicked edge id.</td></tr>
+        </tbody>
+      </table>
+      <p class="small">The container element should have a fixed height (e.g. <code>height: 420px</code>) — the viewport fills it and the SVG is scaled with <code>preserveAspectRatio</code>.</p>
+
+      <h3 id="api-player">Player methods on the viewport handle</h3>
+      <p>When <code>graph.steps</code> exists, the handle returned by <code>mount()</code> also exposes:</p>
+      <table class="tbl">
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>vp.play()</code></td><td>Start (or resume) the autoplay timer.</td></tr>
+          <tr><td><code>vp.pause()</code></td><td>Stop the autoplay timer (keeps current step).</td></tr>
+          <tr><td><code>vp.togglePlay()</code></td><td>Toggle between play and pause.</td></tr>
+          <tr><td><code>vp.nextStep()</code> / <code>vp.prevStep()</code></td><td>Advance / rewind one step (wraps).</td></tr>
+          <tr><td><code>vp.gotoStep(i)</code></td><td>Jump to step <code>i</code>. Negative indices count from the end.</td></tr>
+          <tr><td><code>vp.setInterval(ms)</code></td><td>Change the autoplay interval at runtime.</td></tr>
+          <tr><td><code>vp.stepIndex</code> (getter)</td><td>Current step index.</td></tr>
+        </tbody>
+      </table>
+      <p class="small">Same methods are also available as imperative properties on the <code>&lt;flow-diagram&gt;</code> web component (<code>el.play()</code>, <code>el.nextStep()</code>, etc.).</p>
+
+      <h3><code>parseDSL(text)</code> → <code>graph</code></h3>
+      <p>Parses the DSL text above into a graph object. Leaves <code>x</code>/<code>y</code> undefined if you omit them, letting <code>resolveGraph</code> auto-layout.</p>
+
+      <h3><code>graphToDSL(graph, { compact })</code> → <code>string</code></h3>
+      <p>Inverse of <code>parseDSL</code>. Useful for "view source" tooling and round-trip tests. <code>compact: true</code> skips <code>x</code>/<code>y</code>/<code>w</code>/<code>h</code> so you get the clean version.</p>
+
+      <h3><code>resolveGraph(graph)</code> → <code>graph</code></h3>
+      <p>Low-level: runs auto-layout (if needed), assigns edge anchors, routes edges, and sorts nodes for depth. Called internally by <code>renderSVG</code>.</p>
+
+      <h3 id="api-react"><code>&lt;FlowDiagram&gt;</code> — React</h3>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>App.jsx<span class="spacer"></span><button class="copy" data-copy="import { FlowDiagram } from 'flow-diagram'&#10;&#10;<FlowDiagram&#10;  dsl={dsl}                // or config={graphObject}&#10;  style=&quot;sleek&quot;&#10;  activeNodes={['client','api']}&#10;  activeEdges={['e-client-api-0']}&#10;  animate={true}&#10;  onNodeClick={n => console.log(n)}&#10;  onEdgeClick={e => console.log(e)}&#10;/>">Copy</button></div>
+<pre><span class="tok">import</span> { <span class="key">FlowDiagram</span> } <span class="tok">from</span> <span class="str">'flow-diagram'</span>
+
+&lt;<span class="key">FlowDiagram</span>
+  dsl={dsl}                <span class="cmt">// or config={graphObject}</span>
+  style=<span class="str">"sleek"</span>
+  activeNodes={[<span class="str">'client'</span>,<span class="str">'api'</span>]}
+  activeEdges={[<span class="str">'e-client-api-0'</span>]}
+  animate={<span class="tok">true</span>}
+  onNodeClick={n =&gt; console.log(n)}
+  onEdgeClick={e =&gt; console.log(e)}
+/&gt;</pre>
+      </div>
+      <p class="small">Peer deps: <code>react &gt;= 17</code>, <code>react-dom &gt;= 17</code>.</p>
+
+      <h3 id="api-vue"><code>&lt;FlowDiagram&gt;</code> — Vue 3</h3>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>App.vue<span class="spacer"></span><button class="copy" data-copy="import { FlowDiagram } from 'flow-diagram/dist/wrappers/vue.js'&#10;&#10;&lt;FlowDiagram&#10;  :dsl=&quot;dsl&quot;                 // or :config=&quot;graph&quot;&#10;  style=&quot;city&quot;&#10;  :active-nodes=&quot;['client']&quot;&#10;  :active-edges=&quot;[]&quot;&#10;  @node-click=&quot;onNode&quot;&#10;  @edge-click=&quot;onEdge&quot;&#10;/&gt;">Copy</button></div>
+<pre><span class="tok">import</span> { <span class="key">FlowDiagram</span> } <span class="tok">from</span> <span class="str">'flow-diagram/dist/wrappers/vue.js'</span>
+
+&lt;<span class="key">FlowDiagram</span>
+  :dsl=<span class="str">"dsl"</span>                 <span class="cmt">// or :config="graph"</span>
+  style=<span class="str">"city"</span>
+  :active-nodes=<span class="str">"['client']"</span>
+  :active-edges=<span class="str">"[]"</span>
+  @node-click=<span class="str">"onNode"</span>
+  @edge-click=<span class="str">"onEdge"</span>
+/&gt;</pre>
+      </div>
+      <p class="small">Peer dep: <code>vue &gt;= 3</code>.</p>
+
+      <h3 id="api-angular"><code>&lt;flow-diagram&gt;</code> — Web Component (Angular-friendly)</h3>
+      <div class="term">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>component.html<span class="spacer"></span><button class="copy" data-copy="&lt;!-- Attributes: dsl, config (JSON string), diagram-style, active-nodes, active-edges, height --&gt;&#10;&lt;flow-diagram&#10;  [attr.dsl]=&quot;dsl&quot;&#10;  diagram-style=&quot;blueprint&quot;&#10;  active-nodes=&quot;client,api&quot;&#10;  height=&quot;420px&quot;&#10;  (node-click)=&quot;onNode($event)&quot;&gt;&#10;&lt;/flow-diagram&gt;">Copy</button></div>
+<pre>&lt;<span class="cmt">!-- Attributes: dsl, config, diagram-style, active-nodes, active-edges,</span>
+     <span class="cmt">height, width, autoplay, interval, step-index, show-player, controls --</span>&gt;
+&lt;<span class="key">flow-diagram</span>
+  [attr.dsl]=<span class="str">"dsl"</span>
+  diagram-style=<span class="str">"blueprint"</span>
+  active-nodes=<span class="str">"client,api"</span>
+  autoplay=<span class="str">"true"</span>
+  interval=<span class="str">"2200"</span>
+  height=<span class="str">"420px"</span>
+  (node-click)=<span class="str">"onNode($event)"</span>
+  (step-change)=<span class="str">"onStep($event)"</span>&gt;
+&lt;/<span class="key">flow-diagram</span>&gt;</pre>
+      </div>
+      <p class="small">Register once by importing <code>'flow-diagram/dist/wrappers/angular.js'</code> (or just the standalone bundle — it auto-registers). The element dispatches <code>node-click</code>, <code>edge-click</code>, and <code>step-change</code> <code>CustomEvent</code>s and also exposes imperative <code>.play()</code> / <code>.pause()</code> / <code>.nextStep()</code> / <code>.gotoStep()</code> / <code>.setStyle()</code> / <code>.download()</code> methods.</p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div>© 2026 Flow · MIT License · v0.1</div>
+  <div class="links">
+    <a href="./index.html">Home</a>
+    <a href="./showcase.html">Showcase</a>
+    <a href="./editor.html">Editor</a>
+    <a href="./docs.html">Docs</a>
+    <a href="https://github.com/retry-labs/flow" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+
+<script src="./dist/flow-diagram.standalone.js?v=3"></script>
+<script>
+(function () {
+  const FD = window.FlowDiagram;
+  if (!FD) { console.error('FlowDiagram bundle failed to load'); return; }
+
+  const KINDS = [
+    'service','process','function','worker','gateway','loadbalancer',
+    'cache','queue','store','bus','stream',
+    'actor','external','mobile','cdn','auth','monitor','firewall',
+    'boundary','start','stop','decision','event',
+    'step','tree','image'
+  ];
+  const EDGES = [
+    { kind:'solid',    label:'Solid' },
+    { kind:'dashed',   label:'Dashed' },
+    { kind:'dotted',   label:'Dotted' },
+    { kind:'bold',     label:'Bold' },
+    { kind:'async',    label:'Async' },
+    { kind:'bidir',    label:'Bidirectional' },
+    { kind:'error',    label:'Error' },
+    { kind:'secure',   label:'Secure' },
+    { kind:'realtime', label:'Realtime' },
+  ];
+  const STYLES = ['sleek','sketch','iso','blueprint','city'];
+
+  // ── Node-kind gallery ─────────────────────────────────
+  function singleNodeGraph(kind) {
+    return {
+      canvas: { w: 220, h: 130 },
+      nodes: [{ id:'n', kind, label: kind.charAt(0).toUpperCase()+kind.slice(1), sub:'example', x: 30, y: 30, w: 160, h: 70 }],
+      edges: [],
+    };
+  }
+  const kindsHost = document.getElementById('kinds-gallery');
+  KINDS.forEach(function (k) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.innerHTML = '<div class="label"><b>' + k + '</b><span>kind</span></div><div class="canvas"></div>';
+    kindsHost.appendChild(cell);
+    cell.querySelector('.canvas').innerHTML = FD.renderSVG(singleNodeGraph(k), { styleName: 'sleek' });
+  });
+
+  // ── Edge-kind gallery ─────────────────────────────────
+  function edgeGraph(kind) {
+    return {
+      canvas: { w: 260, h: 120 },
+      nodes: [
+        { id:'a', kind:'service', label:'A', x: 20, y: 30, w: 90, h: 60 },
+        { id:'b', kind:'service', label:'B', x:150, y: 30, w: 90, h: 60 },
+      ],
+      edges: [{ id:'e1', from:'a', to:'b', kind, label: kind }],
+    };
+  }
+  const edgesHost = document.getElementById('edges-gallery');
+  EDGES.forEach(function (e) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.innerHTML = '<div class="label"><b>' + e.label + '</b><span>kind</span></div><div class="canvas"></div>';
+    edgesHost.appendChild(cell);
+    cell.querySelector('.canvas').innerHTML = FD.renderSVG(edgeGraph(e.kind), { styleName: 'sleek', activeNodes: ['a','b'], activeEdges: ['e1'] });
+  });
+
+  // ── Style gallery ─────────────────────────────────────
+  const styleGraph = FD.parseDSL([
+    'nodes:',
+    '  - id: client,  kind: actor,   label: Client',
+    '  - id: gateway, kind: gateway, label: "API Gateway"',
+    '  - id: api,     kind: service, label: API',
+    '  - id: cache,   kind: cache,   label: Redis',
+    '  - id: db,      kind: store,   label: DB',
+    'edges:',
+    '  - client -> gateway, label: "HTTPS"',
+    '  - gateway -> api',
+    '  - api ..> cache, label: "read"',
+    '  - api -> db, label: "write"',
+  ].join('\n'));
+  const stylesHost = document.getElementById('styles-gallery');
+  STYLES.forEach(function (s) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.innerHTML = '<div class="label"><b>style: ' + s + '</b><span>' + (s === 'city' ? 'isometric 3D' : 'flat SVG') + '</span></div><div class="canvas"></div>';
+    stylesHost.appendChild(cell);
+    cell.querySelector('.canvas').innerHTML = FD.renderSVG(styleGraph, { styleName: s });
+  });
+
+  // ── Copy buttons ──────────────────────────────────────
+  document.querySelectorAll('button.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const text = btn.dataset.copy;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function () {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(function () { btn.textContent = orig; }, 1200);
+      });
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

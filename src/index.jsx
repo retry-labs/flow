@@ -4,6 +4,8 @@ export { parseDSL, graphToDSL } from './parser.js';
 export { downloadSVG, svgToString, downloadPNG } from './export.js';
 export { STYLES, registerStyle, getStyle, listStyles } from './styles/index.jsx';
 export { BUILTIN_STYLES, NodeIcon, SleekStyle, SketchStyle, IsoStyle, CityStyle, BlueprintStyle } from './styles/renderers.jsx';
+export { renderSVG, SVG_STYLES } from './svg-renderer.js';
+export { mount } from './viewport.js';
 export { Diagram } from './diagram-component.jsx';
 export { FlowDiagram } from './wrappers/react.jsx';
 export { FlowDiagram as VueFlowDiagram } from './wrappers/vue.jsx';

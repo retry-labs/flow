@@ -4,13 +4,16 @@ A versatile SVG diagram library for system architecture, flow charts, and data p
 
 ## Features
 
-- 5 built-in styles — **Sleek**, **Sketch**, **Iso** (isometric), **City** (3D isometric), **Blueprint**
-- DSL parser — define diagrams as simple YAML-like text
-- Step-by-step animation support (walkthrough stories)
-- Zoom, pan, fullscreen, SVG/PNG export — built-in
-- `<flow-diagram>` Web Component — zero framework required
-- Tree-shakeable ESM, CJS, and UMD bundles
-- Zero runtime dependencies (React/Vue are peer deps)
+- **5 built-in styles** — Sleek, Sketch, Iso, City (3D isometric), Blueprint.
+- **DSL parser** — define diagrams as simple YAML-like text. `parseDSL` + `graphToDSL` round-trip cleanly.
+- **Smart auto-layout** — omit `x`/`y` and the library lays nodes out by rank.
+- **Step player** — declare a `steps:` section, and the viewport adds prev/play/next + caption automatically.
+- **Zoom, pan, fullscreen, SVG download** — the floating control panel is built into every viewport (vanilla, React, Vue, Angular, web component).
+- **`mount()` API** — one call mounts an interactive viewport into any `<div>`. No React required.
+- **`<flow-diagram>` Web Component** — same controls, zero framework.
+- **Tree-shakeable ESM, CJS, and UMD bundles**. The standalone IIFE bundles React internally for plain-HTML use.
+- **Live editor** ([editor.html](./editor.html)) and showcase ([showcase.html](./showcase.html)) included in the repo.
+- **Zero runtime dependencies** (React/Vue are peer deps for the npm package; the standalone bundle is fully self-contained).
 
 ---
 
@@ -21,31 +24,47 @@ Like Mermaid — drop one `<script>` tag and start drawing:
 ```html
 <script src="https://unpkg.com/flow-diagram/dist/flow-diagram.standalone.js"></script>
 
-<flow-diagram id="d1" diagram-style="sleek" height="340px"></flow-diagram>
+<div id="d1" style="height: 340px"></div>
 
 <script>
-  document.getElementById('d1').config = {
-    canvas: { w: 700, h: 300 },
-    nodes: [
-      { id: 'client',  kind: 'actor',   label: 'Client',   x: 40,  y: 110, w: 130, h: 70 },
-      { id: 'gateway', kind: 'gateway', label: 'Gateway',  x: 230, y: 110, w: 150, h: 70 },
-      { id: 'db',      kind: 'store',   label: 'Postgres', x: 450, y: 110, w: 130, h: 70 },
-    ],
-    edges: [
-      { id: 'e1', from: 'client',  to: 'gateway', label: 'HTTPS' },
-      { id: 'e2', from: 'gateway', to: 'db',      label: 'SQL' },
-    ],
-  };
+  // Option A — imperative mount() with full controls (zoom/pan/fullscreen/download).
+  FlowDiagram.mount('#d1', {
+    graph: FlowDiagram.parseDSL(`
+style: sleek
+nodes:
+  - id: client,  kind: actor,   label: Client
+  - id: gateway, kind: gateway, label: "API Gateway"
+  - id: db,      kind: store,   label: Postgres
+edges:
+  - client -> gateway, label: HTTPS
+  - gateway -> db,     label: SQL
+    `),
+  });
 </script>
 ```
 
-**Zero dependencies — not even React.** The standalone file is a pure SVG renderer (52KB). It works safely on any page including Confluence, Notion, React apps, Angular apps — no framework conflicts possible.
+Prefer declarative? Use the web component — same controls, same look:
+
+```html
+<script src="https://unpkg.com/flow-diagram/dist/flow-diagram.standalone.js"></script>
+<flow-diagram diagram-style="sleek" height="340px" dsl="
+  nodes:
+    - id: client,  kind: actor,   label: Client
+    - id: gateway, kind: gateway, label: API Gateway
+    - id: db,      kind: store,   label: Postgres
+  edges:
+    - client -> gateway, label: HTTPS
+    - gateway -> db,     label: SQL
+"></flow-diagram>
+```
+
+**Zero dependencies — not even React.** The standalone file is a self-contained SVG renderer (~78KB). It works safely on any page including Confluence, Notion, React apps, Angular apps — no framework conflicts possible.
 
 | File | Size | Use case |
 |------|------|----------|
-| `flow-diagram.standalone.js` | 52KB | Static HTML, Confluence, Notion, wikis — **no React needed** |
-| `flow-diagram.umd.js` | 149KB | CDN pages that already load React/ReactDOM |
-| `index.mjs` | 142KB | React/Vue npm projects (React is peer dep) |
+| `flow-diagram.standalone.js` | ~78KB | Static HTML, Confluence, Notion, wikis — **no React needed** |
+| `flow-diagram.umd.min.js` | ~75KB | CDN pages that already load React/ReactDOM |
+| `index.mjs` | ~270KB (tree-shakeable) | React/Vue npm projects (React is peer dep) |
 
 ---
 
@@ -122,22 +141,35 @@ Available props:
 
 ```vue
 <script setup>
-import { VueFlowDiagram } from 'flow-diagram';
+import { FlowDiagram } from 'flow-diagram/dist/wrappers/vue.js';
 
 const dsl = `
 nodes:
-  - id: svc  kind: service  label: Orders  x: 40  y: 60 w: 140 h: 70
-  - id: db   kind: store    label: Postgres x: 240 y: 60 w: 130 h: 70
+  - id: svc, kind: service, label: Orders
+  - id: db,  kind: store,   label: Postgres
 edges:
-  - svc -> db  label: "SQL"
+  - svc -> db, label: "SQL"
 `;
 </script>
 
 <template>
   <div style="height: 300px">
-    <VueFlowDiagram :dsl="dsl" style-name="sleek" />
+    <FlowDiagram :dsl="dsl" style="sleek" />
   </div>
 </template>
+```
+
+Vue + step player + click handlers:
+
+```vue
+<FlowDiagram
+  :dsl="dsl"
+  style="city"
+  :autoplay="true"
+  :interval="2200"
+  @step-change="onStep"
+  @node-click="onNode"
+/>
 ```
 
 ---
@@ -187,34 +219,36 @@ The element fires `node-click` and `edge-click` custom events.
 
 ### Plain HTML / Static Sites
 
+No React. No bundler. One script tag and you're done:
+
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/flow-diagram/dist/flow-diagram.umd.min.js"></script>
-</head>
 <body>
-  <flow-diagram id="d1" diagram-style="sleek" height="400px"></flow-diagram>
+  <div id="arch" style="height: 400px"></div>
 
+  <script src="https://unpkg.com/flow-diagram/dist/flow-diagram.standalone.js"></script>
   <script>
-    document.getElementById('d1').config = {
-      canvas: { w: 700, h: 350 },
-      nodes: [
-        { id: 'client',  kind: 'actor',   label: 'Client',  x: 40,  y: 140, w: 130, h: 70 },
-        { id: 'gateway', kind: 'gateway', label: 'Gateway', x: 230, y: 140, w: 150, h: 70 },
-        { id: 'db',      kind: 'store',   label: 'Postgres',x: 450, y: 140, w: 130, h: 70 },
-      ],
-      edges: [
-        { id: 'e1', from: 'client',  to: 'gateway', label: 'HTTPS' },
-        { id: 'e2', from: 'gateway', to: 'db',      label: 'SQL' },
-      ],
-    };
+    FlowDiagram.mount('#arch', {
+      graph: FlowDiagram.parseDSL(`
+style: sleek
+nodes:
+  - id: client,  kind: actor,   label: Client
+  - id: gateway, kind: gateway, label: "API Gateway"
+  - id: db,      kind: store,   label: Postgres
+edges:
+  - client -> gateway, label: HTTPS
+  - gateway -> db,     label: SQL
+      `),
+      autoplay: false,        // set true if the DSL declares `steps:`
+      onNodeClick(id) { console.log('clicked', id); },
+    });
   </script>
 </body>
 </html>
 ```
+
+The `mount()` call returns a handle with `setStyle()`, `setActive()`, `setZoom()`, `resetView()`, `toggleFullscreen()`, `download()`, `play()`, `pause()`, `nextStep()`, `prevStep()`, `gotoStep(i)`, and `destroy()` — see [docs.html](./docs.html#api) for the full table.
 
 ---
 
@@ -400,27 +434,38 @@ registerStyle('dark', {
 ## Programmatic API
 
 ```js
-import { parseDSL, resolveGraph, downloadSVG, listStyles } from 'flow-diagram';
+import {
+  parseDSL,        // DSL text  → graph object
+  graphToDSL,      // graph object → DSL text (round-trip)
+  resolveGraph,    // graph → resolved graph (layout + routing)
+  renderSVG,       // graph + options → self-contained SVG string
+  mount,           // host + options → interactive viewport handle
+  downloadSVG,     // svgElement → triggers a download
+  listStyles,      // → ['sleek','sketch','iso','city','blueprint']
+  registerStyle,   // register your own style module
+} from 'flow-diagram';
 
-// Parse DSL text → graph object
-const graph = parseDSL(dslText);
-
-// Resolve graph (compute edge routes, sort nodes)
-const resolved = resolveGraph(graph);
-
-// Download the SVG from a ref
-downloadSVG(svgElement, 'my-diagram.svg');
-
-// List available styles
-console.log(listStyles()); // ['sleek', 'sketch', 'iso', 'city', 'blueprint']
+const graph = parseDSL(dsl);
+const svg   = renderSVG(graph, { styleName: 'city' });          // SSR-safe
+const vp    = mount('#arch', { graph, styleName: 'city' });     // interactive
+vp.setStyle('blueprint'); vp.nextStep(); vp.download(); vp.destroy();
 ```
+
+### Demo pages (in the repo)
+
+| Page | Purpose |
+|------|---------|
+| [`index.html`](./index.html) | Landing page — hero, features, install snippets, live example. |
+| [`showcase.html`](./showcase.html) | Curated gallery of real-world diagrams with DSL/JSON toggles. |
+| [`editor.html`](./editor.html) | Live DSL editor with style picker and shareable link. |
+| [`docs.html`](./docs.html) | Full reference — DSL grammar, node/edge gallery, JS API. |
 
 ---
 
 ## Building from Source
 
 ```bash
-git clone https://github.com/your-org/flow-diagram
+git clone https://github.com/retry-labs/flow.git flow-diagram
 cd flow-diagram
 npm install
 

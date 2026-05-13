@@ -24,7 +24,7 @@ if (!FD || typeof FD.parseDSL !== 'function' || typeof FD.renderSVG !== 'functio
 }
 
 // ── Extract every DSL example from showcase.html ────────────────────
-const htmlPath = path.join(__dirname, '..', 'examples', 'showcase.html');
+const htmlPath = path.join(__dirname, '..', 'showcase.html');
 const html = fs.readFileSync(htmlPath, 'utf8');
 
 // Matches blocks of the shape:
