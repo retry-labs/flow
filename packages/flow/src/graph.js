@@ -6,6 +6,8 @@
 // - step.highlight marks nodes + edges active at each step
 // -----------------------------------------------------------
 
+import { getLayout, registerLayout } from './layouts/index.js';
+
 export const NODE_KINDS = {
   service:     { label: 'Service',       shape: 'rect',     icon: 'square'   },
   store:       { label: 'Database',      shape: 'cylinder', icon: 'cylinder' },
@@ -432,6 +434,10 @@ function autoCanvas(nodes, padding = 60) {
   };
 }
 
+// Register the built-in rank-based engine once. layouts/index.js
+// registered dagre at load time; both engines are now available.
+registerLayout('rank', autoLayout);
+
 export function resolveGraph(graph) {
   // Apply auto-layout if ANY node is missing x or y. Mutates the input
   // nodes' x/y/w/h in place; downstream renderers can then count on them.
@@ -439,7 +445,13 @@ export function resolveGraph(graph) {
     n => n.kind !== 'boundary' && (n.x === undefined || n.y === undefined)
   );
   if (needsLayout) {
-    autoLayout(graph.nodes || [], graph.edges || []);
+    // Engine selection: explicit `layout:` directive wins. Otherwise
+    // pick dagre when the graph has edges (DAG-shaped) and rank
+    // otherwise (single-column / disconnected nodes).
+    const engineName = graph.layout
+      || (Array.isArray(graph.edges) && graph.edges.length > 0 ? 'dagre' : 'rank');
+    const engine = getLayout(engineName) || autoLayout;
+    engine(graph.nodes || [], graph.edges || []);
     if (!graph.canvas || !graph.canvas.w) {
       graph = { ...graph, canvas: { ...(graph.canvas || {}), ...autoCanvas(graph.nodes) } };
     }

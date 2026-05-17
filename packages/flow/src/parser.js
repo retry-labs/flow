@@ -1,9 +1,33 @@
 // -----------------------------------------------------------
 // DSL Parser — converts YAML-like text into a Graph IR.
 // Zero dependencies. Works in any environment.
+//
+// Dispatch: if the DSL begins with a `type: <name>` directive AND a
+// diagram-type plugin is registered under that name, delegate parsing
+// to the plugin. Otherwise fall back to the built-in `flow` parser.
 // -----------------------------------------------------------
 
+import { sniffType, getType } from './types.js';
+
 export function parseDSL(text) {
+  // Type dispatch — sequence / state / ER / mindmap / etc. plugins
+  // intercept here before the flow parser sees the text.
+  const declaredType = sniffType(text);
+  if (declaredType) {
+    const plugin = getType(declaredType);
+    if (plugin && typeof plugin.parse === 'function') {
+      const ir = plugin.parse(text);
+      // Guarantee the IR carries the type tag so renderSVG can dispatch.
+      if (ir && typeof ir === 'object' && !ir.type) ir.type = declaredType;
+      return ir;
+    }
+    // Declared a type with no plugin → fall through to flow parser so
+    // unknown directives become inert meta; render will still work.
+  }
+  return parseFlowDSL(text);
+}
+
+function parseFlowDSL(text) {
   const lines = text.split('\n');
   const nodes = [];
   const edges = [];
@@ -125,6 +149,7 @@ export function parseDSL(text) {
     // Canvas is computed by resolveGraph from final node positions when
     // unspecified. Users can override with `canvasW: ...` config keys if
     // they need a fixed viewport.
+    type: 'flow',
     canvas: { grid: 20 },
     ...(meta.style ? { style: meta.style } : {}),
     ...(meta.title ? { title: meta.title } : {}),

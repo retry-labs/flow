@@ -9,4 +9,6 @@ export { STYLES, registerStyle, getStyle, listStyles } from "./styles/index.jsx"
 export { BUILTIN_STYLES, NodeIcon, SleekStyle, SketchStyle, IsoStyle, CityStyle, BlueprintStyle } from "./styles/renderers.jsx";
 export { renderSVG, SVG_STYLES } from "./svg-renderer.js";
 export { RLFlowElement, registerElement } from "./element.js";
+export { registerType, getType, listTypes, hasType, sniffType } from "./types.js";
+export { getIcon, listIcons } from "./icons.js";
 //# sourceMappingURL=index.d.ts.map

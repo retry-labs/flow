@@ -526,6 +526,105 @@ declare module 'vue' {
 
 ---
 
+## Diagram types
+
+The DSL's first `type:` directive selects the diagram engine. Default
+is `flow` (the system-architecture renderer described below). Other
+types extend the same parser → IR → SVG pipeline with their own
+shape vocabulary.
+
+| Type | Status | Use case |
+|---|---|---|
+| `flow` (default) | ✅ shipped | System architecture, microservices, data pipelines, generic node-edge diagrams. |
+| `sequence` | ✅ shipped | UML-style sequence diagrams: actors, messages, lifelines, activations, loops/alts. |
+| `state` | 🚧 roadmap | State machines: states, transitions, entry/exit actions. |
+| `er` | 🚧 roadmap | Entity-relationship: tables, attributes, crow's-foot cardinality. |
+| `mindmap` | 🚧 roadmap | Radial tree from a root concept. |
+
+Register your own type via `registerType('myType', { parse, renderSVG })`.
+
+### Sequence diagrams
+
+```yaml
+type: sequence
+title: Login flow
+
+participant Client
+participant Server
+actor       User
+participant DB
+
+User   ->>  Client: enter creds
+Client ->>  Server: login(creds)
+activate Server
+  Server ->> DB:      SELECT user
+  DB     -->> Server: row
+  Server -->> Client: token
+deactivate Server
+Note over Server, DB: secured channel
+
+loop every 5 min
+  Client ->> Server: heartbeat
+  Server -->> Client: ok
+end
+
+alt valid
+  Server ->> Client: 200 OK
+else invalid
+  Server ->> Client: 401
+end
+```
+
+| Syntax | Meaning |
+|---|---|
+| `participant X` / `actor X` | Declare a column. `actor` renders a stick figure; `participant` a rectangle. |
+| `A ->> B: text` | Sync arrow (solid, filled head). |
+| `A -->> B: text` | Reply / async arrow (dashed, open head). |
+| `A -x B` / `A --x B` | Lost message (red `×` at the target). |
+| `A ->> A: text` | Self-message — auto-renders as a loop-back arc. |
+| `activate X` / `deactivate X` | Pushes/pops an activation bar on X's lifeline. |
+| `Note over A, B: text` | Yellow note spanning the two columns. |
+| `Note left of A: text` / `Note right of A: text` | Single-side note. |
+| `loop label … end` | Loop frame around contained events. |
+| `opt label … end` | Optional frame. |
+| `alt label … else label2 … end` | Branching frame; any number of `else` branches. |
+| `par label … and label2 … end` | Parallel branches. |
+
+Nesting works (e.g. `alt` inside `loop`). Frames render as labelled
+boxes around their contents.
+
+---
+
+## Layout engines
+
+The auto-layout used when nodes have no explicit `x`/`y` is pluggable:
+
+| Engine | Bundled | Default for | Good fit |
+|---|---|---|---|
+| `dagre` | ✅ | any flow with edges | Sugiyama layered DAG layout. Few crossings, predictable. |
+| `rank` | ✅ | edgeless graphs | Cheap left-to-right column placement. |
+| `force` | ✅ | — | Fruchterman-Reingold simulation. Deterministic per-id seed. Best for networks. |
+| `radial` | ✅ | — | Root-centred concentric rings. Best for mindmaps + hierarchies. |
+| `elk` | 🚧 opt-in | — | Heavy ELK port; ships from `@retry-labs/flow/elk`, never bundled in standalone. |
+
+Select per-graph via the `layout:` directive:
+
+```yaml
+type: flow
+layout: force
+
+nodes:
+  - id: a, kind: service, label: A
+  - id: b, kind: service, label: B
+  ...
+```
+
+Register a custom engine via `registerLayout('myLayout', fn)`. The
+function receives `(nodes, edges, opts)` and mutates each node's
+`x`/`y` in place.
+
+---
+
 ## DSL Reference
 
 ```yaml

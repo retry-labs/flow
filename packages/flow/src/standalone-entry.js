@@ -13,6 +13,12 @@ import {
 import { shapePath, shapeAnchor } from './shapes.js';
 import { mount } from './viewport.js';
 import { RLFlowElement, registerElement } from './element.js';
+import { listLayouts, getLayout, registerLayout } from './layouts/index.js';
+import { listTypes, getType, registerType } from './types.js';
+import { listIcons, getIcon } from './icons.js';
+
+// Side-import diagram-type plugins to self-register them.
+import './types/sequence.js';
 
 registerElement();
 
@@ -33,6 +39,13 @@ if (typeof window !== 'undefined') {
     EXAMPLE_GRAPH,
     styles: Object.keys(SVG_STYLES),
     SVG_STYLES,
+    // Layout engines (rank | dagre | force | radial — all bundled).
+    listLayouts, getLayout, registerLayout,
+    // Diagram types (flow is the only built-in for now; plugins
+    // register others).
+    listTypes, getType, registerType,
+    // Built-in icon sprite library.
+    listIcons, getIcon,
     version: '__VERSION__',
   };
 }

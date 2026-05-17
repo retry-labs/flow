@@ -23,6 +23,7 @@ const dom = new JSDOM(
 global.window = dom.window;
 global.document = dom.window.document;
 global.HTMLElement = dom.window.HTMLElement;
+global.SVGElement = dom.window.SVGElement;
 global.Element = dom.window.Element;
 global.Node = dom.window.Node;
 global.customElements = dom.window.customElements;

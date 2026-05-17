@@ -7,6 +7,7 @@
 import { shapePath, shapeAnchor } from './shapes.js';
 import { resolveGraph, shapeOf, edgeMidpoint, roughPath, NODE_KINDS } from './graph.js';
 import { getIcon } from './icons.js';
+import { getType } from './types.js';
 
 // ── SVG attribute helpers ──────────────────────────────────
 
@@ -1231,7 +1232,21 @@ function isoProject(x, y) {
   return { x: c * x + c * y, y: -s * x + s * y };
 }
 
-export function renderSVG(graphInput, {
+export function renderSVG(graphInput, opts = {}) {
+  // Type dispatch — if the graph declares a non-flow type and a plugin
+  // is registered for it, delegate to the plugin's renderer. Flow type
+  // (or no type) falls through to the built-in flow renderer below.
+  const declaredType = graphInput && typeof graphInput === 'object' && graphInput.type;
+  if (declaredType && declaredType !== 'flow') {
+    const plugin = getType(declaredType);
+    if (plugin && typeof plugin.renderSVG === 'function') {
+      return plugin.renderSVG(graphInput, opts);
+    }
+  }
+  return renderFlowSVG(graphInput, opts);
+}
+
+function renderFlowSVG(graphInput, {
   styleName,
   activeNodes = [],
   activeEdges = [],

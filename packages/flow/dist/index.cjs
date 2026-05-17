@@ -3,6 +3,556 @@
 var React = require('react');
 
 // -----------------------------------------------------------
+// Dagre-style layered (Sugiyama) layout.
+//
+// Implements the same three phases dagre uses, just hand-rolled to
+// avoid the ~150 KB npm dep:
+//
+//   1. Rank assignment — longest-path layering.
+//   2. Crossing minimization — barycenter / median heuristic with
+//      forward + backward sweeps to settle node order within layers.
+//   3. Coordinate assignment — average parent / child x for each
+//      node, then spread out to honour minimum spacing.
+//
+// Produces materially better layouts than the rank-based fallback,
+// especially on graphs with many cross-layer edges. For a typical
+// architecture diagram (10-30 nodes), it adds <1 ms over the rank
+// engine and noticeably reduces edge crossings.
+//
+// Mutates each node's x, y, w, h in place. Returns the input nodes.
+// -----------------------------------------------------------
+
+const DEFAULTS$2 = {
+  rankDir: 'LR',
+  // 'LR' (left → right) or 'TB' (top → bottom)
+  nodeSep: 60,
+  // horizontal gap between nodes in the same layer
+  rankSep: 120,
+  // gap between layers
+  marginX: 60,
+  // outer margin
+  marginY: 60,
+  nodeW: 150,
+  nodeH: 70,
+  iters: 24 // sweep iterations for crossing minimization
+};
+function layoutDagre(nodes, edges, opts = {}) {
+  const cfg = {
+    ...DEFAULTS$2,
+    ...opts
+  };
+
+  // Boundaries are layout containers — don't position them as nodes.
+  const layoutables = (nodes || []).filter(n => n && n.kind !== 'boundary');
+  if (layoutables.length === 0) return nodes;
+
+  // Ensure every node has w/h before we start (other code paths may
+  // rely on these defaults).
+  for (const n of layoutables) {
+    n.w = n.w || cfg.nodeW;
+    n.h = n.h || cfg.nodeH;
+  }
+  const ids = layoutables.map(n => n.id);
+  const idSet = new Set(ids);
+  const idx = Object.fromEntries(ids.map((id, i) => [id, i]));
+
+  // Build adjacency (only edges where both ends are layoutable).
+  const outAdj = ids.map(() => []);
+  const inAdj = ids.map(() => []);
+  for (const e of edges || []) {
+    if (idSet.has(e.from) && idSet.has(e.to) && e.from !== e.to) {
+      outAdj[idx[e.from]].push(idx[e.to]);
+      inAdj[idx[e.to]].push(idx[e.from]);
+    }
+  }
+
+  // ── 1. Rank assignment (longest-path from any source) ─────
+  // Use a bounded relaxation: each node is enqueued at most N times
+  // where N is the number of nodes (the longest possible path in an
+  // acyclic graph). Cycles still terminate; the resulting rank may
+  // be slightly suboptimal in cyclic cases but cycles are uncommon
+  // in DAG-oriented diagrams and the visuals still render.
+  const rank = new Array(ids.length).fill(-1);
+  const queue = [];
+  for (let i = 0; i < ids.length; i++) {
+    if (inAdj[i].length === 0) {
+      rank[i] = 0;
+      queue.push(i);
+    }
+  }
+  if (queue.length === 0) {
+    rank[0] = 0;
+    queue.push(0);
+  }
+  const maxIters = ids.length * ids.length + 1; // hard cap
+  let iters = 0;
+  while (queue.length && iters++ < maxIters) {
+    const i = queue.shift();
+    for (const j of outAdj[i]) {
+      const r = rank[i] + 1;
+      if (rank[j] < r && r < ids.length) {
+        rank[j] = r;
+        queue.push(j);
+      }
+    }
+  }
+  for (let i = 0; i < rank.length; i++) if (rank[i] < 0) rank[i] = 0;
+
+  // Group node indices by layer.
+  const maxRank = Math.max(...rank);
+  const layers = Array.from({
+    length: maxRank + 1
+  }, () => []);
+  for (let i = 0; i < ids.length; i++) layers[rank[i]].push(i);
+
+  // ── 2. Crossing minimization via barycenter sweeps ────────
+  // We track an order-within-layer (orderInLayer[idx] = position) and
+  // iterate: alternately compute median of neighbours from the
+  // adjacent layer above (down sweep) or below (up sweep), then
+  // resort the layer by that median.
+
+  // Initial order: insertion order within each layer.
+  const orderInLayer = new Array(ids.length).fill(0);
+  for (const layer of layers) {
+    layer.forEach((nodeIdx, pos) => {
+      orderInLayer[nodeIdx] = pos;
+    });
+  }
+  function medianFromLayer(nodeIdx, fromLayer) {
+    const neighbours = fromLayer === 'up' ? inAdj[nodeIdx] : outAdj[nodeIdx];
+    if (neighbours.length === 0) return orderInLayer[nodeIdx];
+    const positions = neighbours.map(n => orderInLayer[n]).sort((a, b) => a - b);
+    const mid = positions.length >>> 1;
+    return positions.length % 2 ? positions[mid] : (positions[mid - 1] + positions[mid]) / 2;
+  }
+  function sweep(direction /* 'down' | 'up' */) {
+    const seq = direction === 'down' ? layers.slice(1) // process layers 1..N referring to layer above
+    : layers.slice(0, -1).reverse(); // process layers N-1..0 referring to layer below
+    for (const layer of seq) {
+      const medians = layer.map(i => [i, medianFromLayer(i, direction === 'down' ? 'up' : 'down')]);
+      medians.sort((a, b) => a[1] - b[1]);
+      layer.length = 0;
+      medians.forEach(([i], pos) => {
+        layer.push(i);
+        orderInLayer[i] = pos;
+      });
+    }
+  }
+  for (let it = 0; it < cfg.iters; it++) {
+    sweep('down');
+    sweep('up');
+  }
+
+  // ── 3. Coordinate assignment ──────────────────────────────
+  // For 'LR' (left-to-right) we treat each layer as a vertical
+  // column. For 'TB' (top-to-bottom) layers are horizontal rows.
+  const isLR = cfg.rankDir === 'LR';
+
+  // First, place nodes in their layer using barycentre of neighbours
+  // (averaged across the adjacent layers) to keep edges short.
+  const positions = ids.map(() => ({
+    x: 0,
+    y: 0
+  }));
+
+  // Stride per layer
+  const layerStride = cfg.rankSep + maxNodeExtent(layoutables, isLR ? 'w' : 'h');
+  layers.forEach((layer, layerIdx) => {
+    // Initial pass: spread along the secondary axis evenly.
+    const stride = cfg.nodeSep + maxNodeExtent(layer.map(i => layoutables[i]), isLR ? 'h' : 'w');
+    const total = layer.length;
+    const span = stride * (total - 1);
+    layer.forEach((nodeIdx, pos) => {
+      const offset = pos * stride - span / 2;
+      if (isLR) {
+        positions[nodeIdx].x = cfg.marginX + layerIdx * layerStride;
+        positions[nodeIdx].y = cfg.marginY + offset + 200; // 200 = baseline
+      } else {
+        positions[nodeIdx].x = cfg.marginX + offset + 400;
+        positions[nodeIdx].y = cfg.marginY + layerIdx * layerStride;
+      }
+    });
+  });
+
+  // Smoothing pass: nudge each node toward the average of its
+  // neighbours (a quick relaxation that materially reduces edge bends).
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < ids.length; i++) {
+      const neighbours = [...inAdj[i], ...outAdj[i]];
+      if (neighbours.length === 0) continue;
+      const avg = neighbours.reduce((a, j) => a + (isLR ? positions[j].y : positions[j].x), 0) / neighbours.length;
+      if (isLR) positions[i].y = positions[i].y * 0.7 + avg * 0.3;else positions[i].x = positions[i].x * 0.7 + avg * 0.3;
+    }
+  }
+
+  // Detect overlap on the secondary axis within each layer and
+  // de-overlap by spreading neighbours apart.
+  layers.forEach(layer => {
+    if (layer.length <= 1) return;
+    // Sort by current secondary-axis position to preserve crossing order.
+    const sortedLayer = [...layer].sort((a, b) => isLR ? positions[a].y - positions[b].y : positions[a].x - positions[b].x);
+    for (let p = 1; p < sortedLayer.length; p++) {
+      const prev = layoutables[sortedLayer[p - 1]];
+      const curr = layoutables[sortedLayer[p]];
+      const minGap = (isLR ? prev.h / 2 + curr.h / 2 : prev.w / 2 + curr.w / 2) + cfg.nodeSep;
+      const prevPos = isLR ? positions[sortedLayer[p - 1]].y : positions[sortedLayer[p - 1]].x;
+      const currPos = isLR ? positions[sortedLayer[p]].y : positions[sortedLayer[p]].x;
+      if (currPos - prevPos < minGap) {
+        if (isLR) positions[sortedLayer[p]].y = prevPos + minGap;else positions[sortedLayer[p]].x = prevPos + minGap;
+      }
+    }
+  });
+
+  // Apply positions to the original nodes (only when x/y are missing
+  // — so explicit positions in DSL still win).
+  for (let i = 0; i < layoutables.length; i++) {
+    const n = layoutables[i];
+    if (n.x === undefined) n.x = Math.round(positions[i].x);
+    if (n.y === undefined) n.y = Math.round(positions[i].y);
+  }
+  return nodes;
+}
+function maxNodeExtent(nodes, axis) {
+  let max = 0;
+  for (const n of nodes) {
+    const v = axis === 'w' ? n.w || 150 : n.h || 70;
+    if (v > max) max = v;
+  }
+  return max;
+}
+
+// -----------------------------------------------------------
+// Force-directed (Fruchterman-Reingold) layout.
+//
+// Hand-rolled, zero deps. Iterative simulation:
+//   - Each node repels every other node (1/r² gravity-like force).
+//   - Each edge attracts its endpoints (Hooke's-law spring).
+//   - Temperature cools each step, damping movement.
+//
+// Reasonable for graphs up to ~200 nodes. For larger graphs, layered
+// (dagre) or radial is faster and looks better.
+//
+// Mutates each node's x/y/w/h in place. Returns the input array.
+// -----------------------------------------------------------
+
+const DEFAULTS$1 = {
+  iters: 180,
+  // number of simulation steps
+  k: 110,
+  // ideal edge length (px)
+  area: 800,
+  // initial bounding-box side
+  cool: 0.95,
+  // temperature multiplier per iteration
+  startT: 60,
+  // initial max displacement per step (px)
+  nodeW: 150,
+  nodeH: 70,
+  marginX: 60,
+  marginY: 60
+};
+function layoutForce(nodes, edges, opts = {}) {
+  const cfg = {
+    ...DEFAULTS$1,
+    ...opts
+  };
+  const layoutables = (nodes || []).filter(n => n && n.kind !== 'boundary');
+  if (layoutables.length === 0) return nodes;
+  for (const n of layoutables) {
+    n.w = n.w || cfg.nodeW;
+    n.h = n.h || cfg.nodeH;
+  }
+  const ids = layoutables.map(n => n.id);
+  const idSet = new Set(ids);
+  const idx = Object.fromEntries(ids.map((id, i) => [id, i]));
+
+  // Seed positions: random inside a square of side `area`. Deterministic
+  // per-id seed so the same DSL always lays out the same way.
+  const N = ids.length;
+  const pos = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const seed = hash(ids[i]);
+    pos[i] = {
+      x: (seed * 9301 + 49297) % 233280 / 233280 * cfg.area,
+      y: (seed * 49297 + 9301) % 233280 / 233280 * cfg.area
+    };
+  }
+
+  // Edge list filtered to layoutable endpoints.
+  const E = [];
+  for (const e of edges || []) {
+    if (idSet.has(e.from) && idSet.has(e.to) && e.from !== e.to) {
+      E.push([idx[e.from], idx[e.to]]);
+    }
+  }
+
+  // Fruchterman-Reingold loop.
+  const k = cfg.k;
+  let temp = cfg.startT;
+  const disp = new Array(N);
+  for (let i = 0; i < N; i++) disp[i] = {
+    x: 0,
+    y: 0
+  };
+  for (let iter = 0; iter < cfg.iters; iter++) {
+    // Reset displacements.
+    for (let i = 0; i < N; i++) {
+      disp[i].x = 0;
+      disp[i].y = 0;
+    }
+
+    // Repulsion between every pair.
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        let dx = pos[i].x - pos[j].x;
+        let dy = pos[i].y - pos[j].y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 0.01) {
+          dx = Math.random() - 0.5;
+          dy = Math.random() - 0.5;
+          d2 = 0.5;
+        }
+        const d = Math.sqrt(d2);
+        const f = k * k / d;
+        const ux = dx / d,
+          uy = dy / d;
+        disp[i].x += ux * f;
+        disp[i].y += uy * f;
+        disp[j].x -= ux * f;
+        disp[j].y -= uy * f;
+      }
+    }
+
+    // Attraction along edges.
+    for (const [a, b] of E) {
+      const dx = pos[a].x - pos[b].x;
+      const dy = pos[a].y - pos[b].y;
+      const d = Math.max(0.1, Math.sqrt(dx * dx + dy * dy));
+      const f = d * d / k;
+      const ux = dx / d,
+        uy = dy / d;
+      disp[a].x -= ux * f;
+      disp[a].y -= uy * f;
+      disp[b].x += ux * f;
+      disp[b].y += uy * f;
+    }
+
+    // Apply displacement, capped by temperature.
+    for (let i = 0; i < N; i++) {
+      const dlen = Math.max(0.01, Math.hypot(disp[i].x, disp[i].y));
+      const scale = Math.min(dlen, temp) / dlen;
+      pos[i].x += disp[i].x * scale;
+      pos[i].y += disp[i].y * scale;
+    }
+    temp *= cfg.cool;
+  }
+
+  // Normalize: shift so min corner is at (marginX, marginY).
+  let minX = Infinity,
+    minY = Infinity;
+  for (let i = 0; i < N; i++) {
+    if (pos[i].x < minX) minX = pos[i].x;
+    if (pos[i].y < minY) minY = pos[i].y;
+  }
+  const dx = cfg.marginX - minX;
+  const dy = cfg.marginY - minY;
+  for (let i = 0; i < N; i++) {
+    const n = layoutables[i];
+    if (n.x === undefined) n.x = Math.round(pos[i].x + dx);
+    if (n.y === undefined) n.y = Math.round(pos[i].y + dy);
+  }
+  return nodes;
+}
+
+// Small deterministic string hash for seeding.
+function hash(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (h << 5) + h + s.charCodeAt(i) | 0;
+  return Math.abs(h);
+}
+
+// -----------------------------------------------------------
+// Radial layout — root in the center, children fanned out in
+// concentric rings. The right choice for mindmaps, classification
+// hierarchies, and small "central-concept" diagrams.
+//
+// Algorithm:
+//   1. Pick a root. Either the first node with no incoming edges,
+//      or a node explicitly tagged `root: true`, or simply nodes[0].
+//   2. BFS to assign depth (= ring number) to each reachable node.
+//   3. For each ring, distribute children evenly on an arc whose
+//      total angle is proportional to the subtree size — so dense
+//      branches get more space than sparse ones.
+//
+// Hand-rolled, zero deps. Mutates node x/y/w/h in place.
+// -----------------------------------------------------------
+
+const DEFAULTS = {
+  ringStep: 140,
+  // px between concentric rings
+  cx: 400,
+  // center x
+  cy: 300,
+  // center y
+  startAng: -Math.PI / 2,
+  // first child placed straight up
+  totalAng: 2 * Math.PI,
+  // full circle
+  nodeW: 140,
+  nodeH: 70
+};
+function layoutRadial(nodes, edges, opts = {}) {
+  const cfg = {
+    ...DEFAULTS,
+    ...opts
+  };
+  const layoutables = (nodes || []).filter(n => n && n.kind !== 'boundary');
+  if (layoutables.length === 0) return nodes;
+  for (const n of layoutables) {
+    n.w = n.w || cfg.nodeW;
+    n.h = n.h || cfg.nodeH;
+  }
+  const idx = Object.fromEntries(layoutables.map((n, i) => [n.id, i]));
+  const N = layoutables.length;
+
+  // Build adjacency (directed, parent → child).
+  const children = layoutables.map(() => []);
+  for (const e of edges || []) {
+    if (idx[e.from] !== undefined && idx[e.to] !== undefined && e.from !== e.to) {
+      children[idx[e.from]].push(idx[e.to]);
+    }
+  }
+
+  // Pick a root.
+  let rootIdx = layoutables.findIndex(n => n.root === true);
+  if (rootIdx < 0) {
+    const inDeg = new Array(N).fill(0);
+    for (const list of children) for (const c of list) inDeg[c]++;
+    rootIdx = inDeg.findIndex(d => d === 0);
+    if (rootIdx < 0) rootIdx = 0;
+  }
+
+  // BFS depth assignment.
+  const depth = new Array(N).fill(-1);
+  depth[rootIdx] = 0;
+  const queue = [rootIdx];
+  while (queue.length) {
+    const i = queue.shift();
+    for (const c of children[i]) {
+      if (depth[c] < 0) {
+        depth[c] = depth[i] + 1;
+        queue.push(c);
+      }
+    }
+  }
+  for (let i = 0; i < N; i++) if (depth[i] < 0) depth[i] = 1; // disconnected → ring 1
+
+  // Subtree-size weighted angular distribution. We assign each child
+  // an angular slice proportional to the number of descendants it
+  // carries; that way busy branches don't bunch up.
+  const size = new Array(N).fill(0);
+  function computeSize(i, visited) {
+    if (visited.has(i)) return 1;
+    visited.add(i);
+    let s = 1;
+    for (const c of children[i]) s += computeSize(c, visited);
+    size[i] = s;
+    return s;
+  }
+  computeSize(rootIdx, new Set());
+
+  // Each node has an angle interval [angStart, angEnd]. Children of
+  // a node split their parent's interval proportionally to size[c].
+  const angStart = new Array(N).fill(0);
+  const angEnd = new Array(N).fill(0);
+  angStart[rootIdx] = cfg.startAng;
+  angEnd[rootIdx] = cfg.startAng + cfg.totalAng;
+  function placeChildren(i, visited) {
+    if (visited.has(i)) return;
+    visited.add(i);
+    const kids = children[i].filter(c => !visited.has(c));
+    if (kids.length === 0) return;
+    const totalKidSize = kids.reduce((a, c) => a + (size[c] || 1), 0);
+    const span = angEnd[i] - angStart[i];
+    let cursor = angStart[i];
+    for (const c of kids) {
+      const slice = (size[c] || 1) / totalKidSize * span;
+      angStart[c] = cursor;
+      angEnd[c] = cursor + slice;
+      cursor += slice;
+    }
+    for (const c of kids) placeChildren(c, visited);
+  }
+  placeChildren(rootIdx, new Set());
+
+  // Place each node at the midpoint of its angle slice on its ring.
+  for (let i = 0; i < N; i++) {
+    const ring = depth[i];
+    const mid = (angStart[i] + angEnd[i]) / 2;
+    const r = ring * cfg.ringStep;
+    const n = layoutables[i];
+    if (n.x === undefined) n.x = Math.round(cfg.cx + Math.cos(mid) * r - n.w / 2);
+    if (n.y === undefined) n.y = Math.round(cfg.cy + Math.sin(mid) * r - n.h / 2);
+  }
+  return nodes;
+}
+
+// -----------------------------------------------------------
+// Layout engine registry.
+//
+// A layout engine takes (nodes, edges, opts) and mutates each node's
+// {x, y, w, h} in place (or returns positions to be applied). Engines
+// only run when at least one node is missing x/y.
+//
+// Built-in engines registered by this module:
+//
+//   - 'rank'   : the original left-to-right rank-based layout
+//                (rank = longest path from a source; nodes per rank
+//                stacked vertically). Cheap, predictable.
+//
+//   - 'dagre'  : DAG-aware Sugiyama-style layered layout. Best for
+//                flow/architecture/state/ER diagrams with clear
+//                direction.
+//
+//   - 'force'  : Fruchterman-Reingold force simulation. Best for
+//                network / undirected / mindmap diagrams.
+//
+//   - 'radial' : Root-centred tree placement. Best for mindmaps.
+//
+// New engines call `registerLayout(name, fn)` from their own module.
+// The runtime `layout:` directive in DSL selects an engine per graph.
+// -----------------------------------------------------------
+
+const LAYOUT_ENGINES = new Map();
+function registerLayout(name, fn) {
+  if (!name || typeof name !== 'string') {
+    throw new Error('registerLayout: name must be a non-empty string');
+  }
+  if (typeof fn !== 'function') {
+    throw new Error('registerLayout: fn must be a function');
+  }
+  if (LAYOUT_ENGINES.has(name)) {
+    // eslint-disable-next-line no-console
+    console.warn(`registerLayout: engine "${name}" is being overwritten`);
+  }
+  LAYOUT_ENGINES.set(name, fn);
+}
+function getLayout(name) {
+  if (!name) return null;
+  return LAYOUT_ENGINES.get(name) || null;
+}
+
+// Register the built-in engines once at module load. New types call
+// `registerLayout(...)` from their own modules.
+//
+// The 'rank' engine is registered lazily by graph.js to avoid a
+// circular import (graph.js owns autoLayout, layouts/index.js is
+// imported by graph.js).
+registerLayout('dagre', layoutDagre);
+registerLayout('force', layoutForce);
+registerLayout('radial', layoutRadial);
+
+// -----------------------------------------------------------
 // Graph IR — the shared data model all styles render from.
 // A diagram is: { nodes, edges, steps, canvas }
 // - node.kind drives which renderer shape is used
@@ -668,12 +1218,21 @@ function autoCanvas(nodes, padding = 60) {
     h: Math.max(400, maxY + padding)
   };
 }
+
+// Register the built-in rank-based engine once. layouts/index.js
+// registered dagre at load time; both engines are now available.
+registerLayout('rank', autoLayout);
 function resolveGraph(graph) {
   // Apply auto-layout if ANY node is missing x or y. Mutates the input
   // nodes' x/y/w/h in place; downstream renderers can then count on them.
   const needsLayout = !graph.nodes || graph.nodes.some(n => n.kind !== 'boundary' && (n.x === undefined || n.y === undefined));
   if (needsLayout) {
-    autoLayout(graph.nodes || [], graph.edges || []);
+    // Engine selection: explicit `layout:` directive wins. Otherwise
+    // pick dagre when the graph has edges (DAG-shaped) and rank
+    // otherwise (single-column / disconnected nodes).
+    const engineName = graph.layout || (Array.isArray(graph.edges) && graph.edges.length > 0 ? 'dagre' : 'rank');
+    const engine = getLayout(engineName) || autoLayout;
+    engine(graph.nodes || [], graph.edges || []);
     if (!graph.canvas || !graph.canvas.w) {
       graph = {
         ...graph,
@@ -1001,11 +1560,105 @@ function shapeAnchor(node, side) {
 }
 
 // -----------------------------------------------------------
+// Diagram-type registry.
+//
+// Adding a new diagram type (sequence, state, ER, mindmap, ...) means
+// registering a small plugin object. The library's public entry
+// points — parseDSL, renderSVG, the React <Diagram> component, the
+// <rl-flow> custom element — all dispatch on `graph.type`.
+//
+// Plugin shape:
+//
+//   {
+//     name: 'sequence',           // unique, used in the DSL `type:` directive
+//     parse(text)    -> graph,    // text → IR. Must return { type, ...payload }
+//     renderSVG(graph, opts) -> string,    // IR → SVG string
+//     Render?({ graph, style, activeNodes, activeEdges, ... }) -> ReactNode
+//                                  // optional React component renderer
+//   }
+//
+// The IR shape is up to the plugin. The only required field is `type`
+// (a string matching the registered name) so dispatch works.
+//
+// `flow` is the *default* (and only) built-in type; the existing
+// parser and renderer handle it directly. New types call
+// `registerType(...)` from their own module.
+// -----------------------------------------------------------
+
+const DIAGRAM_TYPES = new Map();
+function registerType(name, plugin) {
+  if (!name || typeof name !== 'string') {
+    throw new Error('registerType: name must be a non-empty string');
+  }
+  if (!plugin || typeof plugin !== 'object') {
+    throw new Error('registerType: plugin must be an object');
+  }
+  if (DIAGRAM_TYPES.has(name)) {
+    // eslint-disable-next-line no-console
+    console.warn(`registerType: type "${name}" is being overwritten`);
+  }
+  DIAGRAM_TYPES.set(name, plugin);
+}
+function getType(name) {
+  if (!name) return null;
+  return DIAGRAM_TYPES.get(name) || null;
+}
+function listTypes() {
+  return Array.from(DIAGRAM_TYPES.keys()).sort();
+}
+function hasType(name) {
+  return !!name && DIAGRAM_TYPES.has(name);
+}
+
+// Sniff the first lines of a DSL string for `type: <name>`. Returns the
+// type name or null. Cheap pre-parse so dispatch can find the right
+// plugin without parsing the whole document twice.
+function sniffType(text) {
+  if (typeof text !== 'string') return null;
+  // Scan up to the first ~15 lines for a top-level `type: X` directive.
+  // Inline-section keys can also match, so guard against sections.
+  let scanned = 0;
+  for (const raw of text.split('\n')) {
+    if (scanned++ > 15) break;
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    // Stop scanning once we hit a section header.
+    if (/^(nodes|edges|steps|story|config|participants?|actors|states|entities):/i.test(line)) {
+      return null;
+    }
+    const m = line.match(/^type:\s*([\w-]+)/i);
+    if (m) return m[1].toLowerCase();
+  }
+  return null;
+}
+
+// -----------------------------------------------------------
 // DSL Parser — converts YAML-like text into a Graph IR.
 // Zero dependencies. Works in any environment.
+//
+// Dispatch: if the DSL begins with a `type: <name>` directive AND a
+// diagram-type plugin is registered under that name, delegate parsing
+// to the plugin. Otherwise fall back to the built-in `flow` parser.
 // -----------------------------------------------------------
 
 function parseDSL(text) {
+  // Type dispatch — sequence / state / ER / mindmap / etc. plugins
+  // intercept here before the flow parser sees the text.
+  const declaredType = sniffType(text);
+  if (declaredType) {
+    const plugin = getType(declaredType);
+    if (plugin && typeof plugin.parse === 'function') {
+      const ir = plugin.parse(text);
+      // Guarantee the IR carries the type tag so renderSVG can dispatch.
+      if (ir && typeof ir === 'object' && !ir.type) ir.type = declaredType;
+      return ir;
+    }
+    // Declared a type with no plugin → fall through to flow parser so
+    // unknown directives become inert meta; render will still work.
+  }
+  return parseFlowDSL(text);
+}
+function parseFlowDSL(text) {
   const lines = text.split('\n');
   const nodes = [];
   const edges = [];
@@ -1146,6 +1799,7 @@ function parseDSL(text) {
     // Canvas is computed by resolveGraph from final node positions when
     // unspecified. Users can override with `canvasW: ...` config keys if
     // they need a fixed viewport.
+    type: 'flow',
     canvas: {
       grid: 20
     },
@@ -1409,6 +2063,13 @@ const ICONS$1 = {
 function getIcon(name) {
   if (!name) return null;
   return ICONS$1[String(name).toLowerCase()] || null;
+}
+
+/**
+ * List every registered icon name. Useful for autocompletion / docs.
+ */
+function listIcons() {
+  return Object.keys(ICONS$1).sort();
 }
 
 // ---------- Shared helpers ----------
@@ -4885,8 +5546,8 @@ const e = (tag, props, ...children) => {
   return `<${tag}${a}>${inner}</${tag}>`;
 };
 const g = (props, ...children) => e('g', props, ...children);
-const text = (props, content) => `<text ${attrs(props)}>${esc(content)}</text>`;
-const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const text = (props, content) => `<text ${attrs(props)}>${esc$1(content)}</text>`;
+const esc$1 = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // ── Shared shape shell ─────────────────────────────────────
 
@@ -5036,10 +5697,10 @@ function nodeImageOrIcon(node) {
 
 function nodeA11y(node) {
   if (!node) return '';
-  const titleText = esc(node.label || node.id || '');
+  const titleText = esc$1(node.label || node.id || '');
   const kindLabel = node.kind ? String(node.kind) : '';
   const descBits = [kindLabel, node.sub ? String(node.sub) : ''].filter(Boolean);
-  const descText = esc(descBits.join(' — '));
+  const descText = esc$1(descBits.join(' — '));
   return (titleText ? `<title>${titleText}</title>` : '') + (descText ? `<desc>${descText}</desc>` : '');
 }
 
@@ -5052,12 +5713,12 @@ function nodeA11y(node) {
 // The per-style renderer's output goes inside this wrapper unchanged.
 
 function wrapNode(node, inner) {
-  return `<g data-node-id="${esc(node.id)}" role="img">${nodeA11y(node)}${inner}</g>`;
+  return `<g data-node-id="${esc$1(node.id)}" role="img">${nodeA11y(node)}${inner}</g>`;
 }
 function wrapEdge(edge, inner) {
   const fromTo = `${edge.from || ''} → ${edge.to || ''}`;
   const label = edge.label ? `${edge.label} (${fromTo})` : fromTo;
-  return `<g data-edge-id="${esc(edge.id)}" role="img"><title>${esc(label)}</title>${inner}</g>`;
+  return `<g data-edge-id="${esc$1(edge.id)}" role="img"><title>${esc$1(label)}</title>${inner}</g>`;
 }
 
 // ── Edge stroke-width helper (sankey-style weighting) ──────
@@ -7701,7 +8362,20 @@ function isoProject(x, y) {
     y: -s * x + s * y
   };
 }
-function renderSVG(graphInput, {
+function renderSVG(graphInput, opts = {}) {
+  // Type dispatch — if the graph declares a non-flow type and a plugin
+  // is registered for it, delegate to the plugin's renderer. Flow type
+  // (or no type) falls through to the built-in flow renderer below.
+  const declaredType = graphInput && typeof graphInput === 'object' && graphInput.type;
+  if (declaredType && declaredType !== 'flow') {
+    const plugin = getType(declaredType);
+    if (plugin && typeof plugin.renderSVG === 'function') {
+      return plugin.renderSVG(graphInput, opts);
+    }
+  }
+  return renderFlowSVG(graphInput, opts);
+}
+function renderFlowSVG(graphInput, {
   styleName,
   activeNodes = [],
   activeEdges = [],
@@ -7802,7 +8476,7 @@ function renderSVG(graphInput, {
   // fill the visible space correctly. For iso, the background lives inside
   // the projection transform so we use canvas-space coordinates.
   const bgInner = isIso ? style.background(G.canvas.w, G.canvas.h) : `<g transform="translate(${vbX} ${vbY})">${style.background(vbW, vbH)}</g>`;
-  const a11yTitle = G.title ? `<title>${esc(G.title)}</title>` : '';
+  const a11yTitle = G.title ? `<title>${esc$1(G.title)}</title>` : '';
 
   // Inline stylesheet — travels with the SVG so the draw-on animation
   // and the reduced-motion guard work regardless of whether the host
@@ -9546,6 +10220,683 @@ function registerElement() {
   }
 }
 
+// -----------------------------------------------------------
+// Sequence diagram type.
+//
+// Plugin shape (see ../types.js for the contract). Exports a single
+// side-effect: register a sequence-type plugin under name 'sequence'.
+//
+// Syntax (Mermaid-compatible subset, see ROADMAP.md):
+//
+//   type: sequence
+//   title: User login
+//
+//   participant Client
+//   participant Server
+//   actor       User
+//   participant DB
+//
+//   User   ->>  Client: enter creds
+//   Client ->>  Server: login(creds)
+//   activate Server
+//     Server ->> DB:     SELECT user
+//     DB     -->> Server: row
+//     Server -->> Client: token
+//   deactivate Server
+//   Note over Server, DB: secured channel
+//
+//   loop every 5 min
+//     Client ->> Server: heartbeat
+//     Server -->> Client: ok
+//   end
+//
+//   alt valid
+//     Server ->> Client: 200 OK
+//   else invalid
+//     Server ->> Client: 401
+//   end
+//
+//   opt with cookie
+//     Client ->> Server: set-cookie
+//   end
+//
+//   par worker A
+//     Client ->> Server: ping
+//   and worker B
+//     Client ->> Server: ping
+//   end
+//
+// Arrow types:
+//   `->>`  solid arrow with filled head (sync request)
+//   `-->>` dashed arrow with open head  (reply / async)
+//   `-x`   solid arrow with X            (lost message)
+//   `--x`  dashed arrow with X           (lost reply)
+//
+// Notes: `Note over A`, `Note over A, B`, `Note left of A`, `Note right of A`.
+//
+// IR:
+//   {
+//     type: 'sequence',
+//     title, style,
+//     actors:   [{ id, label, kind: 'participant' | 'actor' }],
+//     events:   [Event],   // ordered timeline (messages, notes, activations, frames)
+//   }
+//
+//   Event kinds:
+//     { kind: 'message',    from, to, arrow, label, lost? }
+//     { kind: 'note',       placement, actors: [id], text }
+//     { kind: 'activate',   actor }
+//     { kind: 'deactivate', actor }
+//     { kind: 'frame', frame: 'loop'|'opt', label, body: [Event] }
+//     { kind: 'frame', frame: 'alt'|'par',   branches: [{ label, body: [Event] }] }
+//
+// -----------------------------------------------------------
+
+
+// ── PARSER ──────────────────────────────────────────────────
+
+const ARROW_RE = /^([\w-]+)\s*(-->>|->>|--x|-x)\s*([\w-]+)\s*(?::\s*(.*))?$/;
+const PARTICIPANT_RE = /^participant\s+([\w-]+)(?:\s+as\s+(.+))?$/i;
+const ACTOR_RE = /^actor\s+([\w-]+)(?:\s+as\s+(.+))?$/i;
+const NOTE_OVER_RE = /^note\s+over\s+([\w-]+)(?:\s*,\s*([\w-]+))?\s*:\s*(.*)$/i;
+const NOTE_SIDE_RE = /^note\s+(left|right)\s+of\s+([\w-]+)\s*:\s*(.*)$/i;
+const ACTIVATE_RE = /^activate\s+([\w-]+)$/i;
+const DEACTIVATE_RE = /^deactivate\s+([\w-]+)$/i;
+const LOOP_RE = /^loop(?:\s+(.+))?$/i;
+const OPT_RE = /^opt(?:\s+(.+))?$/i;
+const ALT_RE = /^alt(?:\s+(.+))?$/i;
+const ELSE_RE = /^else(?:\s+(.+))?$/i;
+const PAR_RE = /^par(?:\s+(.+))?$/i;
+const AND_RE = /^and(?:\s+(.+))?$/i;
+const END_RE = /^end$/i;
+const META_RE = /^(\w+):\s*(.+)$/;
+function parseSequenceDSL(text) {
+  const lines = text.split('\n');
+  const actorOrder = []; // preserve participant declaration order
+  const actorMap = Object.create(null); // id → { id, label, kind }
+  const ensureActor = (id, kind = 'participant', label = null) => {
+    if (!actorMap[id]) {
+      actorMap[id] = {
+        id,
+        kind,
+        label: label || id
+      };
+      actorOrder.push(id);
+    } else if (label) {
+      actorMap[id].label = label;
+    }
+    if (kind === 'actor') actorMap[id].kind = 'actor';
+    return actorMap[id];
+  };
+  const meta = {}; // type, title, style, ...
+  const rootBody = []; // top-level events
+  // Stack of { kind: 'frame'|'alt-branch'|'par-branch', target: array-to-push-into,
+  //            frame?: 'loop'|'opt'|'alt'|'par', label?, branches?, currentBranch? }
+  const stack = [{
+    target: rootBody
+  }];
+  let msgCounter = 0;
+  const nextId = prefix => `${prefix}${msgCounter++}`;
+  const top = () => stack[stack.length - 1];
+  for (const raw of lines) {
+    const line = raw.replace(/#.*$/, '').trim();
+    if (!line) continue;
+
+    // Top-level meta (only when at root + before any events).
+    if (stack.length === 1 && top().target.length === 0) {
+      const mm = line.match(META_RE);
+      if (mm && !/^(participant|actor|note|activate|deactivate|loop|opt|alt|par|else|and|end)\b/i.test(mm[1])) {
+        // Not a structural keyword — treat as meta.
+        const key = mm[1].toLowerCase();
+        if (!['nodes', 'edges', 'steps', 'config'].includes(key)) {
+          meta[key] = mm[2].trim().replace(/^"(.*)"$/, '$1');
+          continue;
+        }
+      }
+    }
+
+    // Participant / actor declarations.
+    let m;
+    if (m = line.match(PARTICIPANT_RE)) {
+      ensureActor(m[1], 'participant', m[2]);
+      continue;
+    }
+    if (m = line.match(ACTOR_RE)) {
+      ensureActor(m[1], 'actor', m[2]);
+      continue;
+    }
+
+    // Note over / left / right.
+    if (m = line.match(NOTE_OVER_RE)) {
+      const a = m[1],
+        b = m[2];
+      ensureActor(a);
+      if (b) ensureActor(b);
+      top().target.push({
+        kind: 'note',
+        id: nextId('n'),
+        placement: 'over',
+        actors: b ? [a, b] : [a],
+        text: m[3].trim()
+      });
+      continue;
+    }
+    if (m = line.match(NOTE_SIDE_RE)) {
+      ensureActor(m[2]);
+      top().target.push({
+        kind: 'note',
+        id: nextId('n'),
+        placement: m[1].toLowerCase() === 'left' ? 'leftOf' : 'rightOf',
+        actors: [m[2]],
+        text: m[3].trim()
+      });
+      continue;
+    }
+
+    // Activations.
+    if (m = line.match(ACTIVATE_RE)) {
+      ensureActor(m[1]);
+      top().target.push({
+        kind: 'activate',
+        actor: m[1]
+      });
+      continue;
+    }
+    if (m = line.match(DEACTIVATE_RE)) {
+      ensureActor(m[1]);
+      top().target.push({
+        kind: 'deactivate',
+        actor: m[1]
+      });
+      continue;
+    }
+
+    // Frame openers.
+    if (m = line.match(LOOP_RE)) {
+      const frame = {
+        kind: 'frame',
+        frame: 'loop',
+        label: m[1] || 'loop',
+        body: []
+      };
+      top().target.push(frame);
+      stack.push({
+        target: frame.body
+      });
+      continue;
+    }
+    if (m = line.match(OPT_RE)) {
+      const frame = {
+        kind: 'frame',
+        frame: 'opt',
+        label: m[1] || 'opt',
+        body: []
+      };
+      top().target.push(frame);
+      stack.push({
+        target: frame.body
+      });
+      continue;
+    }
+    if (m = line.match(ALT_RE)) {
+      const branches = [{
+        label: m[1] || 'alt',
+        body: []
+      }];
+      const frame = {
+        kind: 'frame',
+        frame: 'alt',
+        branches
+      };
+      top().target.push(frame);
+      stack.push({
+        target: branches[0].body,
+        frame,
+        kind: 'alt-branch'
+      });
+      continue;
+    }
+    if (m = line.match(ELSE_RE)) {
+      // Switch to a new branch of the enclosing alt.
+      const closer = stack.pop();
+      if (!closer || closer.kind !== 'alt-branch') {
+        // Mismatched else — restore and skip.
+        if (closer) stack.push(closer);
+        continue;
+      }
+      const branch = {
+        label: m[1] || 'else',
+        body: []
+      };
+      closer.frame.branches.push(branch);
+      stack.push({
+        target: branch.body,
+        frame: closer.frame,
+        kind: 'alt-branch'
+      });
+      continue;
+    }
+    if (m = line.match(PAR_RE)) {
+      const branches = [{
+        label: m[1] || 'par',
+        body: []
+      }];
+      const frame = {
+        kind: 'frame',
+        frame: 'par',
+        branches
+      };
+      top().target.push(frame);
+      stack.push({
+        target: branches[0].body,
+        frame,
+        kind: 'par-branch'
+      });
+      continue;
+    }
+    if (m = line.match(AND_RE)) {
+      const closer = stack.pop();
+      if (!closer || closer.kind !== 'par-branch') {
+        if (closer) stack.push(closer);
+        continue;
+      }
+      const branch = {
+        label: m[1] || 'and',
+        body: []
+      };
+      closer.frame.branches.push(branch);
+      stack.push({
+        target: branch.body,
+        frame: closer.frame,
+        kind: 'par-branch'
+      });
+      continue;
+    }
+    if (END_RE.test(line)) {
+      if (stack.length > 1) stack.pop();
+      continue;
+    }
+
+    // Messages (must come after structural keywords).
+    if (m = line.match(ARROW_RE)) {
+      const [, from, arrow, to, label] = m;
+      ensureActor(from);
+      ensureActor(to);
+      const dashed = arrow.startsWith('--');
+      const lost = arrow.endsWith('x');
+      top().target.push({
+        kind: 'message',
+        id: nextId('m'),
+        from,
+        to,
+        arrow: dashed ? lost ? 'lostDashed' : 'reply' : lost ? 'lost' : 'sync',
+        label: (label || '').trim()
+      });
+      continue;
+    }
+    // Anything we don't recognize is silently dropped — keeps the
+    // parser permissive for typos rather than erroring loudly.
+  }
+  return {
+    type: 'sequence',
+    title: meta.title,
+    style: meta.style || 'sleek',
+    actors: actorOrder.map(id => actorMap[id]),
+    events: rootBody
+  };
+}
+
+// ── LAYOUT ──────────────────────────────────────────────────
+
+const ACTOR_W = 130;
+const ACTOR_H = 44;
+const COL_PAD = 50;
+const MSG_GAP = 46;
+const NOTE_PAD_Y = 8;
+const FRAME_PAD_Y = 22;
+const TOP_MARGIN = 30;
+const BOTTOM_MARGIN = 30;
+function layoutSequence(ir) {
+  // Compute actor X positions (uniform columns sized to widest label).
+  const cols = {};
+  const totalActors = ir.actors.length;
+  // Naive column width: take the longest label, ~7px per char + padding.
+  const maxLabel = ir.actors.reduce((m, a) => Math.max(m, (a.label || a.id).length), 0);
+  const colW = Math.max(ACTOR_W, maxLabel * 8 + 40);
+  const colSpacing = colW + COL_PAD;
+  ir.actors.forEach((a, i) => {
+    cols[a.id] = {
+      cx: TOP_MARGIN + colW / 2 + i * colSpacing,
+      left: TOP_MARGIN + i * colSpacing,
+      right: TOP_MARGIN + i * colSpacing + colW
+    };
+  });
+
+  // Walk the event tree assigning Y coordinates. Frames take FRAME_PAD_Y
+  // above and below their body. Returns the maximum Y reached.
+  let y = TOP_MARGIN + ACTOR_H + 30;
+  function walk(events, depth = 0) {
+    for (const ev of events) {
+      if (ev.kind === 'message' || ev.kind === 'note') {
+        ev.y = y;
+        y += MSG_GAP;
+      } else if (ev.kind === 'activate' || ev.kind === 'deactivate') {
+        ev.y = y; // marker — doesn't add height
+      } else if (ev.kind === 'frame') {
+        ev.headerY = y;
+        y += FRAME_PAD_Y;
+        if (ev.frame === 'loop' || ev.frame === 'opt') {
+          walk(ev.body, depth + 1);
+        } else {
+          // alt / par — divider before each branch after the first.
+          for (let b = 0; b < ev.branches.length; b++) {
+            if (b > 0) {
+              ev.branches[b].dividerY = y;
+              y += FRAME_PAD_Y;
+            }
+            walk(ev.branches[b].body, depth + 1);
+          }
+        }
+        y += FRAME_PAD_Y;
+        ev.endY = y;
+      }
+    }
+  }
+  walk(ir.events);
+  const totalH = y + BOTTOM_MARGIN;
+  const totalW = TOP_MARGIN * 2 + colW + (totalActors - 1) * colSpacing;
+  return {
+    cols,
+    colW,
+    colSpacing,
+    totalH,
+    totalW
+  };
+}
+
+// Walks the event tree and produces a flat list of activations per
+// actor: [{ actor, startY, endY }]. Pairs activate/deactivate by
+// stacking per actor.
+function collectActivations(events, activations) {
+  const stacks = activations._stacks || (activations._stacks = {});
+  for (const ev of events) {
+    if (ev.kind === 'activate') {
+      stacks[ev.actor] = stacks[ev.actor] || [];
+      stacks[ev.actor].push({
+        actor: ev.actor,
+        startY: ev.y
+      });
+    } else if (ev.kind === 'deactivate') {
+      const list = stacks[ev.actor];
+      const open = list && list[list.length - 1];
+      if (open) {
+        open.endY = ev.y;
+        activations.push(open);
+        list.pop();
+      }
+    } else if (ev.kind === 'frame') {
+      if (ev.frame === 'loop' || ev.frame === 'opt') {
+        collectActivations(ev.body, activations);
+      } else {
+        for (const b of ev.branches) collectActivations(b.body, activations);
+      }
+    }
+  }
+  return activations;
+}
+
+// ── RENDERER ────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function renderSequence(graph, opts = {}) {
+  const ir = graph;
+  if (!ir || !Array.isArray(ir.actors) || ir.actors.length === 0) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60">
+      <text x="10" y="30" font-family="Inter Tight" font-size="13" fill="#94a3b8">
+        Empty sequence diagram
+      </text>
+    </svg>`;
+  }
+  const layout = layoutSequence(ir);
+  const {
+    cols,
+    colW,
+    totalH,
+    totalW
+  } = layout;
+
+  // Resolve activations (top-level + nested in frames).
+  const activations = [];
+  collectActivations(ir.events, activations);
+  // Auto-close unmatched activates at the end of the diagram.
+  for (const actor of Object.keys(activations._stacks || {})) {
+    for (const open of activations._stacks[actor]) {
+      open.endY = totalH - BOTTOM_MARGIN - 10;
+      activations.push(open);
+    }
+  }
+  delete activations._stacks;
+
+  // Render order: lifelines → frames (deepest first, so outer overlay
+  // doesn't cover inner) → activations → messages → notes → actor
+  // headers (top so they overlay lifelines cleanly).
+
+  const lifelines = ir.actors.map(a => `<line x1="${cols[a.id].cx}" y1="${TOP_MARGIN + ACTOR_H + 4}" ` + `x2="${cols[a.id].cx}" y2="${totalH - BOTTOM_MARGIN}" ` + `stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="5 4"/>`).join('');
+  const frames = renderFrames(ir.events, cols);
+  const activationBars = activations.map(a => {
+    const x = cols[a.actor].cx - 5;
+    const h = Math.max(8, a.endY - a.startY);
+    return `<rect x="${x}" y="${a.startY}" width="10" height="${h}" ` + `fill="#e2e8f0" stroke="#94a3b8" stroke-width="1" rx="1"/>`;
+  }).join('');
+  const messages = renderMessages(ir.events, cols);
+  const notes = renderNotes(ir.events, cols, colW);
+
+  // Top header boxes / actor figures.
+  const actorHeads = ir.actors.map(a => {
+    const c = cols[a.id];
+    if (a.kind === 'actor') {
+      // Stick-figure: head + body. Vertically centered in ACTOR_H.
+      const cx = c.cx,
+        cy = TOP_MARGIN + ACTOR_H / 2;
+      return `
+        <g data-actor-id="${esc(a.id)}">
+          <circle cx="${cx}" cy="${cy - 12}" r="6" fill="#fff" stroke="#475569" stroke-width="1.5"/>
+          <path d="M ${cx} ${cy - 6} V ${cy + 4} M ${cx - 8} ${cy} H ${cx + 8} M ${cx} ${cy + 4} L ${cx - 6} ${cy + 14} M ${cx} ${cy + 4} L ${cx + 6} ${cy + 14}" stroke="#475569" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <text x="${cx}" y="${TOP_MARGIN + ACTOR_H + 18}" text-anchor="middle"
+                font-family="Inter Tight" font-weight="600" font-size="13" fill="#0f172a">${esc(a.label)}</text>
+        </g>`;
+    }
+    return `
+      <g data-actor-id="${esc(a.id)}">
+        <rect x="${c.left}" y="${TOP_MARGIN}" width="${colW}" height="${ACTOR_H}" rx="6"
+              fill="#fff" stroke="#cbd5e1" stroke-width="1.2"/>
+        <text x="${c.cx}" y="${TOP_MARGIN + ACTOR_H / 2 + 5}" text-anchor="middle"
+              font-family="Inter Tight" font-weight="600" font-size="13" fill="#0f172a">${esc(a.label)}</text>
+      </g>`;
+  }).join('');
+  const title = ir.title ? `<title>${esc(ir.title)}</title>` : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 ${totalW} ${totalH}"
+    width="100%" height="100%"
+    preserveAspectRatio="xMidYMid meet"
+    role="img" aria-roledescription="sequence diagram"
+    style="display:block;background:#fbf7ec;font-family:Inter Tight,sans-serif">
+    ${title}
+    <defs>
+      <marker id="seq-arrow"   markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+        <path d="M0 0 L9 3 L0 6 Z" fill="#0f172a"/>
+      </marker>
+      <marker id="seq-arrow-o" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+        <path d="M0 0 L9 3 L0 6" fill="none" stroke="#0f172a" stroke-width="1.2"/>
+      </marker>
+    </defs>
+    ${lifelines}
+    ${frames}
+    ${activationBars}
+    ${messages}
+    ${notes}
+    ${actorHeads}
+  </svg>`;
+}
+function renderMessages(events, cols) {
+  const out = [];
+  for (const ev of events) {
+    if (ev.kind === 'message') {
+      out.push(renderMessage(ev, cols));
+    } else if (ev.kind === 'frame') {
+      if (ev.frame === 'loop' || ev.frame === 'opt') {
+        out.push(renderMessages(ev.body, cols));
+      } else {
+        for (const b of ev.branches) out.push(renderMessages(b.body, cols));
+      }
+    }
+  }
+  return out.join('');
+}
+function renderMessage(m, cols) {
+  const from = cols[m.from],
+    to = cols[m.to];
+  if (!from || !to) return '';
+  const dashed = m.arrow === 'reply' || m.arrow === 'lostDashed';
+  const lost = m.arrow === 'lost' || m.arrow === 'lostDashed';
+  const stroke = '#0f172a';
+  const dash = dashed ? '6 4' : undefined;
+  const sw = 1.4;
+  if (m.from === m.to) {
+    // Self-message: arc 24px to the right then back.
+    const x = from.cx;
+    const y0 = m.y;
+    const y1 = m.y + 22;
+    const path = `M ${x} ${y0} C ${x + 60} ${y0}, ${x + 60} ${y1}, ${x + 6} ${y1}`;
+    return `
+      <g data-message-id="${esc(m.id)}">
+        <path d="${path}" fill="none" stroke="${stroke}" stroke-width="${sw}"
+              ${dash ? `stroke-dasharray="${dash}"` : ''}
+              marker-end="url(#${dashed ? 'seq-arrow-o' : 'seq-arrow'})"/>
+        ${m.label ? `<text x="${x + 14}" y="${y0 - 4}" font-size="11.5" fill="${stroke}" font-family="Inter Tight">${esc(m.label)}</text>` : ''}
+      </g>`;
+  }
+  const x1 = from.cx;
+  const x2 = to.cx;
+  const direction = x2 > x1 ? 1 : -1;
+  const endX = x2 - direction * 6;
+  const labelMid = (x1 + x2) / 2;
+  const labelY = m.y - 6;
+  return `
+    <g data-message-id="${esc(m.id)}">
+      <line x1="${x1}" y1="${m.y}" x2="${endX}" y2="${m.y}"
+            stroke="${stroke}" stroke-width="${sw}" ${dash ? `stroke-dasharray="${dash}"` : ''}
+            marker-end="url(#${dashed ? 'seq-arrow-o' : 'seq-arrow'})"/>
+      ${lost ? `<text x="${endX}" y="${m.y + 4}" font-size="14" font-weight="700" fill="#c0392b">×</text>` : ''}
+      ${m.label ? `<text x="${labelMid}" y="${labelY}" text-anchor="middle" font-size="11.5"
+                          fill="${stroke}" font-family="Inter Tight">${esc(m.label)}</text>` : ''}
+    </g>`;
+}
+function renderNotes(events, cols, colW) {
+  const out = [];
+  for (const ev of events) {
+    if (ev.kind === 'note') {
+      out.push(renderNote(ev, cols, colW));
+    } else if (ev.kind === 'frame') {
+      if (ev.frame === 'loop' || ev.frame === 'opt') {
+        out.push(renderNotes(ev.body, cols, colW));
+      } else {
+        for (const b of ev.branches) out.push(renderNotes(b.body, cols, colW));
+      }
+    }
+  }
+  return out.join('');
+}
+function renderNote(n, cols, colW) {
+  let x, w;
+  if (n.placement === 'over') {
+    const a = cols[n.actors[0]];
+    const b = n.actors[1] ? cols[n.actors[1]] : null;
+    if (b) {
+      const left = Math.min(a.cx, b.cx) - colW / 4;
+      const right = Math.max(a.cx, b.cx) + colW / 4;
+      x = left;
+      w = right - left;
+    } else {
+      x = a.cx - colW / 3;
+      w = colW / 3 * 2;
+    }
+  } else if (n.placement === 'leftOf') {
+    const a = cols[n.actors[0]];
+    w = colW * 0.7;
+    x = a.cx - w - 16;
+  } else {
+    const a = cols[n.actors[0]];
+    w = colW * 0.7;
+    x = a.cx + 16;
+  }
+  const y = n.y - NOTE_PAD_Y;
+  const h = 26 + NOTE_PAD_Y;
+  return `
+    <g data-note-id="${esc(n.id)}">
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3"
+            fill="#fef9c3" stroke="#facc15" stroke-width="1"/>
+      <text x="${x + w / 2}" y="${y + h / 2 + 4}" text-anchor="middle"
+            font-size="11.5" font-family="Inter Tight" fill="#3b2a06">${esc(n.text)}</text>
+    </g>`;
+}
+function renderFrames(events, cols, colW) {
+  const out = [];
+  const actorIds = Object.keys(cols);
+  if (actorIds.length === 0) return '';
+  const leftX = Math.min(...actorIds.map(id => cols[id].left));
+  const rightX = Math.max(...actorIds.map(id => cols[id].right));
+  walkForFrames(events, leftX, rightX, out);
+  return out.join('');
+}
+function walkForFrames(events, leftX, rightX, out, depth = 0) {
+  for (const ev of events) {
+    if (ev.kind === 'frame') {
+      const x = leftX - 4 - depth * 2;
+      const w = rightX - leftX + 8 + depth * 4;
+      const y = ev.headerY;
+      const h = ev.endY - ev.headerY;
+      const labelText = ev.frame === 'alt' || ev.frame === 'par' ? `${ev.frame} ${ev.branches[0].label || ''}` : `${ev.frame} ${ev.label || ''}`;
+      out.push(`
+        <g data-frame-kind="${ev.frame}">
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3"
+                fill="none" stroke="#94a3b8" stroke-width="1"/>
+          <rect x="${x}" y="${y}" width="${Math.min(80, w - 4)}" height="18" rx="2"
+                fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+          <text x="${x + 8}" y="${y + 13}" font-size="10.5" font-weight="700"
+                font-family="JetBrains Mono" fill="#1e293b">${esc(labelText)}</text>
+        </g>`);
+      // Dividers for alt/par.
+      if (ev.frame === 'alt' || ev.frame === 'par') {
+        for (let b = 1; b < ev.branches.length; b++) {
+          const dy = ev.branches[b].dividerY;
+          out.push(`
+            <line x1="${x + 2}" y1="${dy - 6}" x2="${x + w - 2}" y2="${dy - 6}"
+                  stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="${x + 8}" y="${dy + 4}" font-size="10.5" font-weight="700"
+                  font-family="JetBrains Mono" fill="#1e293b">${esc(ev.branches[b].label || '')}</text>`);
+        }
+      }
+      // Recurse into branches/body to render nested frames.
+      if (ev.frame === 'loop' || ev.frame === 'opt') {
+        walkForFrames(ev.body, leftX, rightX, out, depth + 1);
+      } else {
+        for (const b of ev.branches) walkForFrames(b.body, leftX, rightX, out, depth + 1);
+      }
+    }
+  }
+}
+
+// ── REGISTER ────────────────────────────────────────────────
+
+registerType('sequence', {
+  name: 'sequence',
+  parse: parseSequenceDSL,
+  renderSVG: renderSequence
+});
+
 registerElement();
 
 exports.BUILTIN_STYLES = BUILTIN_STYLES;
@@ -9566,19 +10917,26 @@ exports.SleekStyle = SleekStyle;
 exports.downloadPNG = downloadPNG;
 exports.downloadSVG = downloadSVG;
 exports.edgeMidpoint = edgeMidpoint;
+exports.getIcon = getIcon;
 exports.getStyle = getStyle;
+exports.getType = getType;
 exports.graphToDSL = graphToDSL;
+exports.hasType = hasType;
+exports.listIcons = listIcons;
 exports.listStyles = listStyles;
+exports.listTypes = listTypes;
 exports.mount = mount;
 exports.parseDSL = parseDSL;
 exports.pathFromPoints = pathFromPoints;
 exports.registerElement = registerElement;
 exports.registerStyle = registerStyle;
+exports.registerType = registerType;
 exports.renderSVG = renderSVG;
 exports.resolveGraph = resolveGraph;
 exports.roughPath = roughPath;
 exports.routeEdge = routeEdge;
 exports.shapeAnchor = shapeAnchor;
 exports.shapePath = shapePath;
+exports.sniffType = sniffType;
 exports.svgToString = svgToString;
 //# sourceMappingURL=index.cjs.map

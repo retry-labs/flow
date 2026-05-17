@@ -1,8 +1,4 @@
-export function renderSVG(graphInput: any, { styleName, activeNodes, activeEdges, padding, width, height, }?: {
-    activeNodes?: any[];
-    activeEdges?: any[];
-    padding?: number;
-}): string;
+export function renderSVG(graphInput: any, opts?: {}): any;
 export default renderSVG;
 export namespace SVG_STYLES {
     namespace sleek {

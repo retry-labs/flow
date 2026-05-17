@@ -9,6 +9,11 @@ export { mount } from './viewport.js';
 export { Diagram } from './diagram-component.jsx';
 export { RLFlow } from './wrappers/react.jsx';
 export { RLFlowElement, registerElement } from './element.js';
+export { registerType, getType, listTypes, hasType, sniffType } from './types.js';
+export { getIcon, listIcons } from './icons.js';
+
+// Side-import diagram-type plugins to self-register them.
+import './types/sequence.js';
 
 // Auto-register <rl-flow> when imported in a browser. Safe in SSR
 // (typeof customElements !== 'undefined' short-circuits).
