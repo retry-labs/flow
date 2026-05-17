@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Flow — Architecture diagrams in plain text</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="description" content="Zero-dependency SVG diagram renderer with 5 styles (sleek, sketch, iso, blueprint, city). Works in React, Vue, Angular, or plain HTML."/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1814;
+    --ink-2: #3a362d;
+    --muted: #7a7060;
+    --line: #e4decd;
+    --line-2: #d5cdb4;
+    --bg: #fbf7ec;
+    --paper: #ffffff;
+    --accent: #f5c518;
+    --accent-2: #ffb020;
+    --term-bg: #141210;
+    --term-ink: #f1efe6;
+    --term-muted: #8a7f6b;
+    --term-key: #f5c518;
+    --term-str: #9eccff;
+    --term-num: #c0c0a8;
+    --term-cmt: #6f6a5d;
+    --term-tok: #ffb020;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  a { color: var(--ink); }
+
+  /* ── Nav ─────────────────────────────────────────── */
+  /* At rest the nav is part of the page — transparent, no border.
+     Once the user scrolls, .nav.scrolled (toggled in JS at the bottom of the
+     body) adds the translucent backdrop + blur so it reads as a sticky bar. */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 40px;
+    background: transparent;
+    border-bottom: 1px solid transparent;
+    transition: background .2s ease, border-color .2s ease, backdrop-filter .2s ease;
+  }
+  .nav.scrolled {
+    background: rgba(251, 247, 236, 0.85);
+    backdrop-filter: saturate(140%) blur(8px);
+    border-bottom-color: var(--line);
+  }
+  .nav .brand {
+    font-weight: 700; font-size: 17px; letter-spacing: -0.01em;
+    display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none;
+  }
+  .nav .brand .logo {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--ink); color: var(--accent);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 12px;
+  }
+  .nav .links { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  .nav .links a {
+    text-decoration: none; color: var(--ink-2);
+    font-size: 13.5px; font-weight: 500;
+    padding: 7px 12px; border-radius: 8px;
+    transition: background .15s;
+  }
+  .nav .links a:hover { background: rgba(0,0,0,.04); color: var(--ink); }
+  .nav .links a.cta {
+    background: var(--ink); color: var(--paper);
+    font-family: "JetBrains Mono", monospace; font-size: 12px;
+    padding: 7px 14px;
+  }
+  .nav .links a.cta:hover { background: #000; color: var(--accent); }
+
+  /* ── Hero ─────────────────────────────────────── */
+  .hero {
+    padding: 70px 40px 48px;
+    max-width: 1240px; margin: 0 auto;
+    display: grid; gap: 48px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 960px) {
+    .hero { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: center; }
+  }
+  .hero .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: "JetBrains Mono", monospace; font-size: 11.5px;
+    background: var(--paper); border: 1px solid var(--line);
+    padding: 5px 10px; border-radius: 999px;
+    color: var(--muted); margin-bottom: 18px;
+  }
+  .hero .pill b { color: var(--ink); font-weight: 600; }
+  .hero .pill .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #4ade80;
+    box-shadow: 0 0 0 3px rgba(74,222,128,.18);
+  }
+  .hero h1 {
+    font-size: clamp(36px, 5.5vw, 62px);
+    font-weight: 600; letter-spacing: -0.035em;
+    margin: 0 0 18px; line-height: 1.03;
+  }
+  .hero h1 em {
+    font-family: "Instrument Serif", serif;
+    font-style: italic; font-weight: 400;
+    color: var(--ink-2);
+  }
+  .hero .lede {
+    font-size: 17px; color: var(--muted); max-width: 520px;
+    margin: 0 0 28px; line-height: 1.55;
+  }
+  .hero .lede code {
+    background: #f1ead3; padding: 1px 6px; border-radius: 4px;
+    font-family: "JetBrains Mono", monospace; font-size: 13.5px;
+    color: var(--ink);
+  }
+  .hero .ctas { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 18px; border-radius: 10px;
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    text-decoration: none; cursor: pointer; border: 1px solid transparent;
+    transition: transform .1s, background .15s, border-color .15s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--ink); color: var(--paper); }
+  .btn-primary:hover { background: #000; color: var(--accent); }
+  .btn-ghost { background: var(--paper); color: var(--ink); border-color: var(--line-2); }
+  .btn-ghost:hover { border-color: var(--ink); }
+  .hero .meta {
+    margin-top: 22px; display: flex; gap: 18px; flex-wrap: wrap;
+    font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--muted);
+  }
+  .hero .meta b { color: var(--ink); font-weight: 600; }
+
+  .hero-visual {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 24px 60px -32px rgba(0,0,0,.2);
+    overflow: hidden;
+  }
+  .hero-visual .chrome {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    background: #faf6e8;
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    color: var(--muted);
+  }
+  .hero-visual .chrome .dots { display: inline-flex; gap: 5px; margin-right: 6px; }
+  .hero-visual .chrome .dots i {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--line-2);
+  }
+  .hero-visual .stage { background: #fff; }
+  .hero-visual .stage svg { display: block; width: 100%; height: auto; }
+  .hero-visual .caption {
+    border-top: 1px solid var(--line);
+    padding: 10px 14px;
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .hero-visual .caption b { color: var(--ink); font-weight: 600; }
+
+  /* ── Section wrapper ───────────────────────────── */
+  section.band {
+    padding: 72px 40px;
+    border-top: 1px solid var(--line);
+  }
+  section.band.alt { background: var(--paper); }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  .section-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 24px; margin-bottom: 32px; flex-wrap: wrap;
+  }
+  .section-head .eyebrow {
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-2); font-weight: 600;
+  }
+  .section-head h2 {
+    margin: 6px 0 0; font-size: 32px; font-weight: 600;
+    letter-spacing: -0.02em; line-height: 1.1;
+  }
+  .section-head h2 + p {
+    margin: 12px 0 0; color: var(--muted); font-size: 15px; max-width: 640px;
+  }
+  .section-head .link {
+    font-family: "JetBrains Mono", monospace; font-size: 12px;
+    text-decoration: none; color: var(--ink-2);
+    border-bottom: 1px solid var(--line-2);
+    padding-bottom: 2px;
+  }
+  .section-head .link:hover { color: var(--ink); border-color: var(--ink); }
+
+  /* ── Feature cards ─────────────────────────────── */
+  .features {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  .feat {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px;
+  }
+  .feat .ico {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: #fff6d6; color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-bottom: 14px; border: 1px solid #f0e19a;
+  }
+  .feat h3 { margin: 0 0 6px; font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; }
+  .feat p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+
+  /* ── Install / framework tabs ──────────────────── */
+  .install-card {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 16px 40px -24px rgba(0,0,0,.14);
+  }
+  .install-card .tabs {
+    display: flex; gap: 2px; padding: 8px 8px 0;
+    border-bottom: 1px solid var(--line);
+    background: #faf6e8;
+  }
+  .install-card .tab {
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    padding: 10px 16px; border: 0; background: transparent; color: var(--muted);
+    border-radius: 8px 8px 0 0; cursor: pointer; position: relative;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .install-card .tab .icn {
+    width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .install-card .tab:hover { color: var(--ink); }
+  .install-card .tab.active {
+    background: var(--paper); color: var(--ink); font-weight: 600;
+    border: 1px solid var(--line); border-bottom-color: var(--paper); margin-bottom: -1px;
+  }
+  .install-card .panels { padding: 22px 26px 26px; display: grid; gap: 18px; }
+  .install-card .panel { display: none; }
+  .install-card .panel.active { display: grid; gap: 18px; }
+  .install-card h4 {
+    margin: 0; font-size: 13px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+  }
+
+  /* ── Terminal-style code block ─────────────────── */
+  .term {
+    background: var(--term-bg); color: var(--term-ink);
+    border-radius: 12px; overflow: hidden;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px -16px rgba(0,0,0,.35);
+    font-family: "JetBrains Mono", monospace; font-size: 13px;
+  }
+  .term .bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: #1d1a16; border-bottom: 1px solid #2a2620;
+    color: var(--term-muted); font-size: 11px;
+  }
+  .term .bar .dots { display: inline-flex; gap: 5px; margin-right: 6px; }
+  .term .bar .dots i { width: 9px; height: 9px; border-radius: 50%; background: #3a342a; }
+  .term .bar .spacer { flex: 1; }
+  .term .bar .copy {
+    border: 1px solid #2e2923; background: transparent; color: var(--term-muted);
+    font-family: inherit; font-size: 11px; padding: 3px 9px; border-radius: 6px;
+    cursor: pointer; transition: all .15s;
+  }
+  .term .bar .copy:hover { color: var(--term-ink); border-color: #4d4537; }
+  .term pre {
+    margin: 0; padding: 16px 18px; line-height: 1.65;
+    white-space: pre; overflow: auto; max-height: 380px;
+  }
+  .term pre .prompt { color: #4ade80; user-select: none; }
+  .term pre .cmd    { color: var(--term-ink); }
+  .term pre .key    { color: var(--term-key); }
+  .term pre .str    { color: var(--term-str); }
+  .term pre .num    { color: var(--term-num); }
+  .term pre .cmt    { color: var(--term-cmt); font-style: italic; }
+  .term pre .tok    { color: var(--term-tok); }
+  .term pre .pkg    { color: #c5f18a; }
+
+  /* ── Example (DSL → diagram) ───────────────────── */
+  .example {
+    display: grid; gap: 20px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 880px) {
+    .example { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: stretch; }
+  }
+  .example .term { height: 100%; }
+  .example .render {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .example .render .bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line); background: #faf6e8;
+    font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted);
+  }
+  .example .render .bar b { color: var(--ink); font-weight: 600; }
+  .example .render .bar select {
+    font-family: inherit; font-size: 11px;
+    background: #fff; border: 1px solid var(--line-2);
+    border-radius: 6px; padding: 3px 8px; color: var(--ink);
+    cursor: pointer; margin-left: auto;
+  }
+  .example .render .stage { flex: 1; background: #fff; padding: 8px; }
+  .example .render .stage svg { display: block; width: 100%; height: auto; }
+
+  /* ── Quick links ───────────────────────────────── */
+  .quick-links {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  .ql {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px;
+    text-decoration: none; color: inherit;
+    transition: border-color .15s, transform .1s;
+  }
+  .ql:hover { border-color: var(--ink); }
+  .ql h3 {
+    margin: 0 0 6px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ql h3 span { color: var(--muted); font-weight: 400; }
+  .ql p { margin: 0; color: var(--muted); font-size: 13.5px; }
+
+  /* ── Footer ────────────────────────────────────── */
+  footer {
+    padding: 40px 40px 60px;
+    border-top: 1px solid var(--line);
+    font-family: "JetBrains Mono", monospace; font-size: 12px;
+    color: var(--muted);
+    display: flex; gap: 18px; flex-wrap: wrap;
+    align-items: center; justify-content: space-between;
+    max-width: 1240px; margin: 0 auto;
+  }
+  footer .links { display: flex; gap: 16px; }
+  footer a { text-decoration: none; color: inherit; }
+  footer a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="brand" href="./index.html">
+    <span class="logo">F</span> Flow
+  </a>
+  <div class="links">
+    <a href="./index.html" class="active">Home</a>
+    <a href="./showcase.html">Showcase</a>
+    <a href="./editor.html">Editor</a>
+    <a href="./docs.html">Docs</a>
+    <a class="cta" href="https://github.com/retry-labs/flow" target="_blank" rel="noopener">★ GitHub</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div>
+    <span class="pill"><span class="dot"></span><b>v0.1</b> · zero-dependency SVG renderer</span>
+    <h1>Architecture diagrams <em>in plain text.</em></h1>
+    <p class="lede">
+      A YAML-ish DSL compiles to crisp SVG in <b>five</b> rendering styles — <code>sleek</code>,
+      <code>sketch</code>, <code>iso</code>, <code>blueprint</code>, and isometric <code>city</code>.
+      Drop it into React, Vue, Angular, or a single <code>&lt;script&gt;</code> tag.
+    </p>
+    <div class="ctas">
+      <a class="btn btn-primary" href="#install">Get started</a>
+      <a class="btn btn-ghost" href="./showcase.html">See showcase →</a>
+    </div>
+    <div class="meta">
+      <span>Size: <b>~65 KB</b> standalone</span>
+      <span>Deps: <b>0</b></span>
+      <span>License: <b>MIT</b></span>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="chrome">
+      <span class="dots"><i></i><i></i><i></i></span>
+      <span id="hero-chrome-title">flow — hero.flow</span>
+      <span style="margin-left:auto">style: <b id="hero-chrome-style">sleek</b></span>
+    </div>
+    <div class="stage" id="hero-stage"></div>
+    <div class="caption">
+      <span id="hero-step-title">▶ playing —</span>
+      <b id="hero-step-label">Client request</b>
+      <span style="margin-left:auto">step <b id="hero-step-idx">1/5</b></span>
+    </div>
+  </div>
+</header>
+
+<section class="band alt">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Why Flow</div>
+        <h2>Small, sharp, and framework-agnostic.</h2>
+        <p>Designed for docs sites, README hero images, Storybook stories, runbooks, and live-updating system dashboards.</p>
+      </div>
+    </div>
+    <div class="features">
+      <div class="feat">
+        <div class="ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
+        </div>
+        <h3>5 built-in styles</h3>
+        <p>Switch between sleek, hand-drawn sketch, isometric, CAD blueprint, and a full 3-D isometric "city" with one prop.</p>
+      </div>
+      <div class="feat">
+        <div class="ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
+        </div>
+        <h3>Smart auto-layout</h3>
+        <p>Skip the <code>x</code>/<code>y</code> coordinates — Flow lays nodes out left-to-right by longest path. Override only when you want.</p>
+      </div>
+      <div class="feat">
+        <div class="ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6 4 4 8-8"/><path d="M14 7h6v6"/></svg>
+        </div>
+        <h3>Playback steps</h3>
+        <p>Narrate flows step-by-step. Built-in active-node glow and edge animations make runbooks feel live.</p>
+      </div>
+      <div class="feat">
+        <div class="ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+        </div>
+        <h3>Runs anywhere</h3>
+        <p>React component, Vue component, Angular web-component, or a plain <code>renderSVG()</code> call. SSR-safe.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="install">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Get started</div>
+        <h2>Install in your framework.</h2>
+        <p>Pick your stack below. Each tab shows the exact commands and a minimal working snippet.</p>
+      </div>
+      <a class="link" href="./docs.html#api">Full API reference →</a>
+    </div>
+
+    <div class="install-card" id="install-card">
+      <div class="tabs" id="install-tabs">
+        <button class="tab active" data-tab="react"><span class="icn">⚛︎</span>React</button>
+        <button class="tab" data-tab="vue"><span class="icn">V</span>Vue 3</button>
+        <button class="tab" data-tab="angular"><span class="icn">A</span>Angular</button>
+        <button class="tab" data-tab="vanilla"><span class="icn">JS</span>Vanilla / HTML</button>
+        <button class="tab" data-tab="node"><span class="icn">⬢</span>Node.js</button>
+        <button class="tab" data-tab="cdn"><span class="icn">☁︎</span>CDN</button>
+      </div>
+
+      <div class="panels">
+        <!-- React ------------------------------------------------- -->
+        <div class="panel active" data-panel="react">
+          <h4>1. Install</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>zsh<span class="spacer"></span><button class="copy" data-copy="npm install @retry-labs/flow">Copy</button></div>
+<pre><span class="prompt">$</span> <span class="cmd">npm install <span class="pkg">@retry-labs/flow</span></span></pre>
+          </div>
+          <h4>2. Use the component</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>App.jsx<span class="spacer"></span><button class="copy" data-copy="import { RLFlow } from '@retry-labs/flow'&#10;&#10;const dsl = `&#10;nodes:&#10;  - id: client, kind: actor, label: Client&#10;  - id: api, kind: service, label: API&#10;  - id: db, kind: store, label: Postgres&#10;&#10;edges:&#10;  - client -> api, label: HTTPS&#10;  - api -> db, label: query&#10;`&#10;&#10;export default function Arch() {&#10;  return <RLFlow dsl={dsl} style=&quot;sleek&quot; />&#10;}">Copy</button></div>
+<pre><span class="cmt">// Peer deps: react &gt;= 17, react-dom &gt;= 17</span>
+<span class="tok">import</span> { <span class="key">RLFlow</span> } <span class="tok">from</span> <span class="str">'@retry-labs/flow'</span>
+
+<span class="tok">const</span> <span class="key">dsl</span> = <span class="str">`
+nodes:
+  - id: client, kind: actor,   label: Client
+  - id: api,    kind: service, label: API
+  - id: db,     kind: store,   label: Postgres
+
+edges:
+  - client -&gt; api, label: HTTPS
+  - api    -&gt; db,  label: query
+`</span>
+
+<span class="tok">export default function</span> <span class="key">Arch</span>() {
+  <span class="tok">return</span> &lt;<span class="key">RLFlow</span> dsl={dsl} style=<span class="str">"sleek"</span> /&gt;
+}</pre>
+          </div>
+          <p style="margin:0;color:var(--muted);font-size:13px;">
+            Pass a graph object instead of DSL via <code>config={...}</code>. Full prop list in the
+            <a href="./docs.html#api-react" style="color:inherit;border-bottom:1px solid var(--line-2);">API docs</a>.
+          </p>
+        </div>
+
+        <!-- Vue --------------------------------------------------- -->
+        <div class="panel" data-panel="vue">
+          <h4>1. Install</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>zsh<span class="spacer"></span><button class="copy" data-copy="npm install @retry-labs/flow">Copy</button></div>
+<pre><span class="prompt">$</span> <span class="cmd">npm install <span class="pkg">@retry-labs/flow</span></span></pre>
+          </div>
+          <h4>2. Use the component</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>App.vue<span class="spacer"></span><button class="copy" data-copy="&lt;script setup&gt;&#10;import { RLFlow } from '@retry-labs/flow/vue'&#10;&#10;const dsl = `&#10;nodes:&#10;  - id: client, kind: actor,   label: Client&#10;  - id: api,    kind: service, label: API&#10;  - id: db,     kind: store,   label: Postgres&#10;&#10;edges:&#10;  - client -&gt; api, label: HTTPS&#10;  - api    -&gt; db,  label: query&#10;`&#10;&lt;/script&gt;&#10;&#10;&lt;template&gt;&#10;  &lt;RLFlow :dsl=&quot;dsl&quot; style=&quot;sleek&quot; /&gt;&#10;&lt;/template&gt;">Copy</button></div>
+<pre><span class="tok">&lt;script setup&gt;</span>
+<span class="tok">import</span> { <span class="key">RLFlow</span> } <span class="tok">from</span> <span class="str">'@retry-labs/flow/vue'</span>
+
+<span class="tok">const</span> <span class="key">dsl</span> = <span class="str">`
+nodes:
+  - id: client, kind: actor,   label: Client
+  - id: api,    kind: service, label: API
+  - id: db,     kind: store,   label: Postgres
+
+edges:
+  - client -&gt; api, label: HTTPS
+  - api    -&gt; db,  label: query
+`</span>
+<span class="tok">&lt;/script&gt;</span>
+
+<span class="tok">&lt;template&gt;</span>
+  &lt;<span class="key">RLFlow</span> :dsl=<span class="str">"dsl"</span> style=<span class="str">"sleek"</span> /&gt;
+<span class="tok">&lt;/template&gt;</span></pre>
+          </div>
+          <p style="margin:0;color:var(--muted);font-size:13px;">
+            Peer dep: <code>vue &gt;= 3</code>. Emits <code>node-click</code> and <code>edge-click</code> for interactivity.
+          </p>
+        </div>
+
+        <!-- Angular ----------------------------------------------- -->
+        <div class="panel" data-panel="angular">
+          <h4>1. Install</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>zsh<span class="spacer"></span><button class="copy" data-copy="npm install @retry-labs/flow">Copy</button></div>
+<pre><span class="prompt">$</span> <span class="cmd">npm install <span class="pkg">@retry-labs/flow</span></span></pre>
+          </div>
+          <h4>2. Register the custom element</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>main.ts<span class="spacer"></span><button class="copy" data-copy="// Importing the package auto-registers &lt;rl-flow&gt;.&#10;import '@retry-labs/flow'&#10;&#10;// In your AppModule add CUSTOM_ELEMENTS_SCHEMA&#10;import { NgModule, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core'&#10;@NgModule({ schemas: [CUSTOM_ELEMENTS_SCHEMA] }) class AppModule {}">Copy</button></div>
+<pre><span class="cmt">// Register the &lt;rl-flow&gt; custom element once</span>
+<span class="cmt">// Importing the package auto-registers &lt;rl-flow&gt;.</span>
+<span class="tok">import</span> <span class="str">'@retry-labs/flow'</span>
+
+<span class="cmt">// In your AppModule add CUSTOM_ELEMENTS_SCHEMA</span>
+<span class="tok">import</span> { <span class="key">NgModule</span>, <span class="key">CUSTOM_ELEMENTS_SCHEMA</span> } <span class="tok">from</span> <span class="str">'@angular/core'</span>
+<span class="key">@NgModule</span>({ schemas: [<span class="key">CUSTOM_ELEMENTS_SCHEMA</span>] }) <span class="tok">class</span> <span class="key">AppModule</span> {}</pre>
+          </div>
+          <h4>3. Use it in a template</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>app.component.html<span class="spacer"></span><button class="copy" data-copy="&lt;rl-flow&#10;  [attr.dsl]=&quot;dsl&quot;&#10;  diagram-style=&quot;sleek&quot;&#10;  height=&quot;420px&quot;&#10;  (node-click)=&quot;onNode($event)&quot;&gt;&#10;&lt;/rl-flow&gt;">Copy</button></div>
+<pre>&lt;<span class="key">rl-flow</span>
+  [attr.dsl]=<span class="str">"dsl"</span>
+  diagram-style=<span class="str">"sleek"</span>
+  height=<span class="str">"420px"</span>
+  (node-click)=<span class="str">"onNode($event)"</span>&gt;
+&lt;/<span class="key">rl-flow</span>&gt;</pre>
+          </div>
+          <p style="margin:0;color:var(--muted);font-size:13px;">
+            Uses the Web Components bridge — works with any Angular version that supports custom elements.
+          </p>
+        </div>
+
+        <!-- Vanilla ----------------------------------------------- -->
+        <div class="panel" data-panel="vanilla">
+          <h4>1. Drop the bundle in</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>index.html<span class="spacer"></span><button class="copy" data-copy="&lt;!-- Local copy after `npm install @retry-labs/flow` --&gt;&#10;&lt;script src=&quot;./node_modules/@retry-labs/flow/dist/flow.standalone.js&quot;&gt;&lt;/script&gt;&#10;&#10;&lt;div id=&quot;arch&quot; style=&quot;height:420px&quot;&gt;&lt;/div&gt;&#10;&lt;script&gt;&#10;  const dsl = `&#10;nodes:&#10;  - id: client, kind: actor,   label: Client&#10;  - id: api,    kind: service, label: API&#10;  - id: db,     kind: store,   label: Postgres&#10;&#10;edges:&#10;  - client -&gt; api&#10;  - api    -&gt; db&#10;  `&#10;  // mount() gives you zoom / pan / fullscreen / download controls&#10;  const vp = RLFlow.mount('#arch', {&#10;    graph: RLFlow.parseDSL(dsl),&#10;    styleName: 'sleek',&#10;  })&#10;  // vp.setStyle('city'); vp.update({ activeNodes: ['client'] })&#10;&lt;/script&gt;">Copy</button></div>
+<pre><span class="cmt">&lt;!-- Local copy after `npm install @retry-labs/flow` --&gt;</span>
+&lt;<span class="key">script</span> src=<span class="str">"./node_modules/@retry-labs/flow/dist/flow.standalone.js"</span>&gt;&lt;/<span class="key">script</span>&gt;
+
+&lt;<span class="key">div</span> id=<span class="str">"arch"</span> style=<span class="str">"height:420px"</span>&gt;&lt;/<span class="key">div</span>&gt;
+&lt;<span class="key">script</span>&gt;
+  <span class="tok">const</span> dsl = <span class="str">`
+nodes:
+  - id: client, kind: actor,   label: Client
+  - id: api,    kind: service, label: API
+  - id: db,     kind: store,   label: Postgres
+
+edges:
+  - client -&gt; api
+  - api    -&gt; db
+  `</span>
+  <span class="cmt">// mount() gives you zoom / pan / fullscreen / download controls</span>
+  <span class="tok">const</span> vp = <span class="key">RLFlow</span>.<span class="key">mount</span>(<span class="str">'#arch'</span>, {
+    graph: <span class="key">RLFlow</span>.<span class="key">parseDSL</span>(dsl),
+    styleName: <span class="str">'sleek'</span>,
+  })
+  <span class="cmt">// vp.setStyle('city'); vp.update({ activeNodes: ['client'] })</span>
+&lt;/<span class="key">script</span>&gt;</pre>
+          </div>
+          <p style="margin:0;color:var(--muted);font-size:13px;">
+            Prefer the web-component form? <code>&lt;rl-flow dsl="..." diagram-style="city" height="420px"&gt;&lt;/rl-flow&gt;</code> — it
+            wires up the same interactive viewport automatically.
+          </p>
+        </div>
+
+        <!-- Node -------------------------------------------------- -->
+        <div class="panel" data-panel="node">
+          <h4>1. Install</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>zsh<span class="spacer"></span><button class="copy" data-copy="npm install @retry-labs/flow">Copy</button></div>
+<pre><span class="prompt">$</span> <span class="cmd">npm install <span class="pkg">@retry-labs/flow</span></span></pre>
+          </div>
+          <h4>2. Render SVG server-side</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>build-diagrams.mjs<span class="spacer"></span><button class="copy" data-copy="import { writeFileSync } from 'node:fs'&#10;import { parseDSL, renderSVG } from '@retry-labs/flow'&#10;&#10;const dsl = `&#10;nodes:&#10;  - id: client, kind: actor,   label: Client&#10;  - id: api,    kind: service, label: API&#10;  - id: db,     kind: store,   label: Postgres&#10;&#10;edges:&#10;  - client -&gt; api, label: HTTPS&#10;  - api    -&gt; db,  label: query&#10;`&#10;&#10;const svg = renderSVG(parseDSL(dsl), { styleName: 'sleek' })&#10;writeFileSync('docs/architecture.svg', svg)&#10;console.log('wrote docs/architecture.svg')">Copy</button></div>
+<pre><span class="tok">import</span> { <span class="key">writeFileSync</span> } <span class="tok">from</span> <span class="str">'node:fs'</span>
+<span class="tok">import</span> { <span class="key">parseDSL</span>, <span class="key">renderSVG</span> } <span class="tok">from</span> <span class="str">'@retry-labs/flow'</span>
+
+<span class="tok">const</span> dsl = <span class="str">`
+nodes:
+  - id: client, kind: actor,   label: Client
+  - id: api,    kind: service, label: API
+  - id: db,     kind: store,   label: Postgres
+
+edges:
+  - client -&gt; api, label: HTTPS
+  - api    -&gt; db,  label: query
+`</span>
+
+<span class="tok">const</span> svg = <span class="key">renderSVG</span>(<span class="key">parseDSL</span>(dsl), { styleName: <span class="str">'sleek'</span> })
+<span class="key">writeFileSync</span>(<span class="str">'docs/architecture.svg'</span>, svg)
+console.log(<span class="str">'wrote docs/architecture.svg'</span>)</pre>
+          </div>
+          <p style="margin:0;color:var(--muted);font-size:13px;">
+            Generate diagrams at build time for README files, static docs sites, PDF reports, and more.
+          </p>
+        </div>
+
+        <!-- CDN --------------------------------------------------- -->
+        <div class="panel" data-panel="cdn">
+          <h4>Zero-install via unpkg / jsDelivr</h4>
+          <div class="term">
+            <div class="bar"><span class="dots"><i></i><i></i><i></i></span>index.html<span class="spacer"></span><button class="copy" data-copy="&lt;script src=&quot;https://unpkg.com/@retry-labs/flow/dist/flow.standalone.js&quot;&gt;&lt;/script&gt;&#10;&#10;&lt;rl-flow&#10;  diagram-style=&quot;city&quot;&#10;  height=&quot;420px&quot;&#10;  dsl=&quot;&#10;nodes:&#10;  - id: a, kind: service, label: A&#10;  - id: b, kind: store,   label: B&#10;edges:&#10;  - a -&gt; b&#10;&quot;&gt;&#10;&lt;/rl-flow&gt;">Copy</button></div>
+<pre>&lt;<span class="key">script</span> src=<span class="str">"https://unpkg.com/@retry-labs/flow/dist/flow.standalone.js"</span>&gt;&lt;/<span class="key">script</span>&gt;
+
+<span class="cmt">&lt;!-- Web component — comes with the interactive viewport built in. --&gt;</span>
+&lt;<span class="key">rl-flow</span>
+  diagram-style=<span class="str">"city"</span>
+  height=<span class="str">"420px"</span>
+  dsl=<span class="str">"
+nodes:
+  - id: a, kind: service, label: A
+  - id: b, kind: store,   label: B
+edges:
+  - a -&gt; b
+"</span>&gt;
+&lt;/<span class="key">rl-flow</span>&gt;</pre>
+          </div>
+          <p style="margin:0;color:var(--muted);font-size:13px;">
+            Bundle exposes <code>window.RLFlow</code> — no build step required.
+            Pin a specific version with <code>@retry-labs/flow@0.1.0</code>. Listen for <code>node-click</code> /
+            <code>edge-click</code> <code>CustomEvent</code>s on the element.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band alt">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">The DSL in 10 seconds</div>
+        <h2>Write it. Flow lays it out.</h2>
+        <p>No <code>x</code>/<code>y</code> needed — ranks are computed from edges and the canvas sizes itself. Switch the <code>style:</code> directive to re-render the same graph in any of the five styles.</p>
+      </div>
+      <a class="link" href="./docs.html#dsl">DSL reference →</a>
+    </div>
+
+    <div class="example">
+      <div class="term">
+        <div class="bar">
+          <span class="dots"><i></i><i></i><i></i></span>hero.flow
+          <span class="spacer"></span>
+          <button class="copy" data-copy-el="example-dsl">Copy</button>
+        </div>
+<pre id="example-dsl"><span class="cmt"># A minimal, clean DSL — auto-layout handles the rest.</span>
+<span class="key">style</span>: sleek
+
+<span class="key">nodes</span>:
+  - <span class="key">id</span>: client,  <span class="key">kind</span>: actor,   <span class="key">label</span>: Client
+  - <span class="key">id</span>: gateway, <span class="key">kind</span>: gateway, <span class="key">label</span>: <span class="str">"API Gateway"</span>
+  - <span class="key">id</span>: orders,  <span class="key">kind</span>: service, <span class="key">label</span>: Orders
+  - <span class="key">id</span>: cache,   <span class="key">kind</span>: cache,   <span class="key">label</span>: Redis
+  - <span class="key">id</span>: db,      <span class="key">kind</span>: store,   <span class="key">label</span>: Postgres
+
+<span class="key">edges</span>:
+  - client  -&gt; gateway, <span class="key">label</span>: <span class="str">"HTTPS"</span>
+  - gateway -&gt; orders,  <span class="key">label</span>: <span class="str">"POST /order"</span>
+  - orders ..&gt; cache,   <span class="key">label</span>: <span class="str">"read"</span>
+  - orders  -&gt; db,      <span class="key">label</span>: <span class="str">"write"</span></pre>
+      </div>
+      <div class="render">
+        <div class="bar">
+          <b>Live preview</b>
+          <select id="example-style">
+            <option value="sleek">sleek</option>
+            <option value="sketch">sketch</option>
+            <option value="iso">iso</option>
+            <option value="blueprint">blueprint</option>
+            <option value="city">city</option>
+          </select>
+        </div>
+        <div class="stage" id="example-stage"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Keep exploring</div>
+        <h2>Where to next.</h2>
+      </div>
+    </div>
+    <div class="quick-links">
+      <a class="ql" href="./showcase.html">
+        <h3>Showcase gallery <span>→</span></h3>
+        <p>Eight real-world architecture diagrams — microservices, pub/sub, CDN, realtime streaming, and more.</p>
+      </a>
+      <a class="ql" href="./docs.html">
+        <h3>Documentation <span>→</span></h3>
+        <p>Node & edge kinds, DSL grammar, playback steps, styling tokens, and the full JavaScript API.</p>
+      </a>
+      <a class="ql" href="./examples/standalone-test.html">
+        <h3>Visual audit <span>→</span></h3>
+        <p>Every node kind × every style on one page — useful when debugging rendering regressions.</p>
+      </a>
+      <a class="ql" href="https://github.com/retry-labs/flow" target="_blank" rel="noopener">
+        <h3>GitHub <span>↗</span></h3>
+        <p>Report issues, submit PRs, or star the repo. MIT-licensed — use it anywhere.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>© 2026 Flow · MIT License · v0.1</div>
+  <div class="links">
+    <a href="./index.html">Home</a>
+    <a href="./showcase.html">Showcase</a>
+    <a href="./editor.html">Editor</a>
+    <a href="./docs.html">Docs</a>
+    <a href="https://github.com/retry-labs/flow" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+
+<script>
+  // Scroll-aware nav: transparent at the top of the page, chromed once scrolled.
+  (function () {
+    const nav = document.querySelector('.nav');
+    if (!nav) return;
+    const update = () => nav.classList.toggle('scrolled', window.scrollY > 4);
+    addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+</script>
+<script src="./dist/flow.standalone.js?v=3"></script>
+<script>
+(function () {
+  const FD = window.RLFlow;
+  if (!FD) {
+    console.error('RLFlow bundle failed to load from ./dist/flow.standalone.js');
+    return;
+  }
+  // Fallback for stale bundles that don't ship mount() yet — still
+  // renders a static diagram instead of silently blanking the page.
+  if (typeof FD.mount !== 'function') {
+    console.warn('RLFlow.mount missing (stale bundle?) — falling back to static SVG. Hard-refresh to get interactive controls.');
+    FD.mount = function (target, opts) {
+      const el = typeof target === 'string' ? document.querySelector(target) : target;
+      if (!el) return { setStyle(){}, setActive(){}, update(){}, destroy(){} };
+      var graph = opts.graph;
+      var state = { styleName: opts.styleName || 'sleek', activeNodes: opts.activeNodes || [], activeEdges: opts.activeEdges || [] };
+      function paint(){ el.innerHTML = FD.renderSVG(graph, state); }
+      paint();
+      return {
+        setStyle: function (s) { state.styleName = s; paint(); },
+        setActive: function (n, e) { state.activeNodes = n || []; state.activeEdges = e || []; paint(); },
+        update: function (next) { Object.assign(state, next || {}); if (next && next.graph) graph = next.graph; paint(); },
+        destroy: function () { el.innerHTML = ''; },
+        setZoom: function(){}, resetView: function(){}, toggleFullscreen: function(){}, download: function(){},
+      };
+    };
+  }
+
+  // ── Hero: looping playback diagram ─────────────────────
+  const HERO = {
+    canvas: { w: 980, h: 440 },
+    nodes: [
+      { id:'client',    kind:'actor',   label:'Client',      x: 40,  y:180, w:150, h:80 },
+      { id:'gateway',   kind:'gateway', label:'API Gateway', x:230, y:180, w:170, h:80, sub:'auth · rate-limit' },
+      { id:'orders',    kind:'service', label:'Orders',      x:450, y: 60, w:160, h:80, sub:'v4.2.1' },
+      { id:'inventory', kind:'service', label:'Inventory',   x:450, y:300, w:160, h:80, sub:'v2.8.0' },
+      { id:'redis',     kind:'cache',   label:'Redis',       x:660, y: 60, w:140, h:80 },
+      { id:'kafka',     kind:'queue',   label:'Events',      x:660, y:180, w:140, h:80, sub:'kafka' },
+      { id:'postgres',  kind:'store',   label:'Postgres',    x:660, y:320, w:140, h:80 },
+      { id:'audit',     kind:'service', label:'Audit',       x:840, y:180, w:120, h:80, sub:'consumer' },
+    ],
+    edges: [
+      { id:'e1', from:'client',    to:'gateway',   kind:'solid',  label:'HTTPS' },
+      { id:'e2', from:'gateway',   to:'orders',    kind:'solid',  label:'POST /order' },
+      { id:'e3', from:'gateway',   to:'inventory', kind:'solid',  label:'GET /stock' },
+      { id:'e4', from:'orders',    to:'redis',     kind:'dashed', label:'read' },
+      { id:'e5', from:'orders',    to:'kafka',     kind:'solid',  label:'publish' },
+      { id:'e6', from:'inventory', to:'postgres',  kind:'solid',  label:'query' },
+      { id:'e7', from:'kafka',     to:'audit',     kind:'dashed', label:'consume' },
+    ],
+    steps: [
+      { id:'s1', title:'Client request',  active:{ nodes:['client','gateway'],                       edges:['e1'] } },
+      { id:'s2', title:'Gateway fan-out', active:{ nodes:['gateway','orders','inventory'],           edges:['e2','e3'] } },
+      { id:'s3', title:'Read stores',     active:{ nodes:['orders','inventory','redis','postgres'],  edges:['e4','e6'] } },
+      { id:'s4', title:'Publish event',   active:{ nodes:['orders','kafka'],                         edges:['e5'] } },
+      { id:'s5', title:'Audit consumes',  active:{ nodes:['kafka','audit'],                          edges:['e7'] } },
+    ],
+  };
+
+  const heroStage = document.getElementById('hero-stage');
+  heroStage.style.height = '420px';
+  const heroStepLabel = document.getElementById('hero-step-label');
+  const heroStepIdx = document.getElementById('hero-step-idx');
+  const heroChromeStyle = document.getElementById('hero-chrome-style');
+  const HERO_STYLES = ['sleek', 'sketch', 'iso', 'blueprint'];
+  let heroStyleI = 0;
+
+  // The viewport drives the timeline natively — autoplay rotates through
+  // HERO.steps, and onStepChange notifies us so we can also rotate the style
+  // for visual variety. The play/pause/next/prev buttons appear automatically.
+  //
+  // Note: onStepChange fires SYNCHRONOUSLY during mount() with the initial step,
+  // which is before the `heroVp` assignment completes. We therefore:
+  //   1. declare heroVp with `let` (hoisted, no TDZ),
+  //   2. track `prevHeroIdx` so we only rotate styles on a *real* wrap from the
+  //      last step back to 0, not on the first paint or on the initial fire.
+  let heroVp;
+  let prevHeroIdx = -1;
+  heroVp = FD.mount(heroStage, {
+    graph: HERO,
+    styleName: HERO_STYLES[0],
+    autoplay: true,
+    interval: 2200,
+    fileName: 'flow-hero',
+    onStepChange: function (i, step) {
+      // Cycle the style only when the player wraps from the last step → 0.
+      if (heroVp && prevHeroIdx === HERO.steps.length - 1 && i === 0) {
+        heroStyleI = (heroStyleI + 1) % HERO_STYLES.length;
+        heroVp.setStyle(HERO_STYLES[heroStyleI]);
+        heroChromeStyle.textContent = HERO_STYLES[heroStyleI];
+      }
+      prevHeroIdx = i;
+      heroStepLabel.textContent = step.title;
+      heroStepIdx.textContent = (i + 1) + '/' + HERO.steps.length;
+    },
+  });
+  // No manual ticker needed — the viewport handles autoplay. Just wire up
+  // the chrome label on the very first paint so it's not blank for 2.2s.
+  (function primeHero() {
+    const step = HERO.steps[0];
+    const styleName = HERO_STYLES[0];
+    heroStepLabel.textContent = step.title;
+    heroStepIdx.textContent = '1/' + HERO.steps.length;
+    heroChromeStyle.textContent = styleName;
+  })();
+
+  // ── Install tabs ──────────────────────────────────────
+  const tabsEl = document.getElementById('install-tabs');
+  tabsEl.addEventListener('click', function (e) {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    const id = btn.dataset.tab;
+    tabsEl.querySelectorAll('.tab').forEach(function (t) {
+      t.classList.toggle('active', t === btn);
+    });
+    document.querySelectorAll('.install-card .panel').forEach(function (p) {
+      p.classList.toggle('active', p.dataset.panel === id);
+    });
+  });
+
+  // ── Copy buttons ──────────────────────────────────────
+  document.querySelectorAll('button.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      let text = btn.dataset.copy;
+      if (!text && btn.dataset.copyEl) {
+        const el = document.getElementById(btn.dataset.copyEl);
+        if (el) text = el.innerText;
+      }
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function () {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(function () { btn.textContent = orig; }, 1200);
+      });
+    });
+  });
+
+  // ── Live example (DSL → diagram) ──────────────────────
+  const EXAMPLE_DSL = [
+    'style: sleek',
+    '',
+    'nodes:',
+    '  - id: client,  kind: actor,   label: Client',
+    '  - id: gateway, kind: gateway, label: "API Gateway"',
+    '  - id: orders,  kind: service, label: Orders',
+    '  - id: cache,   kind: cache,   label: Redis',
+    '  - id: db,      kind: store,   label: Postgres',
+    '',
+    'edges:',
+    '  - client  -> gateway, label: "HTTPS"',
+    '  - gateway -> orders,  label: "POST /order"',
+    '  - orders ..> cache,   label: "read"',
+    '  - orders  -> db,      label: "write"',
+    ''
+  ].join('\n');
+
+  const exampleStage = document.getElementById('example-stage');
+  // Reserve canvas height so the viewport has somewhere to render.
+  exampleStage.style.height = '380px';
+  const exampleStyle = document.getElementById('example-style');
+  const exampleVp = FD.mount(exampleStage, {
+    graph: FD.parseDSL(EXAMPLE_DSL),
+    styleName: exampleStyle.value,
+    fileName: 'flow-example',
+  });
+  exampleStyle.addEventListener('change', function () {
+    exampleVp.setStyle(exampleStyle.value);
+  });
+})();
+</script>
+
+</body>
+</html>

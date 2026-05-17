@@ -26,10 +26,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
+        working-directory: packages/flow
         run: npm ci
 
       - name: Build library
+        working-directory: packages/flow
         run: npm run build
+
+      - name: Stage library bundle into website/
+        run: |
+          mkdir -p website/dist
+          cp packages/flow/dist/flow.standalone.js website/dist/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -37,7 +44,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: website
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4

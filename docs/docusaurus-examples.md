@@ -4,15 +4,15 @@
 
 import Layout from '@theme/Layout'
 import BrowserOnly from '@docusaurus/BrowserOnly'
-import { FlowDiagram } from 'flow-diagram'
+import { RLFlow } from '@retry-labs/flow'
 
 // Example MDX component for embedding diagrams
-export const FlowDiagramMDX = ({ dsl, config, style = 'sleek', height = '400px' }) => {
+export const RLFlowMDX = ({ dsl, config, style = 'sleek', height = '400px' }) => {
   return (
     <div style={{ margin: '2rem 0', borderRadius: '8px', overflow: 'hidden', border: '1px solid #eaeaea' }}>
       <BrowserOnly>
         {() => (
-          <FlowDiagram
+          <RLFlow
             dsl={dsl}
             config={config}
             style={style}
@@ -71,7 +71,7 @@ edges:
 // Docusaurus plugin configuration
 export const docusaurusConfig = {
   themeConfig: {
-    flowDiagram: {
+    rlFlow: {
       defaultStyle: 'sleek',
       animate: false,
       padding: 20,
@@ -80,4 +80,4 @@ export const docusaurusConfig = {
   }
 }
 
-export default FlowDiagramMDX
+export default RLFlowMDX

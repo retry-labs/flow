@@ -1,8 +1,16 @@
 # Dependencies
 node_modules/
 
-# Build artifacts (keep dist/ as it's built output)
-# Note: dist/ is committed for npm package
+# Local AI-tool state (must never be pushed)
+.claude/
+.cursor/
+.codex/
+.aider/
+.windsurf/
+
+# Build artifacts (keep packages/flow/dist/ — committed for npm package)
+# website/dist/ is staged from the library at deploy time; not committed.
+website/dist/
 
 # Logs
 *.log

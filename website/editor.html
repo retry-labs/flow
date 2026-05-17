@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Flow — Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="description" content="Live DSL editor for the Flow diagram library — write text, see SVG diagrams render instantly across 5 styles."/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1814;
+    --ink-2: #3a362d;
+    --muted: #7a7060;
+    --line: #e4decd;
+    --line-2: #d5cdb4;
+    --bg: #fbf7ec;
+    --paper: #ffffff;
+    --accent: #f5c518;
+    --term-bg: #141210;
+    --term-ink: #f1efe6;
+    --term-key: #f5c518;
+    --term-str: #9eccff;
+    --term-num: #c0c0a8;
+    --term-cmt: #6f6a5d;
+    --err: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink); background: var(--bg);
+    -webkit-font-smoothing: antialiased; line-height: 1.5;
+    height: 100%;
+    display: flex; flex-direction: column;
+  }
+
+  /* ── Nav (shared) ─────────────────────────────────── */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 32px;
+    background: rgba(251, 247, 236, 0.92);
+    backdrop-filter: saturate(140%) blur(8px);
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+  }
+  .nav .brand {
+    font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
+    display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;
+  }
+  .nav .brand .logo {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--ink); color: var(--accent);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 12px;
+  }
+  .nav .links { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  .nav .links a {
+    text-decoration: none; color: var(--ink-2);
+    font-size: 13px; font-weight: 500;
+    padding: 7px 12px; border-radius: 8px;
+    transition: background .15s;
+  }
+  .nav .links a:hover, .nav .links a.active { background: rgba(0,0,0,.04); color: var(--ink); }
+  .nav .links .cta {
+    background: var(--ink); color: #fff;
+    padding: 7px 14px;
+  }
+  .nav .links .cta:hover { background: #2c2823; color: #fff; }
+
+  /* ── Toolbar ──────────────────────────────────────── */
+  .ed-toolbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 32px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+  }
+  .ed-toolbar .label {
+    font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+  .ed-toolbar .chip {
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink-2);
+    padding: 5px 10px; border-radius: 999px; cursor: pointer;
+    transition: all .15s;
+  }
+  .ed-toolbar .chip:hover { border-color: var(--ink); color: var(--ink); }
+  .ed-toolbar .chip.active {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .ed-toolbar select.tpl-select {
+    font-family: inherit; font-size: 12px;
+    background: var(--paper); border: 1px solid var(--line-2);
+    border-radius: 8px; padding: 6px 10px;
+    color: var(--ink); cursor: pointer;
+  }
+  .ed-toolbar .spacer { flex: 1; }
+  .ed-toolbar .btn {
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink-2);
+    font-family: inherit; font-size: 12px; padding: 6px 12px;
+    border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    transition: all .15s;
+  }
+  .ed-toolbar .btn:hover { border-color: var(--ink); color: var(--ink); }
+  .ed-toolbar .btn.primary {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .ed-toolbar .btn.primary:hover { background: #2c2823; }
+
+  /* ── Layout ───────────────────────────────────────── */
+  .ed-main {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: minmax(280px, 1fr) 6px minmax(280px, 1.2fr);
+    overflow: hidden;
+  }
+  @media (max-width: 800px) {
+    .ed-main { grid-template-columns: 1fr; grid-template-rows: 1fr 6px 1fr; }
+    .ed-divider { cursor: row-resize !important; }
+  }
+  .ed-pane {
+    background: var(--paper);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    min-width: 0; min-height: 0;
+  }
+  .ed-pane .pane-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--line);
+    background: #faf6e8;
+    font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted);
+    flex: 0 0 auto;
+  }
+  .ed-pane .pane-head b { color: var(--ink); font-weight: 600; }
+  .ed-pane .pane-body { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+
+  /* ── Editor textarea ─────────────────────────────── */
+  textarea.ed-input {
+    width: 100%; height: 100%;
+    border: none; outline: none; resize: none;
+    padding: 16px 18px;
+    font-family: "JetBrains Mono", monospace; font-size: 13px;
+    line-height: 1.65; color: var(--ink-2); background: var(--term-bg);
+    color: var(--term-ink); tab-size: 2;
+  }
+  textarea.ed-input::placeholder { color: var(--term-cmt); }
+  textarea.ed-input::selection { background: rgba(245, 197, 24, .25); }
+
+  /* ── Preview ─────────────────────────────────────── */
+  .ed-preview { background: #fff; height: 100%; }
+
+  /* ── Status bar / errors ─────────────────────────── */
+  .ed-status {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--line);
+    padding: 8px 32px;
+    background: #faf6e8;
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .ed-status .ok    { color: #16803c; font-weight: 600; }
+  .ed-status .err   { color: var(--err); font-weight: 600; }
+  .ed-status .stat  { display: inline-flex; gap: 4px; }
+  .ed-status .stat b { color: var(--ink); }
+  .ed-status a { color: inherit; }
+
+  /* ── Divider ─────────────────────────────────────── */
+  .ed-divider {
+    background: var(--line);
+    cursor: col-resize;
+    position: relative;
+    transition: background .15s;
+  }
+  .ed-divider:hover { background: var(--line-2); }
+  .ed-divider::before {
+    content: ''; position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px; height: 28px;
+    background: rgba(0,0,0,.18); border-radius: 1px;
+  }
+
+  /* ── Toast ───────────────────────────────────────── */
+  .toast {
+    position: fixed; right: 18px; bottom: 18px;
+    background: var(--ink); color: var(--paper);
+    padding: 10px 14px; border-radius: 10px;
+    font-size: 12px; font-family: "JetBrains Mono", monospace;
+    box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    opacity: 0; transform: translateY(8px); pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="brand" href="./index.html">
+    <span class="logo">F</span> Flow
+  </a>
+  <div class="links">
+    <a href="./index.html">Home</a>
+    <a href="./showcase.html">Showcase</a>
+    <a class="active" href="./editor.html">Editor</a>
+    <a href="./docs.html">Docs</a>
+    <a class="cta" href="https://github.com/retry-labs/flow" target="_blank" rel="noopener">★ GitHub</a>
+  </div>
+</nav>
+
+<div class="ed-toolbar">
+  <span class="label">Style:</span>
+  <div id="style-chips"></div>
+  <span class="label" style="margin-left:14px">Template:</span>
+  <select class="tpl-select" id="tpl-select">
+    <option value="">Choose…</option>
+  </select>
+  <span class="spacer"></span>
+  <button class="btn" id="btn-format" title="Re-emit clean DSL from the parsed graph">Format</button>
+  <button class="btn" id="btn-share" title="Copy a shareable URL with the DSL embedded">Share link</button>
+  <button class="btn" id="btn-download" title="Download the rendered SVG">Download SVG</button>
+  <button class="btn primary" id="btn-fullscreen" title="Open the preview in fullscreen">Fullscreen</button>
+</div>
+
+<main class="ed-main">
+  <section class="ed-pane">
+    <div class="pane-head"><b>DSL</b><span style="margin-left:auto" id="dsl-badge">live</span></div>
+    <div class="pane-body">
+      <textarea
+        id="ed-input"
+        class="ed-input"
+        spellcheck="false"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        wrap="off"
+      ></textarea>
+    </div>
+  </section>
+  <div class="ed-divider" id="ed-divider" aria-label="Drag to resize panes" role="separator" aria-orientation="vertical"></div>
+  <section class="ed-pane">
+    <div class="pane-head"><b>Preview</b><span style="margin-left:auto" id="preview-style">sleek</span></div>
+    <div class="pane-body">
+      <div class="ed-preview" id="ed-preview"></div>
+    </div>
+  </section>
+</main>
+
+<div class="ed-status">
+  <span id="status-msg" class="ok">Ready</span>
+  <span class="stat">nodes: <b id="stat-nodes">0</b></span>
+  <span class="stat">edges: <b id="stat-edges">0</b></span>
+  <span class="stat">steps: <b id="stat-steps">0</b></span>
+  <span style="margin-left:auto">Tip: hover the preview to reveal zoom / fullscreen / download. Press <b>⌘/Ctrl+S</b> to copy the share link.</span>
+</div>
+
+<div class="toast" id="toast">copied</div>
+
+<script src="./dist/flow.standalone.js?v=3"></script>
+<script>
+(function () {
+  const FD = window.RLFlow;
+  if (!FD) {
+    document.getElementById('ed-preview').innerHTML =
+      '<div style="padding:24px;color:#c0392b;font-family:monospace">rl-flow bundle failed to load</div>';
+    return;
+  }
+
+  // ── Templates ───────────────────────────────────────────
+  const TEMPLATES = [
+    { id: 'micro', name: 'Microservices request flow', dsl: [
+      '# Microservices request flow',
+      '',
+      'nodes:',
+      '  - id: client,  kind: actor,   label: Client',
+      '  - id: gateway, kind: gateway, label: "API Gateway", sub: "auth · rate-limit"',
+      '  - id: orders,  kind: service, label: Orders, sub: v1.4',
+      '  - id: cache,   kind: cache,   label: Redis',
+      '  - id: db,      kind: store,   label: Postgres',
+      '',
+      'edges:',
+      '  - client  -> gateway, label: "HTTPS"',
+      '  - gateway -> orders,  label: "POST /order"',
+      '  - orders ..> cache,   label: "read"',
+      '  - orders  -> db,      label: "write"',
+      '',
+    ].join('\n') },
+    { id: 'eventd', name: 'Event-driven fan-out', dsl: [
+      '# Event-driven fan-out',
+      '',
+      'nodes:',
+      '  - id: producer, kind: service, label: Checkout, sub: producer',
+      '  - id: kafka,    kind: queue,   label: "orders.v1", sub: kafka',
+      '  - id: audit,    kind: service, label: Audit,   sub: consumer',
+      '  - id: email,    kind: service, label: Email,   sub: consumer',
+      '  - id: metrics,  kind: service, label: Metrics, sub: consumer',
+      '',
+      'edges:',
+      '  - producer -> kafka,   label: "publish"',
+      '  - kafka  ..> audit,    label: "consume"',
+      '  - kafka  ..> email,    label: "consume"',
+      '  - kafka  ..> metrics,  label: "consume"',
+      '',
+    ].join('\n') },
+    { id: 'auth', name: 'Auth / login pipeline', dsl: [
+      '# Auth / login pipeline',
+      '',
+      'nodes:',
+      '  - id: user,  kind: actor,    label: User',
+      '  - id: login, kind: service,  label: "Login API"',
+      '  - id: auth,  kind: auth,     label: OAuth',
+      '  - id: check, kind: decision, shape: diamond, label: "Valid?"',
+      '  - id: home,  kind: service,  label: Dashboard',
+      '  - id: deny,  kind: stop,     shape: pill, label: Deny',
+      '',
+      'edges:',
+      '  - user  -> login, kind: secure, label: "creds"',
+      '  - login -> auth,  kind: secure, label: "verify"',
+      '  - auth  -> check',
+      '  - check -> home,  label: "yes"',
+      '  - check -> deny,  kind: error,  label: "no"',
+      '',
+    ].join('\n') },
+    { id: 'walk', name: 'Steps / walkthrough player', dsl: [
+      '# Diagram with a steps timeline — the player will appear automatically.',
+      '',
+      'nodes:',
+      '  - id: client,  kind: actor,   label: Client',
+      '  - id: gateway, kind: gateway, label: "API Gateway"',
+      '  - id: orders,  kind: service, label: Orders',
+      '  - id: kafka,   kind: queue,   label: "orders.v1"',
+      '  - id: audit,   kind: service, label: Audit',
+      '',
+      'edges:',
+      '  - client  -> gateway, label: "POST /order"',
+      '  - gateway -> orders',
+      '  - orders  -> kafka,   label: "publish"',
+      '  - kafka  ..> audit,   label: "consume"',
+      '',
+      'steps:',
+      '  - title: "Request arrives", nodes: [client, gateway], edges: [e1]',
+      '  - title: "Route to service", nodes: [gateway, orders], edges: [e2]',
+      '  - title: "Publish event",    nodes: [orders, kafka],   edges: [e3]',
+      '  - title: "Audit consumes",   nodes: [kafka, audit],    edges: [e4]',
+      '',
+    ].join('\n') },
+    { id: 'process', name: 'Process flowchart', dsl: [
+      '# Process flowchart',
+      '',
+      'nodes:',
+      '  - id: start, kind: start,    label: Start',
+      '  - id: input, kind: service,  label: "Collect input"',
+      '  - id: chk,   kind: decision, shape: diamond, label: "Valid?"',
+      '  - id: ok,    kind: service,  label: "Process"',
+      '  - id: fix,   kind: service,  label: "Show errors"',
+      '  - id: done,  kind: stop,     label: End',
+      '',
+      'edges:',
+      '  - start -> input',
+      '  - input -> chk',
+      '  - chk   -> ok,   label: "yes"',
+      '  - chk   -> fix,  label: "no", kind: error',
+      '  - fix   -> input, kind: dashed, label: "retry"',
+      '  - ok    -> done',
+      '',
+    ].join('\n') },
+  ];
+
+  const STYLES = ['sleek', 'sketch', 'iso', 'blueprint', 'city'];
+  let activeStyle = 'sleek';
+
+  // ── DOM refs ────────────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  const inp = $('ed-input');
+  const preview = $('ed-preview');
+  const statusMsg = $('status-msg');
+  const dslBadge = $('dsl-badge');
+  const previewStyleLabel = $('preview-style');
+  const statNodes = $('stat-nodes'), statEdges = $('stat-edges'), statSteps = $('stat-steps');
+  const tplSelect = $('tpl-select');
+  const toast = $('toast');
+
+  // Populate template picker
+  TEMPLATES.forEach((t) => {
+    const o = document.createElement('option');
+    o.value = t.id; o.textContent = t.name;
+    tplSelect.appendChild(o);
+  });
+
+  // ── Style chips ─────────────────────────────────────────
+  const chipBox = $('style-chips');
+  STYLES.forEach((id) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (id === activeStyle ? ' active' : '');
+    b.textContent = id;
+    b.onclick = () => {
+      activeStyle = id;
+      chipBox.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.textContent === id));
+      previewStyleLabel.textContent = id;
+      if (vp) vp.setStyle(activeStyle);
+    };
+    chipBox.appendChild(b);
+  });
+
+  // ── Mount viewport (deferred until first render attempt) ─
+  let vp = null;
+  function ensureMount(graph) {
+    if (vp) { vp.update({ graph }); return; }
+    vp = FD.mount(preview, {
+      graph,
+      styleName: activeStyle,
+      fileName: 'flow-editor',
+    });
+  }
+
+  // ── DSL → graph (debounced) ─────────────────────────────
+  let renderTimer = null;
+  function scheduleRender() {
+    if (renderTimer) clearTimeout(renderTimer);
+    renderTimer = setTimeout(doRender, 120);
+  }
+  function doRender() {
+    const text = inp.value;
+    let graph = null;
+    try {
+      graph = FD.parseDSL(text);
+      const styleFromGraph = graph && graph.style;
+      if (styleFromGraph && STYLES.indexOf(styleFromGraph) >= 0) {
+        // Don't overwrite the chip selection — but pass through to viewport:
+        if (vp) vp.setStyle(styleFromGraph);
+      } else if (vp) {
+        vp.setStyle(activeStyle);
+      }
+      ensureMount(graph);
+      statusMsg.className = 'ok';
+      statusMsg.textContent = 'Parsed — ' + (graph.nodes.length) + ' node(s), ' + (graph.edges.length) + ' edge(s)';
+      statNodes.textContent = graph.nodes.length;
+      statEdges.textContent = graph.edges.length;
+      statSteps.textContent = (graph.steps || []).length;
+    } catch (err) {
+      statusMsg.className = 'err';
+      statusMsg.textContent = 'Parse error: ' + (err && err.message ? err.message : String(err));
+    }
+    syncURL(text);
+  }
+
+  // ── URL state ───────────────────────────────────────────
+  function loadFromURL() {
+    try {
+      const hash = (location.hash || '').replace(/^#/, '');
+      if (!hash) return null;
+      const params = new URLSearchParams(hash);
+      const dsl = params.get('dsl');
+      const st  = params.get('style');
+      if (st && STYLES.indexOf(st) >= 0) {
+        activeStyle = st;
+        chipBox.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.textContent === st));
+        previewStyleLabel.textContent = st;
+      }
+      return dsl;
+    } catch (_) { return null; }
+  }
+  let urlSyncTimer = null;
+  function syncURL(text) {
+    if (urlSyncTimer) clearTimeout(urlSyncTimer);
+    urlSyncTimer = setTimeout(() => {
+      const params = new URLSearchParams();
+      params.set('style', activeStyle);
+      params.set('dsl', text);
+      const newHash = '#' + params.toString();
+      if (location.hash !== newHash) history.replaceState(null, '', newHash);
+    }, 350);
+  }
+
+  // ── Toolbar wiring ──────────────────────────────────────
+  tplSelect.onchange = () => {
+    const t = TEMPLATES.find((x) => x.id === tplSelect.value);
+    if (!t) return;
+    inp.value = t.dsl;
+    scheduleRender();
+    tplSelect.value = '';
+  };
+  $('btn-format').onclick = () => {
+    try {
+      const g = FD.parseDSL(inp.value);
+      inp.value = FD.graphToDSL(g, { compact: true });
+      scheduleRender();
+      flashToast('formatted');
+    } catch (err) {
+      flashToast('format failed: ' + err.message, true);
+    }
+  };
+  $('btn-share').onclick = () => {
+    syncURL(inp.value);
+    navigator.clipboard.writeText(location.href).then(() => flashToast('share link copied'));
+  };
+  $('btn-download').onclick = () => { if (vp) vp.download(); };
+  $('btn-fullscreen').onclick = () => { if (vp) vp.toggleFullscreen(); };
+
+  // ── Tab key support in textarea ─────────────────────────
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = inp.selectionStart, end = inp.selectionEnd;
+      inp.value = inp.value.substring(0, start) + '  ' + inp.value.substring(end);
+      inp.selectionStart = inp.selectionEnd = start + 2;
+      scheduleRender();
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      $('btn-share').click();
+    }
+  });
+  inp.addEventListener('input', scheduleRender);
+
+  // ── Resizable divider (horizontal only on wide layouts) ─
+  const divider = $('ed-divider');
+  let dragX = null;
+  divider.addEventListener('mousedown', (e) => {
+    dragX = e.clientX;
+    document.body.style.cursor = 'col-resize';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (dragX === null) return;
+    const main = document.querySelector('.ed-main');
+    if (!main) return;
+    const rect = main.getBoundingClientRect();
+    const ratio = Math.max(0.18, Math.min(0.82, (e.clientX - rect.left) / rect.width));
+    main.style.gridTemplateColumns = (ratio * 100) + '% 6px ' + ((1 - ratio) * 100) + '%';
+  });
+  document.addEventListener('mouseup', () => {
+    if (dragX !== null) document.body.style.cursor = '';
+    dragX = null;
+  });
+
+  // ── Toast ───────────────────────────────────────────────
+  let toastTimer = null;
+  function flashToast(msg, isErr) {
+    toast.textContent = msg;
+    toast.style.background = isErr ? '#c0392b' : '';
+    toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1500);
+  }
+
+  // ── Boot ────────────────────────────────────────────────
+  const fromURL = loadFromURL();
+  inp.value = fromURL || TEMPLATES[0].dsl;
+  doRender();
+  inp.focus();
+})();
+</script>
+
+</body>
+</html>
