@@ -92,8 +92,21 @@ const META_RE        = /^(\w+):\s*(.+)$/;
 
 export function parseSequenceDSL(text) {
   const lines = text.split('\n');
-  const actorOrder = [];                      // preserve participant declaration order
+  // actorOrder preserves the column order shown in the rendered
+  // diagram. The first time an actor appears (via `participant`,
+  // `actor`, or a message), it's appended to actorOrder — including
+  // when the user only declares it *after* using it in a message.
+  // In that late-declaration case the column appears at the end,
+  // matching Mermaid's behavior. Declare actors up front if you need
+  // a specific column ordering.
+  const actorOrder = [];
   const actorMap = Object.create(null);       // id → { id, label, kind }
+
+  // Kind upgrade rule: `actor X` upgrades a participant to actor
+  // (stick figure). The reverse — `participant X` after `actor X` —
+  // does NOT downgrade. This is intentional: callers usually upgrade
+  // a participant to "User" once they realize it's a human, and
+  // never want the reverse.
   const ensureActor = (id, kind = 'participant', label = null) => {
     if (!actorMap[id]) {
       actorMap[id] = { id, kind, label: label || id };
@@ -272,9 +285,7 @@ const ACTOR_W       = 130;
 const ACTOR_H       = 44;
 const COL_PAD       = 50;
 const MSG_GAP       = 46;
-const NOTE_PAD_X    = 12;
 const NOTE_PAD_Y    = 8;
-const FRAME_PAD_X   = 8;
 const FRAME_PAD_Y   = 22;
 const TOP_MARGIN    = 30;
 const BOTTOM_MARGIN = 30;
@@ -307,6 +318,7 @@ function layoutSequence(ir) {
       } else if (ev.kind === 'activate' || ev.kind === 'deactivate') {
         ev.y = y;  // marker — doesn't add height
       } else if (ev.kind === 'frame') {
+        ev.depth = depth;
         ev.headerY = y;
         y += FRAME_PAD_Y;
         if (ev.frame === 'loop' || ev.frame === 'opt') {
@@ -336,13 +348,12 @@ function layoutSequence(ir) {
 
 // Walks the event tree and produces a flat list of activations per
 // actor: [{ actor, startY, endY }]. Pairs activate/deactivate by
-// stacking per actor.
-function collectActivations(events, activations) {
-  const stacks = activations._stacks || (activations._stacks = {});
+// stacking per actor. `stacks` is the per-actor LIFO of open
+// activations being threaded through the recursion.
+function collectActivations(events, activations, stacks) {
   for (const ev of events) {
     if (ev.kind === 'activate') {
-      stacks[ev.actor] = stacks[ev.actor] || [];
-      stacks[ev.actor].push({ actor: ev.actor, startY: ev.y });
+      (stacks[ev.actor] || (stacks[ev.actor] = [])).push({ actor: ev.actor, startY: ev.y });
     } else if (ev.kind === 'deactivate') {
       const list = stacks[ev.actor];
       const open = list && list[list.length - 1];
@@ -353,13 +364,12 @@ function collectActivations(events, activations) {
       }
     } else if (ev.kind === 'frame') {
       if (ev.frame === 'loop' || ev.frame === 'opt') {
-        collectActivations(ev.body, activations);
+        collectActivations(ev.body, activations, stacks);
       } else {
-        for (const b of ev.branches) collectActivations(b.body, activations);
+        for (const b of ev.branches) collectActivations(b.body, activations, stacks);
       }
     }
   }
-  return activations;
 }
 
 // ── RENDERER ────────────────────────────────────────────────
@@ -381,17 +391,18 @@ function renderSequence(graph, opts = {}) {
   const layout = layoutSequence(ir);
   const { cols, colW, totalH, totalW } = layout;
 
-  // Resolve activations (top-level + nested in frames).
+  // Resolve activations (top-level + nested in frames). Unmatched
+  // activates auto-close at the bottom of the diagram so an
+  // unbalanced DSL still renders something useful.
   const activations = [];
-  collectActivations(ir.events, activations);
-  // Auto-close unmatched activates at the end of the diagram.
-  for (const actor of Object.keys(activations._stacks || {})) {
-    for (const open of activations._stacks[actor]) {
+  const openStacks = {};
+  collectActivations(ir.events, activations, openStacks);
+  for (const actor of Object.keys(openStacks)) {
+    for (const open of openStacks[actor]) {
       open.endY = totalH - BOTTOM_MARGIN - 10;
       activations.push(open);
     }
   }
-  delete activations._stacks;
 
   // Render order: lifelines → frames (deepest first, so outer overlay
   // doesn't cover inner) → activations → messages → notes → actor
@@ -493,7 +504,9 @@ function renderMessage(m, cols) {
   const sw = 1.4;
 
   if (m.from === m.to) {
-    // Self-message: arc 24px to the right then back.
+    // Self-message: arc 60px to the right then back. Label sits to
+    // the right of the arc at its vertical midpoint so it doesn't
+    // collide with the message immediately above.
     const x = from.cx;
     const y0 = m.y;
     const y1 = m.y + 22;
@@ -503,7 +516,7 @@ function renderMessage(m, cols) {
         <path d="${path}" fill="none" stroke="${stroke}" stroke-width="${sw}"
               ${dash ? `stroke-dasharray="${dash}"` : ''}
               marker-end="url(#${dashed ? 'seq-arrow-o' : 'seq-arrow'})"/>
-        ${m.label ? `<text x="${x + 14}" y="${y0 - 4}" font-size="11.5" fill="${stroke}" font-family="Inter Tight">${esc(m.label)}</text>` : ''}
+        ${m.label ? `<text x="${x + 68}" y="${(y0 + y1) / 2 + 4}" font-size="11.5" fill="${stroke}" font-family="Inter Tight">${esc(m.label)}</text>` : ''}
       </g>`;
   }
 
@@ -583,9 +596,13 @@ function renderFrames(events, cols, colW) {
   return out.join('');
 }
 
-function walkForFrames(events, leftX, rightX, out, depth = 0) {
+function walkForFrames(events, leftX, rightX, out) {
   for (const ev of events) {
     if (ev.kind === 'frame') {
+      // ev.depth is set during layout; using it here (instead of the
+      // recursion depth of this walk) decouples the visual depth
+      // offset from any future render-time recursion changes.
+      const depth = ev.depth || 0;
       const x = leftX - 4 - depth * 2;
       const w = (rightX - leftX) + 8 + depth * 4;
       const y = ev.headerY;
@@ -615,9 +632,9 @@ function walkForFrames(events, leftX, rightX, out, depth = 0) {
       }
       // Recurse into branches/body to render nested frames.
       if (ev.frame === 'loop' || ev.frame === 'opt') {
-        walkForFrames(ev.body, leftX, rightX, out, depth + 1);
+        walkForFrames(ev.body, leftX, rightX, out);
       } else {
-        for (const b of ev.branches) walkForFrames(b.body, leftX, rightX, out, depth + 1);
+        for (const b of ev.branches) walkForFrames(b.body, leftX, rightX, out);
       }
     }
   }

@@ -146,10 +146,12 @@ function layoutDagre(nodes, edges, opts = {}) {
   // ── 3. Coordinate assignment ──────────────────────────────
   // For 'LR' (left-to-right) we treat each layer as a vertical
   // column. For 'TB' (top-to-bottom) layers are horizontal rows.
+  //
+  // Initial placement uses an arbitrary origin (0, 0); we recenter
+  // the whole graph against (cfg.marginX, cfg.marginY) at the end
+  // once smoothing + de-overlap have settled the layout. This keeps
+  // the algorithm independent of "screen size" assumptions.
   const isLR = cfg.rankDir === 'LR';
-
-  // First, place nodes in their layer using barycentre of neighbours
-  // (averaged across the adjacent layers) to keep edges short.
   const positions = ids.map(() => ({
     x: 0,
     y: 0
@@ -165,11 +167,11 @@ function layoutDagre(nodes, edges, opts = {}) {
     layer.forEach((nodeIdx, pos) => {
       const offset = pos * stride - span / 2;
       if (isLR) {
-        positions[nodeIdx].x = cfg.marginX + layerIdx * layerStride;
-        positions[nodeIdx].y = cfg.marginY + offset + 200; // 200 = baseline
+        positions[nodeIdx].x = layerIdx * layerStride;
+        positions[nodeIdx].y = offset;
       } else {
-        positions[nodeIdx].x = cfg.marginX + offset + 400;
-        positions[nodeIdx].y = cfg.marginY + layerIdx * layerStride;
+        positions[nodeIdx].x = offset;
+        positions[nodeIdx].y = layerIdx * layerStride;
       }
     });
   });
@@ -203,12 +205,29 @@ function layoutDagre(nodes, edges, opts = {}) {
     }
   });
 
+  // Final centering: shift the whole graph so its bounding box top-
+  // left lands at (cfg.marginX, cfg.marginY). Accounts for node
+  // width/height so the visual bounds (not just the centre points)
+  // start at the margin.
+  let minX = Infinity,
+    minY = Infinity;
+  for (let i = 0; i < ids.length; i++) {
+    const halfW = layoutables[i].w / 2;
+    const halfH = layoutables[i].h / 2;
+    if (positions[i].x - halfW < minX) minX = positions[i].x - halfW;
+    if (positions[i].y - halfH < minY) minY = positions[i].y - halfH;
+  }
+  if (!Number.isFinite(minX)) minX = 0;
+  if (!Number.isFinite(minY)) minY = 0;
+  const shiftX = cfg.marginX - minX;
+  const shiftY = cfg.marginY - minY;
+
   // Apply positions to the original nodes (only when x/y are missing
   // — so explicit positions in DSL still win).
   for (let i = 0; i < layoutables.length; i++) {
     const n = layoutables[i];
-    if (n.x === undefined) n.x = Math.round(positions[i].x);
-    if (n.y === undefined) n.y = Math.round(positions[i].y);
+    if (n.x === undefined) n.x = Math.round(positions[i].x + shiftX);
+    if (n.y === undefined) n.y = Math.round(positions[i].y + shiftY);
   }
   return nodes;
 }
@@ -308,9 +327,13 @@ function layoutForce(nodes, edges, opts = {}) {
         let dy = pos[i].y - pos[j].y;
         let d2 = dx * dx + dy * dy;
         if (d2 < 0.01) {
-          dx = Math.random() - 0.5;
-          dy = Math.random() - 0.5;
-          d2 = 0.5;
+          // Two nodes coincide. Perturb with a deterministic offset
+          // derived from (i, j, iter) so repeated layouts of the same
+          // graph still produce identical output.
+          const seed = (i + 1) * 31 + (j + 1) * 17 + iter;
+          dx = Math.cos(seed) * 0.7;
+          dy = Math.sin(seed) * 0.7;
+          d2 = dx * dx + dy * dy;
         }
         const d = Math.sqrt(d2);
         const f = k * k / d;
@@ -1600,8 +1623,7 @@ function registerType(name, plugin) {
   DIAGRAM_TYPES.set(name, plugin);
 }
 function getType(name) {
-  if (!name) return null;
-  return DIAGRAM_TYPES.get(name) || null;
+  return name && DIAGRAM_TYPES.get(name) || null;
 }
 function listTypes() {
   return Array.from(DIAGRAM_TYPES.keys()).sort();
@@ -1613,19 +1635,18 @@ function hasType(name) {
 // Sniff the first lines of a DSL string for `type: <name>`. Returns the
 // type name or null. Cheap pre-parse so dispatch can find the right
 // plugin without parsing the whole document twice.
+//
+// The directive must appear before any of the flow-type section
+// headers (`nodes:`, `edges:`, `steps:`, `story:`, `config:`); after
+// one of those, sniff gives up.
 function sniffType(text) {
   if (typeof text !== 'string') return null;
-  // Scan up to the first ~15 lines for a top-level `type: X` directive.
-  // Inline-section keys can also match, so guard against sections.
   let scanned = 0;
   for (const raw of text.split('\n')) {
     if (scanned++ > 15) break;
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
-    // Stop scanning once we hit a section header.
-    if (/^(nodes|edges|steps|story|config|participants?|actors|states|entities):/i.test(line)) {
-      return null;
-    }
+    if (/^(nodes|edges|steps|story|config):/i.test(line)) return null;
     const m = line.match(/^type:\s*([\w-]+)/i);
     if (m) return m[1].toLowerCase();
   }
@@ -1809,6 +1830,9 @@ function parseFlowDSL(text) {
     ...(meta.title ? {
       title: meta.title
     } : {}),
+    ...(meta.layout ? {
+      layout: meta.layout
+    } : {}),
     nodes,
     edges,
     ...(steps.length > 0 ? {
@@ -1846,10 +1870,11 @@ function graphToDSL(graph, options) {
   lines.push(compact ? '# Compact DSL — logical structure only (auto-layout will position nodes)' : '# Auto-generated DSL — round-trips through parseDSL()');
   lines.push('');
 
-  // Top-level metadata: style, title.
+  // Top-level metadata: style, title, layout.
   if (graph.style) lines.push(`style: ${graph.style}`);
   if (graph.title) lines.push(`title: ${quote(graph.title)}`);
-  if (graph.style || graph.title) lines.push('');
+  if (graph.layout) lines.push(`layout: ${graph.layout}`);
+  if (graph.style || graph.title || graph.layout) lines.push('');
 
   // Nodes
   if (Array.isArray(graph.nodes) && graph.nodes.length) {
@@ -10312,8 +10337,21 @@ const END_RE = /^end$/i;
 const META_RE = /^(\w+):\s*(.+)$/;
 function parseSequenceDSL(text) {
   const lines = text.split('\n');
-  const actorOrder = []; // preserve participant declaration order
+  // actorOrder preserves the column order shown in the rendered
+  // diagram. The first time an actor appears (via `participant`,
+  // `actor`, or a message), it's appended to actorOrder — including
+  // when the user only declares it *after* using it in a message.
+  // In that late-declaration case the column appears at the end,
+  // matching Mermaid's behavior. Declare actors up front if you need
+  // a specific column ordering.
+  const actorOrder = [];
   const actorMap = Object.create(null); // id → { id, label, kind }
+
+  // Kind upgrade rule: `actor X` upgrades a participant to actor
+  // (stick figure). The reverse — `participant X` after `actor X` —
+  // does NOT downgrade. This is intentional: callers usually upgrade
+  // a participant to "User" once they realize it's a human, and
+  // never want the reverse.
   const ensureActor = (id, kind = 'participant', label = null) => {
     if (!actorMap[id]) {
       actorMap[id] = {
@@ -10583,6 +10621,7 @@ function layoutSequence(ir) {
       } else if (ev.kind === 'activate' || ev.kind === 'deactivate') {
         ev.y = y; // marker — doesn't add height
       } else if (ev.kind === 'frame') {
+        ev.depth = depth;
         ev.headerY = y;
         y += FRAME_PAD_Y;
         if (ev.frame === 'loop' || ev.frame === 'opt') {
@@ -10616,13 +10655,12 @@ function layoutSequence(ir) {
 
 // Walks the event tree and produces a flat list of activations per
 // actor: [{ actor, startY, endY }]. Pairs activate/deactivate by
-// stacking per actor.
-function collectActivations(events, activations) {
-  const stacks = activations._stacks || (activations._stacks = {});
+// stacking per actor. `stacks` is the per-actor LIFO of open
+// activations being threaded through the recursion.
+function collectActivations(events, activations, stacks) {
   for (const ev of events) {
     if (ev.kind === 'activate') {
-      stacks[ev.actor] = stacks[ev.actor] || [];
-      stacks[ev.actor].push({
+      (stacks[ev.actor] || (stacks[ev.actor] = [])).push({
         actor: ev.actor,
         startY: ev.y
       });
@@ -10636,13 +10674,12 @@ function collectActivations(events, activations) {
       }
     } else if (ev.kind === 'frame') {
       if (ev.frame === 'loop' || ev.frame === 'opt') {
-        collectActivations(ev.body, activations);
+        collectActivations(ev.body, activations, stacks);
       } else {
-        for (const b of ev.branches) collectActivations(b.body, activations);
+        for (const b of ev.branches) collectActivations(b.body, activations, stacks);
       }
     }
   }
-  return activations;
 }
 
 // ── RENDERER ────────────────────────────────────────────────
@@ -10667,17 +10704,18 @@ function renderSequence(graph, opts = {}) {
     totalW
   } = layout;
 
-  // Resolve activations (top-level + nested in frames).
+  // Resolve activations (top-level + nested in frames). Unmatched
+  // activates auto-close at the bottom of the diagram so an
+  // unbalanced DSL still renders something useful.
   const activations = [];
-  collectActivations(ir.events, activations);
-  // Auto-close unmatched activates at the end of the diagram.
-  for (const actor of Object.keys(activations._stacks || {})) {
-    for (const open of activations._stacks[actor]) {
+  const openStacks = {};
+  collectActivations(ir.events, activations, openStacks);
+  for (const actor of Object.keys(openStacks)) {
+    for (const open of openStacks[actor]) {
       open.endY = totalH - BOTTOM_MARGIN - 10;
       activations.push(open);
     }
   }
-  delete activations._stacks;
 
   // Render order: lifelines → frames (deepest first, so outer overlay
   // doesn't cover inner) → activations → messages → notes → actor
@@ -10765,7 +10803,9 @@ function renderMessage(m, cols) {
   const dash = dashed ? '6 4' : undefined;
   const sw = 1.4;
   if (m.from === m.to) {
-    // Self-message: arc 24px to the right then back.
+    // Self-message: arc 60px to the right then back. Label sits to
+    // the right of the arc at its vertical midpoint so it doesn't
+    // collide with the message immediately above.
     const x = from.cx;
     const y0 = m.y;
     const y1 = m.y + 22;
@@ -10775,7 +10815,7 @@ function renderMessage(m, cols) {
         <path d="${path}" fill="none" stroke="${stroke}" stroke-width="${sw}"
               ${dash ? `stroke-dasharray="${dash}"` : ''}
               marker-end="url(#${dashed ? 'seq-arrow-o' : 'seq-arrow'})"/>
-        ${m.label ? `<text x="${x + 14}" y="${y0 - 4}" font-size="11.5" fill="${stroke}" font-family="Inter Tight">${esc(m.label)}</text>` : ''}
+        ${m.label ? `<text x="${x + 68}" y="${(y0 + y1) / 2 + 4}" font-size="11.5" fill="${stroke}" font-family="Inter Tight">${esc(m.label)}</text>` : ''}
       </g>`;
   }
   const x1 = from.cx;
@@ -10851,9 +10891,13 @@ function renderFrames(events, cols, colW) {
   walkForFrames(events, leftX, rightX, out);
   return out.join('');
 }
-function walkForFrames(events, leftX, rightX, out, depth = 0) {
+function walkForFrames(events, leftX, rightX, out) {
   for (const ev of events) {
     if (ev.kind === 'frame') {
+      // ev.depth is set during layout; using it here (instead of the
+      // recursion depth of this walk) decouples the visual depth
+      // offset from any future render-time recursion changes.
+      const depth = ev.depth || 0;
       const x = leftX - 4 - depth * 2;
       const w = rightX - leftX + 8 + depth * 4;
       const y = ev.headerY;
@@ -10881,9 +10925,9 @@ function walkForFrames(events, leftX, rightX, out, depth = 0) {
       }
       // Recurse into branches/body to render nested frames.
       if (ev.frame === 'loop' || ev.frame === 'opt') {
-        walkForFrames(ev.body, leftX, rightX, out, depth + 1);
+        walkForFrames(ev.body, leftX, rightX, out);
       } else {
-        for (const b of ev.branches) walkForFrames(b.body, leftX, rightX, out, depth + 1);
+        for (const b of ev.branches) walkForFrames(b.body, leftX, rightX, out);
       }
     }
   }

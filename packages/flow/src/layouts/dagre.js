@@ -130,10 +130,13 @@ export function layoutDagre(nodes, edges, opts = {}) {
   // ── 3. Coordinate assignment ──────────────────────────────
   // For 'LR' (left-to-right) we treat each layer as a vertical
   // column. For 'TB' (top-to-bottom) layers are horizontal rows.
+  //
+  // Initial placement uses an arbitrary origin (0, 0); we recenter
+  // the whole graph against (cfg.marginX, cfg.marginY) at the end
+  // once smoothing + de-overlap have settled the layout. This keeps
+  // the algorithm independent of "screen size" assumptions.
   const isLR = cfg.rankDir === 'LR';
 
-  // First, place nodes in their layer using barycentre of neighbours
-  // (averaged across the adjacent layers) to keep edges short.
   const positions = ids.map(() => ({ x: 0, y: 0 }));
 
   // Stride per layer
@@ -150,11 +153,11 @@ export function layoutDagre(nodes, edges, opts = {}) {
     layer.forEach((nodeIdx, pos) => {
       const offset = pos * stride - span / 2;
       if (isLR) {
-        positions[nodeIdx].x = cfg.marginX + layerIdx * layerStride;
-        positions[nodeIdx].y = cfg.marginY + offset + 200;  // 200 = baseline
+        positions[nodeIdx].x = layerIdx * layerStride;
+        positions[nodeIdx].y = offset;
       } else {
-        positions[nodeIdx].x = cfg.marginX + offset + 400;
-        positions[nodeIdx].y = cfg.marginY + layerIdx * layerStride;
+        positions[nodeIdx].x = offset;
+        positions[nodeIdx].y = layerIdx * layerStride;
       }
     });
   });
@@ -197,12 +200,28 @@ export function layoutDagre(nodes, edges, opts = {}) {
     }
   });
 
+  // Final centering: shift the whole graph so its bounding box top-
+  // left lands at (cfg.marginX, cfg.marginY). Accounts for node
+  // width/height so the visual bounds (not just the centre points)
+  // start at the margin.
+  let minX = Infinity, minY = Infinity;
+  for (let i = 0; i < ids.length; i++) {
+    const halfW = layoutables[i].w / 2;
+    const halfH = layoutables[i].h / 2;
+    if (positions[i].x - halfW < minX) minX = positions[i].x - halfW;
+    if (positions[i].y - halfH < minY) minY = positions[i].y - halfH;
+  }
+  if (!Number.isFinite(minX)) minX = 0;
+  if (!Number.isFinite(minY)) minY = 0;
+  const shiftX = cfg.marginX - minX;
+  const shiftY = cfg.marginY - minY;
+
   // Apply positions to the original nodes (only when x/y are missing
   // — so explicit positions in DSL still win).
   for (let i = 0; i < layoutables.length; i++) {
     const n = layoutables[i];
-    if (n.x === undefined) n.x = Math.round(positions[i].x);
-    if (n.y === undefined) n.y = Math.round(positions[i].y);
+    if (n.x === undefined) n.x = Math.round(positions[i].x + shiftX);
+    if (n.y === undefined) n.y = Math.round(positions[i].y + shiftY);
   }
 
   return nodes;

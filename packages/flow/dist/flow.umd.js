@@ -148,10 +148,12 @@
     // ── 3. Coordinate assignment ──────────────────────────────
     // For 'LR' (left-to-right) we treat each layer as a vertical
     // column. For 'TB' (top-to-bottom) layers are horizontal rows.
+    //
+    // Initial placement uses an arbitrary origin (0, 0); we recenter
+    // the whole graph against (cfg.marginX, cfg.marginY) at the end
+    // once smoothing + de-overlap have settled the layout. This keeps
+    // the algorithm independent of "screen size" assumptions.
     const isLR = cfg.rankDir === 'LR';
-
-    // First, place nodes in their layer using barycentre of neighbours
-    // (averaged across the adjacent layers) to keep edges short.
     const positions = ids.map(() => ({
       x: 0,
       y: 0
@@ -167,11 +169,11 @@
       layer.forEach((nodeIdx, pos) => {
         const offset = pos * stride - span / 2;
         if (isLR) {
-          positions[nodeIdx].x = cfg.marginX + layerIdx * layerStride;
-          positions[nodeIdx].y = cfg.marginY + offset + 200; // 200 = baseline
+          positions[nodeIdx].x = layerIdx * layerStride;
+          positions[nodeIdx].y = offset;
         } else {
-          positions[nodeIdx].x = cfg.marginX + offset + 400;
-          positions[nodeIdx].y = cfg.marginY + layerIdx * layerStride;
+          positions[nodeIdx].x = offset;
+          positions[nodeIdx].y = layerIdx * layerStride;
         }
       });
     });
@@ -205,12 +207,29 @@
       }
     });
 
+    // Final centering: shift the whole graph so its bounding box top-
+    // left lands at (cfg.marginX, cfg.marginY). Accounts for node
+    // width/height so the visual bounds (not just the centre points)
+    // start at the margin.
+    let minX = Infinity,
+      minY = Infinity;
+    for (let i = 0; i < ids.length; i++) {
+      const halfW = layoutables[i].w / 2;
+      const halfH = layoutables[i].h / 2;
+      if (positions[i].x - halfW < minX) minX = positions[i].x - halfW;
+      if (positions[i].y - halfH < minY) minY = positions[i].y - halfH;
+    }
+    if (!Number.isFinite(minX)) minX = 0;
+    if (!Number.isFinite(minY)) minY = 0;
+    const shiftX = cfg.marginX - minX;
+    const shiftY = cfg.marginY - minY;
+
     // Apply positions to the original nodes (only when x/y are missing
     // — so explicit positions in DSL still win).
     for (let i = 0; i < layoutables.length; i++) {
       const n = layoutables[i];
-      if (n.x === undefined) n.x = Math.round(positions[i].x);
-      if (n.y === undefined) n.y = Math.round(positions[i].y);
+      if (n.x === undefined) n.x = Math.round(positions[i].x + shiftX);
+      if (n.y === undefined) n.y = Math.round(positions[i].y + shiftY);
     }
     return nodes;
   }
@@ -310,9 +329,13 @@
           let dy = pos[i].y - pos[j].y;
           let d2 = dx * dx + dy * dy;
           if (d2 < 0.01) {
-            dx = Math.random() - 0.5;
-            dy = Math.random() - 0.5;
-            d2 = 0.5;
+            // Two nodes coincide. Perturb with a deterministic offset
+            // derived from (i, j, iter) so repeated layouts of the same
+            // graph still produce identical output.
+            const seed = (i + 1) * 31 + (j + 1) * 17 + iter;
+            dx = Math.cos(seed) * 0.7;
+            dy = Math.sin(seed) * 0.7;
+            d2 = dx * dx + dy * dy;
           }
           const d = Math.sqrt(d2);
           const f = k * k / d;
@@ -5805,26 +5828,24 @@
 
   const DIAGRAM_TYPES = new Map();
   function getType(name) {
-    if (!name) return null;
-    return DIAGRAM_TYPES.get(name) || null;
+    return name && DIAGRAM_TYPES.get(name) || null;
   }
 
   // Sniff the first lines of a DSL string for `type: <name>`. Returns the
   // type name or null. Cheap pre-parse so dispatch can find the right
   // plugin without parsing the whole document twice.
+  //
+  // The directive must appear before any of the flow-type section
+  // headers (`nodes:`, `edges:`, `steps:`, `story:`, `config:`); after
+  // one of those, sniff gives up.
   function sniffType(text) {
     if (typeof text !== 'string') return null;
-    // Scan up to the first ~15 lines for a top-level `type: X` directive.
-    // Inline-section keys can also match, so guard against sections.
     let scanned = 0;
     for (const raw of text.split('\n')) {
       if (scanned++ > 15) break;
       const line = raw.trim();
       if (!line || line.startsWith('#')) continue;
-      // Stop scanning once we hit a section header.
-      if (/^(nodes|edges|steps|story|config|participants?|actors|states|entities):/i.test(line)) {
-        return null;
-      }
+      if (/^(nodes|edges|steps|story|config):/i.test(line)) return null;
       const m = line.match(/^type:\s*([\w-]+)/i);
       if (m) return m[1].toLowerCase();
     }
@@ -6007,6 +6028,9 @@
       } : {}),
       ...(meta.title ? {
         title: meta.title
+      } : {}),
+      ...(meta.layout ? {
+        layout: meta.layout
       } : {}),
       nodes,
       edges,

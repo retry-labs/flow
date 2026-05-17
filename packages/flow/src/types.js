@@ -41,8 +41,7 @@ export function registerType(name, plugin) {
 }
 
 export function getType(name) {
-  if (!name) return null;
-  return DIAGRAM_TYPES.get(name) || null;
+  return (name && DIAGRAM_TYPES.get(name)) || null;
 }
 
 export function listTypes() {
@@ -56,19 +55,18 @@ export function hasType(name) {
 // Sniff the first lines of a DSL string for `type: <name>`. Returns the
 // type name or null. Cheap pre-parse so dispatch can find the right
 // plugin without parsing the whole document twice.
+//
+// The directive must appear before any of the flow-type section
+// headers (`nodes:`, `edges:`, `steps:`, `story:`, `config:`); after
+// one of those, sniff gives up.
 export function sniffType(text) {
   if (typeof text !== 'string') return null;
-  // Scan up to the first ~15 lines for a top-level `type: X` directive.
-  // Inline-section keys can also match, so guard against sections.
   let scanned = 0;
   for (const raw of text.split('\n')) {
     if (scanned++ > 15) break;
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
-    // Stop scanning once we hit a section header.
-    if (/^(nodes|edges|steps|story|config|participants?|actors|states|entities):/i.test(line)) {
-      return null;
-    }
+    if (/^(nodes|edges|steps|story|config):/i.test(line)) return null;
     const m = line.match(/^type:\s*([\w-]+)/i);
     if (m) return m[1].toLowerCase();
   }

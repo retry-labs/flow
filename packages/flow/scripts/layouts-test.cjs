@@ -178,6 +178,91 @@ check('radial: leaves placed at consistent ring distance', () => {
   if (span > 80) throw new Error('leaves not on a consistent ring (span ' + span + 'px)');
 });
 
+// ── End-to-end DSL `layout:` directive ──────────────────
+
+check('DSL `layout: force` actually selects the force engine', () => {
+  const dsl = [
+    'layout: force',
+    'nodes:',
+    '  - id: a, kind: service, label: A',
+    '  - id: b, kind: service, label: B',
+    '  - id: c, kind: service, label: C',
+    'edges:',
+    '  - a -> b',
+    '  - b -> c',
+  ].join('\n');
+  const ir = FD.parseDSL(dsl);
+  if (ir.layout !== 'force') throw new Error('parseDSL dropped layout: ' + JSON.stringify(ir));
+  // Compare against the dagre default by rendering both — positions
+  // should differ if the engine actually changed.
+  const dagreIr = FD.parseDSL(dsl.replace('layout: force\n', ''));
+  const r1 = FD.resolveGraph(ir);
+  const r2 = FD.resolveGraph(dagreIr);
+  const same = r1.nodes.every((n, i) => n.x === r2.nodes[i].x && n.y === r2.nodes[i].y);
+  if (same) throw new Error('force and dagre produced identical positions — layout directive ignored');
+});
+
+check('graphToDSL round-trips `layout:` directive', () => {
+  const original = {
+    type: 'flow',
+    layout: 'radial',
+    nodes: [{ id: 'r', kind: 'service', label: 'R', root: true }, { id: 'c', kind: 'service', label: 'C' }],
+    edges: [{ id: 'e', from: 'r', to: 'c' }],
+  };
+  const text = FD.graphToDSL(original);
+  if (!/layout:\s*radial/.test(text)) throw new Error('graphToDSL omitted layout: ' + text);
+  const reparsed = FD.parseDSL(text);
+  if (reparsed.layout !== 'radial') throw new Error('reparsed layout missing: ' + JSON.stringify(reparsed));
+});
+
+// ── Dagre robustness ────────────────────────────────────
+
+check('dagre handles a disconnected graph (multiple roots)', () => {
+  const g = {
+    nodes: [
+      { id: 'a', kind: 'service', label: 'A' },
+      { id: 'b', kind: 'service', label: 'B' },
+      { id: 'c', kind: 'service', label: 'C' },
+      { id: 'd', kind: 'service', label: 'D' },
+    ],
+    edges: [
+      { id: 'e1', from: 'a', to: 'b' },
+      { id: 'e2', from: 'c', to: 'd' },  // separate component
+    ],
+  };
+  const pos = positionsFor(g, 'dagre');
+  noOverlap(pos);
+  // Both pairs should be laid out properly without anyone landing at origin.
+  for (const p of pos) {
+    if (p.x === undefined || p.y === undefined) throw new Error('node ' + p.id + ' missing position');
+  }
+});
+
+// ── Force determinism (truly deterministic, not just lucky) ─
+
+check('force: 10 repeated layouts of same graph produce identical positions', () => {
+  // Use a graph where two random initial seeds collide — exercises the
+  // perturbation branch.
+  const g = {
+    nodes: Array.from({ length: 8 }, (_, i) => ({ id: 's' + i, kind: 'service', label: 'S' + i })),
+    edges: [
+      { id: 'e0', from: 's0', to: 's1' },
+      { id: 'e1', from: 's2', to: 's3' },
+      { id: 'e2', from: 's0', to: 's4' },
+      { id: 'e3', from: 's5', to: 's6' },
+    ],
+  };
+  const ref = positionsFor(g, 'force');
+  for (let trial = 0; trial < 10; trial++) {
+    const fresh = positionsFor(JSON.parse(JSON.stringify(g)), 'force');
+    for (let i = 0; i < ref.length; i++) {
+      if (ref[i].x !== fresh[i].x || ref[i].y !== fresh[i].y) {
+        throw new Error('trial ' + trial + ' diverged at ' + ref[i].id);
+      }
+    }
+  }
+});
+
 // ── Registry + listLayouts ──────────────────────────────
 
 check('listLayouts exposes all built-in engines', () => {

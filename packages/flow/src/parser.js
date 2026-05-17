@@ -151,8 +151,9 @@ function parseFlowDSL(text) {
     // they need a fixed viewport.
     type: 'flow',
     canvas: { grid: 20 },
-    ...(meta.style ? { style: meta.style } : {}),
-    ...(meta.title ? { title: meta.title } : {}),
+    ...(meta.style  ? { style:  meta.style  } : {}),
+    ...(meta.title  ? { title:  meta.title  } : {}),
+    ...(meta.layout ? { layout: meta.layout } : {}),
     nodes,
     edges,
     ...(steps.length > 0 ? { steps } : {}),
@@ -193,10 +194,11 @@ export function graphToDSL(graph, options) {
     : '# Auto-generated DSL — round-trips through parseDSL()');
   lines.push('');
 
-  // Top-level metadata: style, title.
-  if (graph.style) lines.push(`style: ${graph.style}`);
-  if (graph.title) lines.push(`title: ${quote(graph.title)}`);
-  if (graph.style || graph.title) lines.push('');
+  // Top-level metadata: style, title, layout.
+  if (graph.style)  lines.push(`style: ${graph.style}`);
+  if (graph.title)  lines.push(`title: ${quote(graph.title)}`);
+  if (graph.layout) lines.push(`layout: ${graph.layout}`);
+  if (graph.style || graph.title || graph.layout) lines.push('');
 
   // Nodes
   if (Array.isArray(graph.nodes) && graph.nodes.length) {

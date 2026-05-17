@@ -213,6 +213,41 @@ check('self-message renders an arc (cubic path), not a straight line', () => {
   if (!/<path[^>]*d="M[^"]*C/.test(svg)) throw new Error('no cubic path for self-message');
 });
 
+check('nested activate/deactivate stacks per actor (no orphan bars)', () => {
+  // Re-enter B before exiting the first activation. Both bars should
+  // render, neither should leak past totalH-BOTTOM_MARGIN.
+  const ir = FD.parseDSL([
+    'type: sequence',
+    'A ->> B: outer',
+    'activate B',
+    'A ->> B: inner',
+    'activate B',
+    'B -->> A: inner-rep',
+    'deactivate B',
+    'B -->> A: outer-rep',
+    'deactivate B',
+  ].join('\n'));
+  const svg = FD.renderSVG(ir);
+  // Expect two activation bars (rect with fill="#e2e8f0").
+  const matches = svg.match(/<rect[^>]*fill="#e2e8f0"/g) || [];
+  if (matches.length !== 2) {
+    throw new Error('expected 2 activation bars from nested activate, got ' + matches.length);
+  }
+});
+
+check('unbalanced activate (no deactivate) auto-closes at diagram bottom', () => {
+  const ir = FD.parseDSL([
+    'type: sequence',
+    'A ->> B: req',
+    'activate B',
+    // intentionally no deactivate
+  ].join('\n'));
+  const svg = FD.renderSVG(ir);
+  if (!/<rect[^>]*fill="#e2e8f0"/.test(svg)) {
+    throw new Error('unbalanced activation should still render a bar (auto-closed)');
+  }
+});
+
 check('activation bar renders between activate and deactivate', () => {
   const ir = FD.parseDSL([
     'type: sequence',

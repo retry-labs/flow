@@ -75,7 +75,15 @@ export function layoutForce(nodes, edges, opts = {}) {
         let dx = pos[i].x - pos[j].x;
         let dy = pos[i].y - pos[j].y;
         let d2 = dx * dx + dy * dy;
-        if (d2 < 0.01) { dx = (Math.random() - 0.5); dy = (Math.random() - 0.5); d2 = 0.5; }
+        if (d2 < 0.01) {
+          // Two nodes coincide. Perturb with a deterministic offset
+          // derived from (i, j, iter) so repeated layouts of the same
+          // graph still produce identical output.
+          const seed = (i + 1) * 31 + (j + 1) * 17 + iter;
+          dx = Math.cos(seed) * 0.7;
+          dy = Math.sin(seed) * 0.7;
+          d2 = dx * dx + dy * dy;
+        }
         const d = Math.sqrt(d2);
         const f = (k * k) / d;
         const ux = dx / d, uy = dy / d;
