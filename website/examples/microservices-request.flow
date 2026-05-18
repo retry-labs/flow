@@ -1,0 +1,20 @@
+---
+name: Microservices request flow
+category: Web
+tags: [microservices, gateway, cache, database]
+description: Client → API gateway → service → cache + database. The bread-and-butter web architecture.
+---
+# Microservices request flow
+
+nodes:
+  - id: client,  kind: actor,   label: Client
+  - id: gateway, kind: gateway, label: "API Gateway", sub: "auth · rate-limit"
+  - id: orders,  kind: service, label: Orders, sub: v1.4
+  - id: cache,   kind: cache,   label: Redis
+  - id: db,      kind: store,   label: Postgres
+
+edges:
+  - client  -> gateway, label: "HTTPS"
+  - gateway -> orders,  label: "POST /order"
+  - orders ..> cache,   label: "read"
+  - orders  -> db,      label: "write"

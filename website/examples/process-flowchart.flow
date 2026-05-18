@@ -1,0 +1,23 @@
+---
+name: Process / decision flow
+category: Process
+tags: [flowchart, decision, runbook]
+description: Pure flowchart — start, decision, parallel branches, stop. Great for runbooks and onboarding flows.
+---
+# Process flowchart
+
+nodes:
+  - id: start, kind: start,    label: Start
+  - id: input, kind: service,  label: "Collect input"
+  - id: chk,   kind: decision, shape: diamond, label: "Valid?"
+  - id: ok,    kind: service,  label: "Process"
+  - id: fix,   kind: service,  label: "Show errors"
+  - id: done,  kind: stop,     label: End
+
+edges:
+  - start -> input
+  - input -> chk
+  - chk   -> ok,   label: "yes"
+  - chk   -> fix,  label: "no", kind: error
+  - fix   -> input, kind: dashed, label: "retry"
+  - ok    -> done

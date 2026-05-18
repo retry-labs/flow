@@ -1,0 +1,20 @@
+---
+name: Event-driven (fan-out)
+category: Data
+tags: [pub-sub, kafka, fan-out, events]
+description: Producer publishes once, multiple consumers process the event independently.
+---
+# Event-driven fan-out
+
+nodes:
+  - id: producer, kind: service, label: Checkout, sub: producer
+  - id: kafka,    kind: queue,   label: "orders.v1", sub: kafka
+  - id: audit,    kind: service, label: Audit,   sub: consumer
+  - id: email,    kind: service, label: Email,   sub: consumer
+  - id: metrics,  kind: service, label: Metrics, sub: consumer
+
+edges:
+  - producer -> kafka,   label: "publish"
+  - kafka  ..> audit,    label: "consume"
+  - kafka  ..> email,    label: "consume"
+  - kafka  ..> metrics,  label: "consume"

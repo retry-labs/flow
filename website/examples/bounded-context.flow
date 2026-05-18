@@ -1,0 +1,20 @@
+---
+name: Bounded context (group)
+category: Architecture
+tags: [ddd, microservices, boundary, worker]
+description: Wrap related services with a boundary node — useful for DDD or microservices service-area diagrams.
+---
+# Bounded context with explicit boundary
+
+nodes:
+  - id: box, kind: boundary, label: "orders bounded context", x: 60, y: 30, w: 540, h: 250
+  - id: api, kind: service,  label: "Orders API",  x: 90,  y: 70,  w: 150, h: 80
+  - id: wkr, kind: worker,   label: Worker,        x: 90,  y: 180, w: 150, h: 80
+  - id: q,   kind: queue,    label: "Internal Q",  x: 270, y: 125, w: 150, h: 80
+  - id: db,  kind: store,    label: "Orders DB",   x: 450, y: 125, w: 130, h: 80
+
+edges:
+  - api  -> q
+  - q   ..> wkr
+  - wkr  -> db
+  - api ..> db, label: "read"

@@ -1,0 +1,22 @@
+---
+name: Auth / login pipeline
+category: Security
+tags: [oauth, decision, secure-edge]
+description: Demonstrates the secure edge kind for sensitive flows and decision diamonds for branching.
+---
+# Auth / login pipeline
+
+nodes:
+  - id: user,  kind: actor,    label: User
+  - id: login, kind: service,  label: "Login API"
+  - id: auth,  kind: auth,     label: OAuth
+  - id: check, kind: decision, shape: diamond, label: "Valid?"
+  - id: home,  kind: service,  label: Dashboard
+  - id: deny,  kind: stop,     shape: pill, label: Deny
+
+edges:
+  - user  -> login, kind: secure, label: "creds"
+  - login -> auth,  kind: secure, label: "verify"
+  - auth  -> check
+  - check -> home,  label: "yes"
+  - check -> deny,  kind: error,  label: "no"

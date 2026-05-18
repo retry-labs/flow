@@ -1,0 +1,21 @@
+---
+name: Same DSL — rendered as a 3D city
+category: Web
+tags: [microservices, style-city, isometric]
+description: Add a single line — style city — to render any diagram with isometric buildings, roads, and labels.
+---
+# 3D city rendering — try changing the style line!
+style: city
+
+nodes:
+  - id: client,  kind: actor,   label: Client
+  - id: gateway, kind: gateway, label: "API Gateway"
+  - id: orders,  kind: service, label: Orders
+  - id: cache,   kind: cache,   label: Redis
+  - id: db,      kind: store,   label: Postgres
+
+edges:
+  - client  -> gateway, label: "HTTPS"
+  - gateway -> orders,  label: "POST /order"
+  - orders ..> cache,   label: "read"
+  - orders  -> db,      label: "write"

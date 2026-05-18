@@ -1,0 +1,18 @@
+---
+name: CDN + origin caching
+category: Web
+tags: [cdn, cache, edge, load-balancer]
+description: Edge cache fronting an origin service. Bold edge highlights the hot path.
+---
+# CDN fronting an origin
+
+nodes:
+  - id: visitor, kind: actor,        label: Visitor
+  - id: cdn,     kind: cdn,          label: CDN, sub: "edge cache"
+  - id: lb,      kind: loadbalancer, label: LB
+  - id: app,     kind: service,      label: Origin, sub: "app pod ×N"
+
+edges:
+  - visitor -> cdn, kind: bold,  label: "GET /asset"
+  - cdn    ..> lb,                label: "miss"
+  - lb      -> app

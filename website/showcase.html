@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <title>Flow — Showcase gallery</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta name="description" content="Curated, real-world architecture diagrams — microservices, pub/sub, CDN, realtime streaming, boundaries, and more."/>
+<meta name="description" content="Browse a growing gallery of architecture and process diagrams. Search by name, filter by category or tag, and copy any DSL into your project."/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -17,8 +17,12 @@
     --line-2: #d5cdb4;
     --bg: #fbf7ec;
     --paper: #ffffff;
+    --paper-2: #faf6e9;
     --accent: #f5c518;
     --accent-2: #ffb020;
+    --shadow-card: 0 1px 0 rgba(0,0,0,.02), 0 4px 14px rgba(80,60,20,.05);
+    --shadow-card-hover: 0 2px 0 rgba(0,0,0,.03), 0 10px 28px rgba(80,60,20,.10);
+    --shadow-modal: 0 30px 80px rgba(20,15,5,.35), 0 8px 24px rgba(20,15,5,.18);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -28,9 +32,9 @@
     -webkit-font-smoothing: antialiased; line-height: 1.5;
   }
 
-  /* ── Nav (scroll-aware: transparent at top, chromed when scrolled) ── */
+  /* ── Nav (scroll-aware) ────────────────────────────── */
   .nav {
-    position: sticky; top: 0; z-index: 50;
+    position: sticky; top: 0; z-index: 60;
     display: flex; align-items: center; gap: 8px;
     padding: 14px 40px;
     background: transparent;
@@ -68,10 +72,10 @@
   }
   .nav .links a.cta:hover { background: #000; color: var(--accent); }
 
-  /* ── Header ─────────────────────────────────────── */
+  /* ── Header ───────────────────────────────────────── */
   header.page {
-    padding: 56px 40px 28px;
-    max-width: 1240px; margin: 0 auto;
+    padding: 48px 40px 16px;
+    max-width: 1320px; margin: 0 auto;
   }
   .eyebrow {
     font-family: "JetBrains Mono", monospace; font-size: 11px;
@@ -79,7 +83,7 @@
     color: var(--accent-2); font-weight: 600;
   }
   header.page h1 {
-    margin: 6px 0 12px; font-size: 40px; font-weight: 600;
+    margin: 6px 0 10px; font-size: 38px; font-weight: 600;
     letter-spacing: -0.025em; line-height: 1.08;
   }
   header.page h1 em {
@@ -94,97 +98,341 @@
     font-family: "JetBrains Mono", monospace; font-size: 13px;
   }
 
-  /* ── Style bar ──────────────────────────────────── */
-  .style-bar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 14px 40px; max-width: 1240px; margin: 0 auto;
-    background: transparent; flex-wrap: wrap;
+  /* ── Filter bar (sticky beneath nav) ──────────────── */
+  .filterbar {
+    position: sticky; top: 56px; z-index: 40;
+    background: rgba(251, 247, 236, 0.92);
+    backdrop-filter: saturate(140%) blur(8px);
+    border-bottom: 1px solid var(--line);
+    margin-top: 18px;
   }
-  .style-bar .lbl {
-    font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); margin-right: 4px;
+  .filterbar-inner {
+    max-width: 1320px; margin: 0 auto;
+    padding: 14px 40px 12px;
+    display: flex; flex-direction: column; gap: 10px;
   }
+  .filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .filter-row .lbl {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--muted);
+    letter-spacing: 0.04em; text-transform: uppercase;
+    margin-right: 2px;
+  }
+  .search {
+    position: relative; flex: 1 1 320px; min-width: 240px;
+  }
+  .search input {
+    width: 100%; padding: 11px 14px 11px 40px;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+    border-radius: 12px; font: inherit; font-size: 14.5px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .search input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(245,197,24,.18);
+  }
+  .search .icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; opacity: .55; pointer-events: none;
+  }
+  .search .clear {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    border: 0; background: transparent; color: var(--muted);
+    width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+    font-size: 16px; line-height: 1; display: none;
+  }
+  .search .clear:hover { background: rgba(0,0,0,.05); color: var(--ink); }
+  .search.has-value .clear { display: inline-block; }
+
+  .count {
+    font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted);
+    background: var(--paper); border: 1px solid var(--line);
+    padding: 8px 12px; border-radius: 999px;
+    white-space: nowrap;
+  }
+
   .chip {
     border: 1px solid var(--line); background: var(--paper); color: var(--ink);
     font-family: inherit; font-size: 12.5px; font-weight: 500;
-    padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: all .15s;
+    padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    transition: all .12s;
+    display: inline-flex; align-items: center; gap: 6px;
   }
   .chip:hover { border-color: var(--accent); }
-  .chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .style-bar .hint {
-    margin-left: auto;
-    font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--muted);
+  .chip.active {
+    background: var(--ink); color: #fff; border-color: var(--ink);
   }
-  .style-bar .hint code {
-    background: #f3eed8; padding: 1px 5px; border-radius: 3px; color: var(--ink);
+  .chip.style-chip {
+    font-family: "JetBrains Mono", monospace; font-size: 11.5px;
   }
-
-  /* ── Showcase grid ─────────────────────────────── */
-  main {
-    padding: 20px 40px 64px; max-width: 1240px; margin: 0 auto;
-    display: grid; grid-template-columns: 1fr; gap: 28px;
-  }
-  @media (min-width: 1100px) { main { grid-template-columns: 1fr 1fr; gap: 32px; } }
-
-  .sc-card {
-    background: var(--paper); border: 1px solid var(--line);
-    border-radius: 14px; overflow: hidden;
-    display: flex; flex-direction: column;
-  }
-  .sc-card .sc-head { padding: 22px 24px 12px; border-bottom: 1px solid var(--line); }
-  .sc-card .sc-tag {
-    display: inline-block;
+  .chip .badge {
     font-family: "JetBrains Mono", monospace; font-size: 10px;
-    letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--muted); background: #f3eed8;
-    padding: 3px 8px; border-radius: 4px; margin-bottom: 10px;
+    opacity: .7;
   }
-  .sc-card .sc-name {
-    font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 6px;
+  .chip.active .badge { opacity: .9; }
+  .chip.tag-chip {
+    font-size: 11.5px; padding: 4px 10px;
+    background: var(--paper-2); border-color: var(--line);
+    color: var(--ink-2);
   }
-  .sc-card .sc-desc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
-  .sc-card .sc-canvas {
-    background: #fff; padding: 12px; border-bottom: 1px solid var(--line);
-    height: 320px; position: relative;
+  .chip.tag-chip.active {
+    background: var(--accent); color: var(--ink); border-color: var(--accent);
   }
-  .sc-card .sc-canvas .fd-host { height: 100%; }
-  .sc-card .sc-canvas svg { display: block; width: 100%; height: 100%; }
+  .tag-row {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    max-height: 36px; overflow: hidden;
+    transition: max-height .25s ease;
+  }
+  .tag-row.expanded { max-height: 400px; }
+  .tag-toggle {
+    border: 0; background: none; color: var(--muted);
+    font: inherit; font-size: 11.5px; font-weight: 500;
+    cursor: pointer; padding: 4px 6px; border-radius: 6px;
+    text-decoration: underline; text-underline-offset: 2px;
+  }
+  .tag-toggle:hover { color: var(--ink); }
+  .reset {
+    border: 0; background: transparent; color: var(--muted);
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    cursor: pointer; padding: 6px 10px; border-radius: 6px;
+    margin-left: auto;
+  }
+  .reset:hover { color: var(--ink); background: rgba(0,0,0,.04); }
 
-  /* ── Source viewer ────────────────────────────── */
-  .src-toolbar {
-    display: flex; align-items: center; gap: 6px;
-    padding: 10px 14px;
-    background: #fafaf6; border-bottom: 1px solid var(--line);
+  /* ── Grid ─────────────────────────────────────────── */
+  main {
+    padding: 24px 40px 80px;
+    max-width: 1320px; margin: 0 auto;
   }
-  .src-toolbar .src-tab {
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+  }
+
+  .tile {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .15s ease, border-color .15s ease;
+    box-shadow: var(--shadow-card);
+    display: flex; flex-direction: column;
+    text-align: left;
+    font: inherit; color: inherit;
+    padding: 0;
+  }
+  .tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--line-2);
+  }
+  .tile:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .tile .thumb {
+    background:
+      linear-gradient(to bottom, rgba(255,255,255,0) 70%, rgba(20,15,5,.025)),
+      #fff;
+    height: 168px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+    position: relative;
+  }
+  .tile .thumb svg { width: 100%; height: 100%; display: block; }
+  .tile .thumb.loading::after {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 30% 50%, rgba(245,197,24,.10), transparent 40%),
+      radial-gradient(circle at 70% 50%, rgba(0,0,0,.04), transparent 50%);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  .tile .meta {
+    padding: 12px 14px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+    flex: 1;
+  }
+  .tile .row1 {
+    display: flex; align-items: center; gap: 8px;
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .tile .row1 .cat {
+    color: var(--ink-2); font-weight: 600;
+  }
+  .tile .row1 .dot {
+    width: 3px; height: 3px; border-radius: 50%; background: var(--line-2);
+  }
+  .tile .name {
+    font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+    margin: 0; line-height: 1.25;
+  }
+  .tile .tags {
+    display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;
+  }
+  .tile .tags .pill {
+    font-family: "JetBrains Mono", monospace; font-size: 9.5px;
+    color: var(--muted); background: var(--paper-2);
+    border: 1px solid var(--line);
+    padding: 2px 7px; border-radius: 999px;
+  }
+  .tile .tags .pill.match {
+    color: var(--ink); background: rgba(245,197,24,.22);
+    border-color: rgba(245,197,24,.45);
+  }
+
+  /* ── Empty & status states ───────────────────────── */
+  .empty, .status {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--muted);
+  }
+  .empty h3 { margin: 0 0 6px; color: var(--ink); font-size: 17px; font-weight: 600; }
+  .empty p { margin: 0 0 16px; font-size: 14px; }
+  .empty .btn {
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+    font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+  }
+  .empty .btn:hover { border-color: var(--ink); }
+
+  /* ── Modal ───────────────────────────────────────── */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(20,15,5,.45);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: flex-start; justify-content: center;
+    overflow-y: auto;
+    padding: 40px 20px;
+    animation: fadeIn .15s ease;
+  }
+  .modal-backdrop.open { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal {
+    background: var(--paper);
+    border-radius: 16px;
+    width: 100%; max-width: 1100px;
+    box-shadow: var(--shadow-modal);
+    overflow: hidden;
+    animation: pop .18s cubic-bezier(.2,.9,.3,1.1);
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal-head {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .modal-head .crumb {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .modal-head .crumb .cat { color: var(--ink-2); font-weight: 600; }
+  .modal-head h2 {
+    margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+  .modal-head p.desc {
+    margin: 6px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.5;
+  }
+  .modal-head .actions {
+    display: flex; align-items: flex-start; gap: 6px;
+  }
+  .icon-btn {
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink-2);
+    width: 36px; height: 36px; border-radius: 10px;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px; line-height: 1; padding: 0;
+    transition: all .12s;
+  }
+  .icon-btn:hover { border-color: var(--ink); color: var(--ink); }
+  .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  .modal-canvas {
+    background: #fff;
+    padding: 12px;
+    height: 460px;
+    position: relative;
+    border-bottom: 1px solid var(--line);
+  }
+  .modal-canvas .fd-host { width: 100%; height: 100%; }
+  .modal-source-head {
+    padding: 12px 18px;
+    background: #fafaf6;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .modal-source-head .lbl {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+    margin-right: 8px;
+  }
+  .modal-source-head .src-tab {
     border: 1px solid var(--line); background: #fff; color: var(--ink);
     font-family: "JetBrains Mono", monospace; font-size: 11px;
     padding: 5px 11px; border-radius: 6px; cursor: pointer; transition: all .15s;
   }
-  .src-toolbar .src-tab:hover { border-color: var(--accent); }
-  .src-toolbar .src-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .src-toolbar .src-spacer { flex: 1; }
-  .src-toolbar .src-copy {
+  .modal-source-head .src-tab:hover { border-color: var(--accent); }
+  .modal-source-head .src-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .modal-source-head .src-spacer { flex: 1; }
+  .modal-source-head .src-copy, .modal-source-head .src-github {
     border: 1px solid var(--line); background: #fff;
     font-family: "JetBrains Mono", monospace; font-size: 11px;
     padding: 5px 11px; border-radius: 6px; cursor: pointer; color: var(--muted);
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 5px;
   }
-  .src-toolbar .src-copy:hover { color: var(--ink); border-color: var(--ink); }
-  .src-panel {
+  .modal-source-head .src-copy:hover, .modal-source-head .src-github:hover {
+    color: var(--ink); border-color: var(--ink);
+  }
+  .modal-source {
     background: #141210; color: #f1efe6; overflow: auto;
-    max-height: 320px; display: none;
+    max-height: 380px;
   }
-  .src-panel.open { display: block; }
-  .src-panel pre {
-    margin: 0; padding: 16px 18px;
-    font-family: "JetBrains Mono", monospace; font-size: 12px; line-height: 1.6;
+  .modal-source pre {
+    margin: 0; padding: 16px 20px;
+    font-family: "JetBrains Mono", monospace; font-size: 12.5px; line-height: 1.6;
     white-space: pre;
   }
-  .src-panel .key { color: #f5c518; }
-  .src-panel .str { color: #9eccff; }
-  .src-panel .num { color: #c0c0a8; }
-  .src-panel .cmt { color: #6f6a5d; font-style: italic; }
+  .modal-source .key { color: #f5c518; }
+  .modal-source .str { color: #9eccff; }
+  .modal-source .num { color: #c0c0a8; }
+  .modal-source .cmt { color: #6f6a5d; font-style: italic; }
 
-  /* ── Footer ───────────────────────────────────── */
+  .modal-nav {
+    position: fixed;
+    top: 50%; transform: translateY(-50%);
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,.9);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: var(--ink-2);
+    z-index: 101;
+    transition: all .12s;
+  }
+  .modal-nav:hover { background: #fff; color: var(--ink); border-color: var(--ink); }
+  .modal-nav:disabled { opacity: .3; cursor: not-allowed; }
+  .modal-nav.prev { left: 24px; }
+  .modal-nav.next { right: 24px; }
+
+  /* ── Footer ───────────────────────────────────────── */
   footer {
     padding: 40px 40px 60px;
     border-top: 1px solid var(--line);
@@ -192,11 +440,24 @@
     color: var(--muted);
     display: flex; gap: 18px; flex-wrap: wrap;
     align-items: center; justify-content: space-between;
-    max-width: 1240px; margin: 0 auto;
+    max-width: 1320px; margin: 0 auto;
   }
   footer .links { display: flex; gap: 16px; }
   footer a { text-decoration: none; color: inherit; }
   footer a:hover { color: var(--ink); }
+
+  /* ── Mobile ──────────────────────────────────────── */
+  @media (max-width: 720px) {
+    .nav { padding: 12px 18px; }
+    .nav .links a { padding: 6px 8px; font-size: 12.5px; }
+    header.page { padding: 32px 18px 8px; }
+    header.page h1 { font-size: 30px; }
+    .filterbar-inner { padding: 12px 18px 10px; }
+    main { padding: 20px 18px 60px; }
+    .modal-backdrop { padding: 12px; }
+    .modal-canvas { height: 320px; }
+    .modal-nav { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -216,19 +477,45 @@
 
 <header class="page">
   <div class="eyebrow">Showcase</div>
-  <h1>Eight diagrams, <em>one DSL.</em></h1>
+  <h1>A growing gallery, <em>one DSL.</em></h1>
   <p class="lede">
-    Each card is written in the same clean DSL you would type yourself — <b>no <code>x</code>/<code>y</code>
-    coordinates required</b>. Flow auto-lays out nodes left-to-right by longest path. Toggle the source
-    on any card to copy the DSL into your own project, or switch the global render style up top.
+    Every example is a single <code>.flow</code> file in this repo — open one to see the rendered diagram
+    and copy the DSL into your project. Use the search bar and tag pills to find what you need.
   </p>
 </header>
 
-<div class="style-bar" id="style-bar">
-  <span class="lbl">Render style:</span>
+<div class="filterbar">
+  <div class="filterbar-inner">
+    <div class="filter-row">
+      <div class="search">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input id="q" type="search" placeholder="Search examples — name, tag, kind, kafka, oauth…" autocomplete="off" spellcheck="false"/>
+        <button class="clear" id="q-clear" title="Clear search" aria-label="Clear search">×</button>
+      </div>
+      <div class="count" id="count">…</div>
+      <button class="reset" id="reset" title="Reset filters">Reset</button>
+    </div>
+    <div class="filter-row" id="cat-row">
+      <span class="lbl">Category</span>
+    </div>
+    <div class="filter-row" id="style-row">
+      <span class="lbl">Style</span>
+    </div>
+    <div class="filter-row" style="align-items: flex-start;">
+      <span class="lbl" style="padding-top: 6px;">Tags</span>
+      <div class="tag-row" id="tag-row" style="flex: 1;"></div>
+      <button class="tag-toggle" id="tag-toggle" style="display: none;">Show all</button>
+    </div>
+  </div>
 </div>
 
-<main id="showcase"></main>
+<main>
+  <div class="grid" id="grid">
+    <div class="status">Loading examples…</div>
+  </div>
+</main>
 
 <footer>
   <div>© 2026 Flow · MIT License · v0.1</div>
@@ -241,8 +528,37 @@
   </div>
 </footer>
 
+<!-- Modal scaffold (single instance reused) -->
+<div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+  <button class="modal-nav prev" id="modal-prev" aria-label="Previous example">‹</button>
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <div>
+        <div class="crumb"><span class="cat" id="modal-cat"></span> <span id="modal-tags"></span></div>
+        <h2 id="modal-title">Example name</h2>
+        <p class="desc" id="modal-desc"></p>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" id="modal-close" title="Close (Esc)" aria-label="Close">×</button>
+      </div>
+    </div>
+    <div class="modal-canvas"><div class="fd-host" id="modal-stage"></div></div>
+    <div class="modal-source-head">
+      <span class="lbl">Source</span>
+      <button class="src-tab active" data-mode="dsl"  title="The original DSL from the .flow file">DSL</button>
+      <button class="src-tab" data-mode="full" title="Full DSL with auto-layout coordinates expanded">Full DSL</button>
+      <button class="src-tab" data-mode="json">JSON</button>
+      <span class="src-spacer"></span>
+      <a class="src-github" id="modal-github" target="_blank" rel="noopener" title="View .flow file on GitHub">⌥ View on GitHub</a>
+      <button class="src-copy" id="modal-copy">Copy</button>
+    </div>
+    <div class="modal-source"><pre id="modal-pre"></pre></div>
+  </div>
+  <button class="modal-nav next" id="modal-next" aria-label="Next example">›</button>
+</div>
+
 <script>
-  // Scroll-aware nav: transparent at the top of the page, chromed once scrolled.
+  // Scroll-aware nav.
   (function () {
     const nav = document.querySelector('.nav');
     if (!nav) return;
@@ -254,230 +570,76 @@
 <script src="./dist/flow.standalone.js?v=3"></script>
 <script>
 (function () {
+  'use strict';
   const FD = window.RLFlow;
-  if (!FD) { console.error('RLFlow bundle failed to load'); return; }
-  // Stale-bundle fallback — render static SVG if mount() isn't available.
+  const grid = document.getElementById('grid');
+
+  if (!FD) {
+    grid.innerHTML = '<div class="empty"><h3>Bundle failed to load</h3><p>Could not load <code>./dist/flow.standalone.js</code>. Hard-refresh or check the network tab.</p></div>';
+    return;
+  }
+  // Stale-bundle fallback so the page still works against older caches.
   if (typeof FD.mount !== 'function') {
-    console.warn('RLFlow.mount missing (stale bundle?) — falling back to static SVG. Hard-refresh for interactive controls.');
     FD.mount = function (target, opts) {
       const el = typeof target === 'string' ? document.querySelector(target) : target;
-      if (!el) return { setStyle(){}, setActive(){}, update(){}, destroy(){} };
-      var graph = opts.graph;
-      var state = { styleName: opts.styleName || 'sleek', activeNodes: opts.activeNodes || [], activeEdges: opts.activeEdges || [] };
-      function paint(){ el.innerHTML = FD.renderSVG(graph, state); }
+      if (!el) return { setStyle(){}, update(){}, destroy(){} };
+      let graph = opts.graph;
+      const state = { styleName: opts.styleName || 'sleek' };
+      const paint = () => { el.innerHTML = FD.renderSVG(graph, state); };
       paint();
       return {
-        setStyle: function (s) { state.styleName = s; paint(); },
-        setActive: function (n, e) { state.activeNodes = n || []; state.activeEdges = e || []; paint(); },
-        update: function (next) { Object.assign(state, next || {}); if (next && next.graph) graph = next.graph; paint(); },
-        destroy: function () { el.innerHTML = ''; },
-        setZoom: function(){}, resetView: function(){}, toggleFullscreen: function(){}, download: function(){},
+        setStyle: s => { state.styleName = s; paint(); },
+        update: next => { Object.assign(state, next || {}); if (next && next.graph) graph = next.graph; paint(); },
+        destroy: () => { el.innerHTML = ''; },
       };
     };
   }
 
+  // ── Constants ──────────────────────────────────────────
   const STYLES = ['sleek', 'sketch', 'iso', 'blueprint', 'city'];
-  let activeStyle = 'sleek';
+  const REPO_BLOB_BASE = 'https://github.com/retry-labs/flow/blob/gh-pages/website/examples/';
+  const EXAMPLES_BASE = './examples/';
 
-  const EXAMPLES = [
-    {
-      id: 'micro',
-      tag: 'web · microservices',
-      name: 'Microservices request flow',
-      desc: 'Client → API gateway → service → cache + database. The bread-and-butter web architecture.',
-      dsl: [
-        '# Microservices request flow',
-        '',
-        'nodes:',
-        '  - id: client,  kind: actor,   label: Client',
-        '  - id: gateway, kind: gateway, label: "API Gateway", sub: "auth · rate-limit"',
-        '  - id: orders,  kind: service, label: Orders, sub: v1.4',
-        '  - id: cache,   kind: cache,   label: Redis',
-        '  - id: db,      kind: store,   label: Postgres',
-        '',
-        'edges:',
-        '  - client  -> gateway, label: "HTTPS"',
-        '  - gateway -> orders,  label: "POST /order"',
-        '  - orders ..> cache,   label: "read"',
-        '  - orders  -> db,      label: "write"',
-        ''
-      ].join('\n'),
-    },
-    {
-      id: 'eventd',
-      tag: 'pub / sub',
-      name: 'Event-driven (fan-out)',
-      desc: 'Producer publishes once, multiple consumers process the event independently.',
-      dsl: [
-        '# Event-driven fan-out',
-        '',
-        'nodes:',
-        '  - id: producer, kind: service, label: Checkout, sub: producer',
-        '  - id: kafka,    kind: queue,   label: "orders.v1", sub: kafka',
-        '  - id: audit,    kind: service, label: Audit,   sub: consumer',
-        '  - id: email,    kind: service, label: Email,   sub: consumer',
-        '  - id: metrics,  kind: service, label: Metrics, sub: consumer',
-        '',
-        'edges:',
-        '  - producer -> kafka,   label: "publish"',
-        '  - kafka  ..> audit,    label: "consume"',
-        '  - kafka  ..> email,    label: "consume"',
-        '  - kafka  ..> metrics,  label: "consume"',
-        ''
-      ].join('\n'),
-    },
-    {
-      id: 'auth',
-      tag: 'security',
-      name: 'Auth / login pipeline',
-      desc: 'Demonstrates the secure edge kind for sensitive flows and decision diamonds for branching.',
-      dsl: [
-        '# Auth / login pipeline',
-        '',
-        'nodes:',
-        '  - id: user,  kind: actor,    label: User',
-        '  - id: login, kind: service,  label: "Login API"',
-        '  - id: auth,  kind: auth,     label: OAuth',
-        '  - id: check, kind: decision, shape: diamond, label: "Valid?"',
-        '  - id: home,  kind: service,  label: Dashboard',
-        '  - id: deny,  kind: stop,     shape: pill, label: Deny',
-        '',
-        'edges:',
-        '  - user  -> login, kind: secure, label: "creds"',
-        '  - login -> auth,  kind: secure, label: "verify"',
-        '  - auth  -> check',
-        '  - check -> home,  label: "yes"',
-        '  - check -> deny,  kind: error,  label: "no"',
-        ''
-      ].join('\n'),
-    },
-    {
-      id: 'cdn',
-      tag: 'caching · web',
-      name: 'CDN + origin caching',
-      desc: 'Edge cache fronting an origin service. Bold edge highlights the hot path.',
-      dsl: [
-        '# CDN fronting an origin',
-        '',
-        'nodes:',
-        '  - id: visitor, kind: actor,        label: Visitor',
-        '  - id: cdn,     kind: cdn,          label: CDN, sub: "edge cache"',
-        '  - id: lb,      kind: loadbalancer, label: LB',
-        '  - id: app,     kind: service,      label: Origin, sub: "app pod ×N"',
-        '',
-        'edges:',
-        '  - visitor -> cdn, kind: bold,  label: "GET /asset"',
-        '  - cdn    ..> lb,                label: "miss"',
-        '  - lb      -> app',
-        ''
-      ].join('\n'),
-    },
-    {
-      id: 'realtime',
-      tag: 'streaming',
-      name: 'Realtime / streaming',
-      desc: 'Use the realtime edge kind for live data flows (WebSocket, SSE, MQTT). Animated dashes show movement.',
-      dsl: [
-        '# Realtime streaming pipeline',
-        '',
-        'nodes:',
-        '  - id: sensor, kind: mobile,   label: Mobile',
-        '  - id: edge,   kind: firewall, label: Edge',
-        '  - id: bus,    kind: bus,      label: "Event Bus"',
-        '  - id: live,   kind: stream,   label: "Live View"',
-        '',
-        'edges:',
-        '  - sensor -> edge, kind: realtime',
-        '  - edge   -> bus,  kind: realtime, label: "mqtt"',
-        '  - bus    -> live, kind: realtime, label: "ws"',
-        ''
-      ].join('\n'),
-    },
-    {
-      id: 'city',
-      tag: 'style: city',
-      name: 'Same DSL — rendered as a 3D city',
-      desc: 'Add a single line — `style: city` — to render any diagram with isometric buildings, roads, and labels.',
-      dsl: [
-        '# 3D city rendering — try changing the style line!',
-        'style: city',
-        '',
-        'nodes:',
-        '  - id: client,  kind: actor,   label: Client',
-        '  - id: gateway, kind: gateway, label: "API Gateway"',
-        '  - id: orders,  kind: service, label: Orders',
-        '  - id: cache,   kind: cache,   label: Redis',
-        '  - id: db,      kind: store,   label: Postgres',
-        '',
-        'edges:',
-        '  - client  -> gateway, label: "HTTPS"',
-        '  - gateway -> orders,  label: "POST /order"',
-        '  - orders ..> cache,   label: "read"',
-        '  - orders  -> db,      label: "write"',
-        ''
-      ].join('\n'),
-    },
-    {
-      id: 'boundary',
-      tag: 'DDD · grouping',
-      name: 'Bounded context (group)',
-      desc: 'Wrap related services with a boundary node — useful for DDD or microservices service-area diagrams.',
-      dsl: [
-        '# Bounded context with explicit boundary',
-        '',
-        'nodes:',
-        '  - id: box, kind: boundary, label: "orders bounded context", x: 60, y: 30, w: 540, h: 250',
-        '  - id: api, kind: service,  label: "Orders API",  x: 90,  y: 70,  w: 150, h: 80',
-        '  - id: wkr, kind: worker,   label: Worker,        x: 90,  y: 180, w: 150, h: 80',
-        '  - id: q,   kind: queue,    label: "Internal Q",  x: 270, y: 125, w: 150, h: 80',
-        '  - id: db,  kind: store,    label: "Orders DB",   x: 450, y: 125, w: 130, h: 80',
-        '',
-        'edges:',
-        '  - api  -> q',
-        '  - q   ..> wkr',
-        '  - wkr  -> db',
-        '  - api ..> db, label: "read"',
-        ''
-      ].join('\n'),
-    },
-    {
-      id: 'flow',
-      tag: 'process',
-      name: 'Process / decision flow',
-      desc: 'Pure flowchart — start, decision, parallel branches, stop. Great for runbooks and onboarding flows.',
-      dsl: [
-        '# Process flowchart',
-        '',
-        'nodes:',
-        '  - id: start, kind: start,    label: Start',
-        '  - id: input, kind: service,  label: "Collect input"',
-        '  - id: chk,   kind: decision, shape: diamond, label: "Valid?"',
-        '  - id: ok,    kind: service,  label: "Process"',
-        '  - id: fix,   kind: service,  label: "Show errors"',
-        '  - id: done,  kind: stop,     label: End',
-        '',
-        'edges:',
-        '  - start -> input',
-        '  - input -> chk',
-        '  - chk   -> ok,   label: "yes"',
-        '  - chk   -> fix,  label: "no", kind: error',
-        '  - fix   -> input, kind: dashed, label: "retry"',
-        '  - ok    -> done',
-        ''
-      ].join('\n'),
-    },
-  ];
-
-  // ── Render helpers ────────────────────────────────────
-  // Mount a viewport into `el` and return its instance so callers can
-  // setStyle / update later. A graph's own `style: ...` directive wins
-  // over the global toolbar choice (this is what the "city" card relies on).
-  function mountInto(el, graph, opts) {
-    const styleName = (graph && graph.style) ? graph.style : activeStyle;
-    return FD.mount(el, Object.assign({ graph, styleName, fileName: 'flow-showcase' }, opts || {}));
+  // ── Front-matter + DSL parser ──────────────────────────
+  // Parses a .flow file:
+  //   ---
+  //   name: Foo
+  //   tags: [a, b, c]
+  //   ---
+  //   <dsl body>
+  function parseFlowFile(text) {
+    const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+    if (!m) return { meta: {}, dsl: text };
+    const meta = {};
+    m[1].split(/\r?\n/).forEach(line => {
+      const i = line.indexOf(':');
+      if (i < 0) return;
+      const key = line.slice(0, i).trim();
+      let val = line.slice(i + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (val.startsWith('[') && val.endsWith(']')) {
+        val = val.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+      }
+      meta[key] = val;
+    });
+    return { meta, dsl: m[2] };
   }
 
-  // ── Source viewer (DSL / Full DSL / JSON / Hide) ──────
+  // ── State ──────────────────────────────────────────────
+  const state = {
+    examples: [],           // [{ id, file, name, category, tags, description, dsl, graph }]
+    activeStyle: 'sleek',
+    activeCategory: 'All',
+    activeTags: new Set(),  // OR-filter
+    query: '',
+    filtered: [],           // current filtered list (in render order)
+    modalIndex: -1,         // index into `filtered`
+    tilesByFile: new Map(), // file -> tile element (for thumbnail re-render)
+  };
+
+  // ── Source rendering helpers ───────────────────────────
   function escapeHTML(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
@@ -497,124 +659,412 @@
   function compactGraph(g) {
     return { canvas: g.canvas, style: g.style, nodes: g.nodes, edges: g.edges, steps: g.steps };
   }
-  function srcText(example, graph, mode) {
-    if (mode === 'dsl')  return example.dsl;
-    if (mode === 'full') return FD.graphToDSL(graph);
-    return JSON.stringify(compactGraph(graph), null, 2);
-  }
-  function highlightFor(mode) {
-    return mode === 'json' ? highlightJSON : highlightDSL;
+
+  // ── Load examples ──────────────────────────────────────
+  async function loadAll() {
+    let manifest;
+    try {
+      const r = await fetch(EXAMPLES_BASE + 'index.json', { cache: 'no-cache' });
+      manifest = await r.json();
+    } catch (e) {
+      grid.innerHTML = '<div class="empty"><h3>Could not load examples manifest</h3><p><code>examples/index.json</code> failed to fetch — are you running this off a static server?</p></div>';
+      return;
+    }
+    const files = manifest.files || [];
+
+    const results = await Promise.all(files.map(async (file) => {
+      try {
+        const r = await fetch(EXAMPLES_BASE + file, { cache: 'no-cache' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const text = await r.text();
+        const { meta, dsl } = parseFlowFile(text);
+        const id = file.replace(/\.flow$/, '');
+        const tags = Array.isArray(meta.tags) ? meta.tags : (meta.tags ? [meta.tags] : []);
+        return {
+          id,
+          file,
+          name: meta.name || id,
+          category: meta.category || 'Other',
+          tags,
+          description: meta.description || '',
+          dsl,
+          graph: FD.parseDSL(dsl),
+        };
+      } catch (e) {
+        console.warn('Failed to load example', file, e);
+        return null;
+      }
+    }));
+
+    state.examples = results.filter(Boolean);
+    if (!state.examples.length) {
+      grid.innerHTML = '<div class="empty"><h3>No examples found</h3><p>The manifest listed files but none could be loaded.</p></div>';
+      return;
+    }
+
+    buildFilters();
+    applyURL();
+    applyFilters();
+    setupModal();
   }
 
-  function mountSourceViewer(host, example, getGraph, opts) {
-    opts = opts || {};
-    const startMode = opts.defaultMode || 'dsl';
-    const toolbar = document.createElement('div');
-    toolbar.className = 'src-toolbar';
-    toolbar.innerHTML =
-      '<button class="src-tab' + (startMode === 'dsl'  ? ' active' : '') + '" data-mode="dsl"  title="The exact DSL you would write — clean, no x/y">DSL</button>' +
-      '<button class="src-tab' + (startMode === 'full' ? ' active' : '') + '" data-mode="full" title="Full DSL after auto-layout (coords included)">Full DSL</button>' +
-      '<button class="src-tab' + (startMode === 'json' ? ' active' : '') + '" data-mode="json">JSON</button>' +
-      '<button class="src-tab" data-mode="off">Hide</button>' +
-      '<span class="src-spacer"></span>' +
-      '<button class="src-copy">Copy</button>';
-    const panel = document.createElement('div');
-    panel.className = 'src-panel open';
-    const pre = document.createElement('pre');
-    panel.appendChild(pre);
-    host.appendChild(toolbar);
-    host.appendChild(panel);
+  // ── Filter UI ──────────────────────────────────────────
+  function buildFilters() {
+    // Categories (unique, sorted by count desc)
+    const catCount = new Map();
+    const tagCount = new Map();
+    state.examples.forEach(ex => {
+      catCount.set(ex.category, (catCount.get(ex.category) || 0) + 1);
+      ex.tags.forEach(t => tagCount.set(t, (tagCount.get(t) || 0) + 1));
+    });
 
-    let mode = startMode;
-    const refresh = () => {
-      if (mode === 'off') return;
-      pre.innerHTML = highlightFor(mode)(srcText(example, getGraph(), mode));
-    };
-    toolbar.querySelectorAll('.src-tab').forEach(function (b) {
-      b.onclick = function () {
-        toolbar.querySelectorAll('.src-tab').forEach(function (x) { x.classList.remove('active'); });
+    // Categories row
+    const catRow = document.getElementById('cat-row');
+    const catList = ['All', ...Array.from(catCount.keys()).sort((a, b) => catCount.get(b) - catCount.get(a))];
+    catList.forEach(cat => {
+      const b = document.createElement('button');
+      b.className = 'chip' + (cat === state.activeCategory ? ' active' : '');
+      b.dataset.cat = cat;
+      const count = cat === 'All' ? state.examples.length : catCount.get(cat);
+      b.innerHTML = cat + ' <span class="badge">' + count + '</span>';
+      b.onclick = () => {
+        state.activeCategory = cat;
+        catRow.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
+        applyFilters();
+        syncURL();
+      };
+      catRow.appendChild(b);
+    });
+
+    // Style row
+    const styleRow = document.getElementById('style-row');
+    STYLES.forEach(id => {
+      const b = document.createElement('button');
+      b.className = 'chip style-chip' + (id === state.activeStyle ? ' active' : '');
+      b.dataset.style = id;
+      b.textContent = id;
+      b.onclick = () => {
+        state.activeStyle = id;
+        styleRow.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.style === id));
+        rerenderThumbs();
+      };
+      styleRow.appendChild(b);
+    });
+
+    // Tag row
+    const tagRow = document.getElementById('tag-row');
+    const tagToggle = document.getElementById('tag-toggle');
+    const tagList = Array.from(tagCount.keys()).sort((a, b) => tagCount.get(b) - tagCount.get(a));
+    tagList.forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'chip tag-chip';
+      b.dataset.tag = t;
+      b.innerHTML = t + ' <span class="badge">' + tagCount.get(t) + '</span>';
+      b.onclick = () => {
+        if (state.activeTags.has(t)) state.activeTags.delete(t);
+        else state.activeTags.add(t);
+        b.classList.toggle('active', state.activeTags.has(t));
+        applyFilters();
+        syncURL();
+      };
+      tagRow.appendChild(b);
+    });
+    if (tagList.length > 12) {
+      tagToggle.style.display = '';
+      tagToggle.textContent = 'Show all (' + tagList.length + ')';
+      tagToggle.onclick = () => {
+        const expanded = tagRow.classList.toggle('expanded');
+        tagToggle.textContent = expanded ? 'Show less' : 'Show all (' + tagList.length + ')';
+      };
+    }
+  }
+
+  // ── Search input ───────────────────────────────────────
+  const searchInput = document.getElementById('q');
+  const searchEl = searchInput.parentElement;
+  const clearBtn = document.getElementById('q-clear');
+  searchInput.addEventListener('input', () => {
+    state.query = searchInput.value.trim().toLowerCase();
+    searchEl.classList.toggle('has-value', !!state.query);
+    applyFilters();
+    syncURL();
+  });
+  clearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    state.query = '';
+    searchEl.classList.remove('has-value');
+    applyFilters();
+    syncURL();
+    searchInput.focus();
+  });
+  document.getElementById('reset').addEventListener('click', resetFilters);
+
+  function resetFilters() {
+    state.query = '';
+    state.activeCategory = 'All';
+    state.activeTags.clear();
+    searchInput.value = '';
+    searchEl.classList.remove('has-value');
+    document.querySelectorAll('#cat-row .chip').forEach(c => c.classList.toggle('active', c.dataset.cat === 'All'));
+    document.querySelectorAll('#tag-row .chip').forEach(c => c.classList.remove('active'));
+    applyFilters();
+    syncURL();
+  }
+
+  // ── Filtering ──────────────────────────────────────────
+  function matches(ex) {
+    if (state.activeCategory !== 'All' && ex.category !== state.activeCategory) return false;
+    if (state.activeTags.size > 0) {
+      let any = false;
+      state.activeTags.forEach(t => { if (ex.tags.includes(t)) any = true; });
+      if (!any) return false;
+    }
+    if (state.query) {
+      const hay = (ex.name + ' ' + ex.description + ' ' + ex.tags.join(' ') + ' ' + ex.category + ' ' + ex.dsl).toLowerCase();
+      if (!hay.includes(state.query)) return false;
+    }
+    return true;
+  }
+
+  function applyFilters() {
+    state.filtered = state.examples.filter(matches);
+    renderGrid();
+    document.getElementById('count').textContent =
+      state.filtered.length + (state.filtered.length === 1 ? ' example' : ' examples') +
+      (state.filtered.length !== state.examples.length ? ' of ' + state.examples.length : '');
+  }
+
+  // ── Grid render ────────────────────────────────────────
+  function renderGrid() {
+    grid.innerHTML = '';
+    state.tilesByFile.clear();
+
+    if (!state.filtered.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = '<h3>No matches</h3><p>Try a different search term, clear some tag filters, or pick another category.</p><button class="btn" id="empty-reset">Reset filters</button>';
+      grid.appendChild(empty);
+      document.getElementById('empty-reset').onclick = resetFilters;
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const tile = entry.target;
+          renderThumb(tile);
+          observer.unobserve(tile);
+        }
+      });
+    }, { rootMargin: '200px' });
+
+    state.filtered.forEach((ex, i) => {
+      const tile = document.createElement('button');
+      tile.className = 'tile';
+      tile.dataset.file = ex.file;
+      tile.dataset.index = String(i);
+      tile.setAttribute('aria-label', 'Open ' + ex.name);
+
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb loading';
+      tile.appendChild(thumb);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const tagHTML = ex.tags.slice(0, 4).map(t => {
+        const cls = state.activeTags.has(t) ? 'pill match' : 'pill';
+        return '<span class="' + cls + '">' + escapeHTML(t) + '</span>';
+      }).join('');
+      meta.innerHTML =
+        '<div class="row1"><span class="cat">' + escapeHTML(ex.category) + '</span></div>' +
+        '<h3 class="name">' + escapeHTML(ex.name) + '</h3>' +
+        '<div class="tags">' + tagHTML + '</div>';
+      tile.appendChild(meta);
+
+      tile.addEventListener('click', () => openModal(i));
+      state.tilesByFile.set(ex.file, tile);
+      grid.appendChild(tile);
+      observer.observe(tile);
+    });
+  }
+
+  function renderThumb(tile) {
+    const file = tile.dataset.file;
+    const ex = state.examples.find(e => e.file === file);
+    if (!ex) return;
+    const styleName = (ex.graph && ex.graph.style) ? ex.graph.style : state.activeStyle;
+    const thumb = tile.querySelector('.thumb');
+    thumb.classList.remove('loading');
+    thumb.innerHTML = FD.renderSVG(ex.graph, { styleName });
+  }
+
+  function rerenderThumbs() {
+    state.tilesByFile.forEach((tile) => {
+      const thumb = tile.querySelector('.thumb');
+      // Only re-render thumbs already rendered (skip the lazy loading placeholders)
+      if (!thumb.classList.contains('loading')) renderThumb(tile);
+    });
+  }
+
+  // ── Modal ──────────────────────────────────────────────
+  const backdrop = document.getElementById('modal-backdrop');
+  const modalCat = document.getElementById('modal-cat');
+  const modalTags = document.getElementById('modal-tags');
+  const modalTitle = document.getElementById('modal-title');
+  const modalDesc = document.getElementById('modal-desc');
+  const modalStage = document.getElementById('modal-stage');
+  const modalGithub = document.getElementById('modal-github');
+  const modalCopy = document.getElementById('modal-copy');
+  const modalPre = document.getElementById('modal-pre');
+  const modalPrev = document.getElementById('modal-prev');
+  const modalNext = document.getElementById('modal-next');
+  let modalVp = null;
+  let modalMode = 'dsl';
+
+  function setupModal() {
+    document.getElementById('modal-close').onclick = closeModal;
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) closeModal();
+    });
+    modalPrev.onclick = () => openModal(state.modalIndex - 1);
+    modalNext.onclick = () => openModal(state.modalIndex + 1);
+
+    document.querySelectorAll('.modal-source-head .src-tab').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('.modal-source-head .src-tab').forEach(x => x.classList.remove('active'));
         b.classList.add('active');
-        const m = b.dataset.mode;
-        if (m === 'off') { panel.classList.remove('open'); mode = 'off'; }
-        else { mode = m; panel.classList.add('open'); refresh(); }
+        modalMode = b.dataset.mode;
+        refreshModalSource();
       };
     });
-    toolbar.querySelector('.src-copy').onclick = function () {
-      if (mode === 'off') return;
-      const btn = toolbar.querySelector('.src-copy');
-      const orig = btn.textContent;
-      navigator.clipboard.writeText(srcText(example, getGraph(), mode)).then(function () {
-        btn.textContent = 'Copied!';
-        setTimeout(function () { btn.textContent = orig; }, 1200);
+    modalCopy.onclick = () => {
+      const text = currentSourceText();
+      if (!text) return;
+      const orig = modalCopy.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        modalCopy.textContent = 'Copied!';
+        setTimeout(() => { modalCopy.textContent = orig; }, 1200);
       });
     };
-    refresh();
-    return { refresh };
-  }
 
-  // ── Build the gallery ─────────────────────────────────
-  const cards = [];
-  function buildShowcase() {
-    const host = document.getElementById('showcase');
-    host.innerHTML = '';
-    cards.length = 0;
-
-    EXAMPLES.forEach(function (ex) {
-      const card = document.createElement('div');
-      card.className = 'sc-card';
-
-      const head = document.createElement('div');
-      head.className = 'sc-head';
-      head.innerHTML =
-        '<span class="sc-tag">' + ex.tag + '</span>' +
-        '<h3 class="sc-name">' + ex.name + '</h3>' +
-        '<p class="sc-desc">' + ex.desc + '</p>';
-
-      const canvas = document.createElement('div');
-      canvas.className = 'sc-canvas';
-
-      card.appendChild(head);
-      card.appendChild(canvas);
-      host.appendChild(card);
-
-      const graph = FD.parseDSL(ex.dsl);
-      const vp = mountInto(canvas, graph);
-
-      mountSourceViewer(card, ex, function () { return FD.parseDSL(ex.dsl); });
-      cards.push({ canvas: canvas, example: ex, vp: vp });
+    addEventListener('keydown', (e) => {
+      if (!backdrop.classList.contains('open')) return;
+      if (e.key === 'Escape') closeModal();
+      else if (e.key === 'ArrowRight') openModal(state.modalIndex + 1);
+      else if (e.key === 'ArrowLeft') openModal(state.modalIndex - 1);
     });
   }
 
-  function rerenderAll() {
-    cards.forEach(function (c) {
-      const g = FD.parseDSL(c.example.dsl);
-      // Per-graph `style: ...` directive always wins over the toolbar choice.
-      const next = (g && g.style) ? g.style : activeStyle;
-      c.vp.setStyle(next);
+  function openModal(i) {
+    if (!state.filtered.length) return;
+    // Wrap around
+    if (i < 0) i = state.filtered.length - 1;
+    if (i >= state.filtered.length) i = 0;
+    state.modalIndex = i;
+    const ex = state.filtered[i];
+
+    modalCat.textContent = ex.category;
+    modalTags.innerHTML = ex.tags.length ? '· ' + ex.tags.map(escapeHTML).join(', ') : '';
+    modalTitle.textContent = ex.name;
+    modalDesc.textContent = ex.description;
+    modalGithub.href = REPO_BLOB_BASE + ex.file;
+
+    if (modalVp) { modalVp.destroy(); modalVp = null; }
+    modalStage.innerHTML = '';
+    const freshGraph = FD.parseDSL(ex.dsl);
+    const styleName = (freshGraph && freshGraph.style) ? freshGraph.style : state.activeStyle;
+    modalVp = FD.mount(modalStage, {
+      graph: freshGraph,
+      styleName,
+      fileName: 'flow-' + ex.id,
     });
+
+    refreshModalSource();
+
+    backdrop.hidden = false;
+    backdrop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    modalPrev.disabled = state.filtered.length < 2;
+    modalNext.disabled = state.filtered.length < 2;
+
+    syncURL();
   }
 
-  // ── Style switcher ────────────────────────────────────
-  const styleBar = document.getElementById('style-bar');
-  STYLES.forEach(function (id) {
-    const b = document.createElement('button');
-    b.className = 'chip' + (id === activeStyle ? ' active' : '');
-    b.textContent = id;
-    b.onclick = function () {
-      activeStyle = id;
-      styleBar.querySelectorAll('.chip').forEach(function (c) {
-        c.classList.toggle('active', c.textContent === id);
-      });
-      rerenderAll();
-    };
-    styleBar.appendChild(b);
+  function closeModal() {
+    backdrop.classList.remove('open');
+    backdrop.hidden = true;
+    document.body.style.overflow = '';
+    if (modalVp) { modalVp.destroy(); modalVp = null; }
+    state.modalIndex = -1;
+    syncURL();
+  }
+
+  function currentSourceText() {
+    if (state.modalIndex < 0) return '';
+    const ex = state.filtered[state.modalIndex];
+    const graph = FD.parseDSL(ex.dsl);
+    if (modalMode === 'dsl')  return ex.dsl;
+    if (modalMode === 'full') return FD.graphToDSL ? FD.graphToDSL(graph) : ex.dsl;
+    return JSON.stringify(compactGraph(graph), null, 2);
+  }
+
+  function refreshModalSource() {
+    const text = currentSourceText();
+    const hl = modalMode === 'json' ? highlightJSON : highlightDSL;
+    modalPre.innerHTML = hl(text);
+  }
+
+  // ── URL state (deep links) ─────────────────────────────
+  function syncURL() {
+    const params = new URLSearchParams();
+    if (state.query) params.set('q', state.query);
+    if (state.activeCategory !== 'All') params.set('cat', state.activeCategory);
+    if (state.activeTags.size) params.set('tags', Array.from(state.activeTags).join(','));
+    if (state.modalIndex >= 0 && state.filtered[state.modalIndex]) {
+      params.set('ex', state.filtered[state.modalIndex].id);
+    }
+    const qs = params.toString();
+    const newURL = location.pathname + (qs ? '?' + qs : '');
+    history.replaceState(null, '', newURL);
+  }
+
+  function applyURL() {
+    const params = new URLSearchParams(location.search);
+    const q = params.get('q');
+    if (q) {
+      state.query = q.toLowerCase();
+      searchInput.value = q;
+      searchEl.classList.add('has-value');
+    }
+    const cat = params.get('cat');
+    if (cat) state.activeCategory = cat;
+    const tags = params.get('tags');
+    if (tags) tags.split(',').filter(Boolean).forEach(t => state.activeTags.add(t));
+  }
+
+  // After examples + filters are built, honor ?ex=... by opening the modal.
+  function maybeOpenInitialModal() {
+    const params = new URLSearchParams(location.search);
+    const exId = params.get('ex');
+    if (!exId) return;
+    const i = state.filtered.findIndex(e => e.id === exId);
+    if (i >= 0) openModal(i);
+  }
+
+  // Patch applyFilters to honor URL → category/tag chips on first paint.
+  const _originalApply = applyFilters;
+  applyFilters = function () {
+    document.querySelectorAll('#cat-row .chip').forEach(c => c.classList.toggle('active', c.dataset.cat === state.activeCategory));
+    document.querySelectorAll('#tag-row .chip').forEach(c => c.classList.toggle('active', state.activeTags.has(c.dataset.tag)));
+    _originalApply();
+  };
+
+  // ── Boot ───────────────────────────────────────────────
+  loadAll().then(() => {
+    // Open deep-linked example only after initial render.
+    maybeOpenInitialModal();
   });
-  const hint = document.createElement('span');
-  hint.className = 'hint';
-  hint.innerHTML = 'Tip: a <code>style: city</code> line in the DSL overrides this for that diagram.';
-  styleBar.appendChild(hint);
-
-  buildShowcase();
 })();
 </script>
 

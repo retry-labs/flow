@@ -1,0 +1,13 @@
+{
+  "_doc": "List of .flow files in this directory. To add an example: drop a .flow file beside this one (with a YAML front-matter block: name, category, tags, description) and add its filename to the array below.",
+  "files": [
+    "microservices-request.flow",
+    "event-driven-fanout.flow",
+    "auth-login.flow",
+    "cdn-origin.flow",
+    "realtime-streaming.flow",
+    "city-style-example.flow",
+    "bounded-context.flow",
+    "process-flowchart.flow"
+  ]
+}

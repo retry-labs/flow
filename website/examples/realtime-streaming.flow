@@ -1,0 +1,18 @@
+---
+name: Realtime / streaming
+category: Data
+tags: [realtime, websocket, mqtt, stream]
+description: Use the realtime edge kind for live data flows (WebSocket, SSE, MQTT). Animated dashes show movement.
+---
+# Realtime streaming pipeline
+
+nodes:
+  - id: sensor, kind: mobile,   label: Mobile
+  - id: edge,   kind: firewall, label: Edge
+  - id: bus,    kind: bus,      label: "Event Bus"
+  - id: live,   kind: stream,   label: "Live View"
+
+edges:
+  - sensor -> edge, kind: realtime
+  - edge   -> bus,  kind: realtime, label: "mqtt"
+  - bus    -> live, kind: realtime, label: "ws"
