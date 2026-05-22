@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <title>Flow — Showcase gallery</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta name="description" content="Browse a growing gallery of architecture and process diagrams. Search by name, filter by category or tag, and copy any DSL into your project."/>
+<meta name="description" content="Browse a growing gallery of architecture and process diagrams. Search by name, filter by category or tag, copy any DSL into your project."/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -13,42 +13,56 @@
     --ink: #1a1814;
     --ink-2: #3a362d;
     --muted: #7a7060;
-    --line: #e4decd;
-    --line-2: #d5cdb4;
+    --muted-2: #a59880;
+    --line: #ece5d0;
+    --line-2: #ddd4b5;
     --bg: #fbf7ec;
+    --bg-2: #f6f0db;
     --paper: #ffffff;
     --paper-2: #faf6e9;
     --accent: #f5c518;
     --accent-2: #ffb020;
-    --shadow-card: 0 1px 0 rgba(0,0,0,.02), 0 4px 14px rgba(80,60,20,.05);
-    --shadow-card-hover: 0 2px 0 rgba(0,0,0,.03), 0 10px 28px rgba(80,60,20,.10);
-    --shadow-modal: 0 30px 80px rgba(20,15,5,.35), 0 8px 24px rgba(20,15,5,.18);
+    --accent-soft: rgba(245, 197, 24, .14);
+    --shadow-1: 0 1px 0 rgba(0,0,0,.02), 0 1px 3px rgba(80,60,20,.04);
+    --shadow-2: 0 2px 0 rgba(0,0,0,.03), 0 6px 16px rgba(80,60,20,.07);
+    --shadow-3: 0 4px 0 rgba(0,0,0,.04), 0 14px 32px rgba(80,60,20,.12);
+    --shadow-drawer: -24px 0 60px rgba(20,15,5,.18), -2px 0 12px rgba(20,15,5,.06);
+    --radius-s: 8px;
+    --radius-m: 12px;
+    --radius-l: 16px;
+    --ease: cubic-bezier(.2,.85,.3,1);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
+  html { scrollbar-gutter: stable; }
   body {
     font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif;
     color: var(--ink); background: var(--bg);
     -webkit-font-smoothing: antialiased; line-height: 1.5;
+    overflow-x: hidden;
   }
+  body.drawer-open { overflow: hidden; }
+
+  ::selection { background: var(--accent-soft); }
 
   /* ── Nav (scroll-aware) ────────────────────────────── */
   .nav {
     position: sticky; top: 0; z-index: 60;
     display: flex; align-items: center; gap: 8px;
-    padding: 14px 40px;
+    padding: 14px 32px;
     background: transparent;
     border-bottom: 1px solid transparent;
     transition: background .2s ease, border-color .2s ease, backdrop-filter .2s ease;
   }
   .nav.scrolled {
-    background: rgba(251, 247, 236, 0.85);
-    backdrop-filter: saturate(140%) blur(8px);
+    background: rgba(251, 247, 236, 0.88);
+    backdrop-filter: saturate(140%) blur(10px);
     border-bottom-color: var(--line);
   }
   .nav .brand {
     font-weight: 700; font-size: 17px; letter-spacing: -0.01em;
-    display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;
+    display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none; color: inherit;
   }
   .nav .brand .logo {
     width: 22px; height: 22px; border-radius: 6px;
@@ -56,175 +70,261 @@
     display: inline-flex; align-items: center; justify-content: center;
     font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 12px;
   }
-  .nav .links { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  .nav .links { margin-left: auto; display: flex; gap: 2px; align-items: center; }
   .nav .links a {
     text-decoration: none; color: var(--ink-2);
     font-size: 13.5px; font-weight: 500;
     padding: 7px 12px; border-radius: 8px;
-    transition: background .15s;
+    transition: background .15s, color .15s;
   }
   .nav .links a:hover { background: rgba(0,0,0,.04); color: var(--ink); }
   .nav .links a.active { color: var(--ink); background: rgba(0,0,0,.06); }
   .nav .links a.cta {
     background: var(--ink); color: var(--paper);
     font-family: "JetBrains Mono", monospace; font-size: 12px;
-    padding: 7px 14px;
+    padding: 7px 14px; margin-left: 6px;
   }
   .nav .links a.cta:hover { background: #000; color: var(--accent); }
 
   /* ── Header ───────────────────────────────────────── */
   header.page {
-    padding: 48px 40px 16px;
-    max-width: 1320px; margin: 0 auto;
+    padding: 56px 32px 24px;
+    max-width: 1360px; margin: 0 auto;
   }
   .eyebrow {
     font-family: "JetBrains Mono", monospace; font-size: 11px;
     letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--accent-2); font-weight: 600;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .eyebrow::before {
+    content: ''; width: 18px; height: 1px; background: var(--accent-2);
   }
   header.page h1 {
-    margin: 6px 0 10px; font-size: 38px; font-weight: 600;
-    letter-spacing: -0.025em; line-height: 1.08;
+    margin: 10px 0 12px; font-size: clamp(32px, 4.4vw, 44px); font-weight: 600;
+    letter-spacing: -0.025em; line-height: 1.05;
   }
   header.page h1 em {
     font-family: "Instrument Serif", serif;
     font-style: italic; font-weight: 400; color: var(--ink-2);
   }
   header.page p.lede {
-    margin: 0; color: var(--muted); font-size: 15.5px; max-width: 720px; line-height: 1.55;
+    margin: 0; color: var(--muted); font-size: 16px;
+    max-width: 720px; line-height: 1.55;
   }
   header.page p.lede code {
-    background: #f1ead3; padding: 1px 6px; border-radius: 4px;
-    font-family: "JetBrains Mono", monospace; font-size: 13px;
+    background: var(--bg-2); padding: 1px 7px; border-radius: 5px;
+    font-family: "JetBrains Mono", monospace; font-size: 13.5px;
+    border: 1px solid var(--line);
   }
 
   /* ── Filter bar (sticky beneath nav) ──────────────── */
   .filterbar {
     position: sticky; top: 56px; z-index: 40;
-    background: rgba(251, 247, 236, 0.92);
-    backdrop-filter: saturate(140%) blur(8px);
+    background: rgba(251, 247, 236, 0.94);
+    backdrop-filter: saturate(140%) blur(10px);
     border-bottom: 1px solid var(--line);
     margin-top: 18px;
   }
   .filterbar-inner {
-    max-width: 1320px; margin: 0 auto;
-    padding: 14px 40px 12px;
+    max-width: 1360px; margin: 0 auto;
+    padding: 14px 32px 12px;
     display: flex; flex-direction: column; gap: 10px;
   }
-  .filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .filter-row .lbl {
-    font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--muted);
-    letter-spacing: 0.04em; text-transform: uppercase;
-    margin-right: 2px;
+
+  /* Row 1: search + count + reset */
+  .row-search {
+    display: flex; align-items: center; gap: 10px;
   }
   .search {
-    position: relative; flex: 1 1 320px; min-width: 240px;
+    position: relative; flex: 1 1 auto; min-width: 0;
   }
   .search input {
-    width: 100%; padding: 11px 14px 11px 40px;
-    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
-    border-radius: 12px; font: inherit; font-size: 14.5px;
-    transition: border-color .15s, box-shadow .15s;
+    width: 100%; height: 44px;
+    padding: 0 44px 0 44px;
+    border: 1.5px solid var(--line);
+    background: var(--paper); color: var(--ink);
+    border-radius: var(--radius-m);
+    font: inherit; font-size: 15px;
+    transition: border-color .15s, box-shadow .15s, background .15s;
   }
+  .search input::placeholder { color: var(--muted-2); }
   .search input:focus {
-    outline: none; border-color: var(--accent);
-    box-shadow: 0 0 0 4px rgba(245,197,24,.18);
+    outline: none; border-color: var(--ink);
+    box-shadow: 0 0 0 4px var(--accent-soft);
   }
   .search .icon {
-    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-    width: 16px; height: 16px; opacity: .55; pointer-events: none;
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: var(--muted); pointer-events: none;
   }
   .search .clear {
-    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
     border: 0; background: transparent; color: var(--muted);
     width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
-    font-size: 16px; line-height: 1; display: none;
+    font-size: 18px; line-height: 1; display: none;
+    transition: background .12s, color .12s;
   }
   .search .clear:hover { background: rgba(0,0,0,.05); color: var(--ink); }
   .search.has-value .clear { display: inline-block; }
+  .search kbd {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    background: var(--bg-2); color: var(--muted);
+    border: 1px solid var(--line);
+    padding: 2px 6px; border-radius: 4px;
+    pointer-events: none;
+  }
+  .search.has-value kbd { display: none; }
+  .search:focus-within kbd { display: none; }
 
   .count {
-    font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted);
+    font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--muted);
     background: var(--paper); border: 1px solid var(--line);
-    padding: 8px 12px; border-radius: 999px;
+    padding: 0 14px; height: 44px;
+    border-radius: var(--radius-m);
+    display: inline-flex; align-items: center; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .count strong { color: var(--ink); font-weight: 600; margin-right: 4px; }
+
+  .reset {
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+    font: inherit; font-size: 13px; height: 44px;
+    cursor: pointer; padding: 0 14px; border-radius: var(--radius-m);
+    transition: background .12s, color .12s, border-color .12s;
     white-space: nowrap;
   }
+  .reset:hover { color: var(--ink); background: var(--paper); border-color: var(--line); }
+  .reset[disabled] { opacity: .35; cursor: not-allowed; }
 
+  /* Row 2: category + style switcher */
+  .row-chips {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .chip-group {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .chip-group .lbl {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--muted);
+    letter-spacing: 0.05em; text-transform: uppercase;
+    margin-right: 4px;
+  }
+  .style-group {
+    margin-left: auto;
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px;
+    display: inline-flex; gap: 2px;
+  }
   .chip {
-    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink-2);
     font-family: inherit; font-size: 12.5px; font-weight: 500;
     padding: 6px 12px; border-radius: 999px; cursor: pointer;
-    transition: all .12s;
+    transition: all .12s var(--ease);
     display: inline-flex; align-items: center; gap: 6px;
+    line-height: 1;
   }
-  .chip:hover { border-color: var(--accent); }
+  .chip:hover { border-color: var(--ink-2); color: var(--ink); }
   .chip.active {
     background: var(--ink); color: #fff; border-color: var(--ink);
   }
-  .chip.style-chip {
-    font-family: "JetBrains Mono", monospace; font-size: 11.5px;
-  }
   .chip .badge {
     font-family: "JetBrains Mono", monospace; font-size: 10px;
-    opacity: .7;
+    background: var(--bg-2); color: var(--muted);
+    padding: 1px 6px; border-radius: 999px;
+    font-weight: 500;
+    transition: all .12s;
   }
-  .chip.active .badge { opacity: .9; }
-  .chip.tag-chip {
-    font-size: 11.5px; padding: 4px 10px;
-    background: var(--paper-2); border-color: var(--line);
-    color: var(--ink-2);
+  .chip:hover .badge { background: var(--bg); }
+  .chip.active .badge {
+    background: rgba(255,255,255,.18); color: rgba(255,255,255,.9);
   }
-  .chip.tag-chip.active {
-    background: var(--accent); color: var(--ink); border-color: var(--accent);
+  .style-group .chip {
+    border: 0; background: transparent;
+    font-family: "JetBrains Mono", monospace; font-size: 11.5px;
+    padding: 5px 12px;
   }
+  .style-group .chip:hover { background: var(--bg-2); }
+  .style-group .chip.active { background: var(--ink); color: #fff; }
+
+  /* Row 3: tags (collapsible) */
+  .row-tags {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding-top: 2px;
+    border-top: 1px dashed var(--line);
+    padding-top: 10px;
+  }
+  .tags-toggle {
+    flex-shrink: 0;
+    border: 0; background: transparent;
+    font: inherit; font-size: 12px; color: var(--muted);
+    cursor: pointer; padding: 4px 0;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: "JetBrains Mono", monospace; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.04em; font-size: 10.5px;
+  }
+  .tags-toggle:hover { color: var(--ink); }
+  .tags-toggle .caret {
+    transition: transform .2s var(--ease);
+    font-size: 10px;
+  }
+  .tags-toggle.expanded .caret { transform: rotate(180deg); }
+  .tags-active-count {
+    background: var(--ink); color: var(--accent);
+    font-size: 10px; font-weight: 600;
+    padding: 1px 6px; border-radius: 999px;
+    min-width: 16px; text-align: center;
+  }
+
   .tag-row {
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-    max-height: 36px; overflow: hidden;
-    transition: max-height .25s ease;
+    flex: 1; min-width: 0;
+    display: flex; gap: 5px; flex-wrap: wrap;
+    max-height: 28px; overflow: hidden;
+    transition: max-height .3s var(--ease);
   }
   .tag-row.expanded { max-height: 400px; }
-  .tag-toggle {
-    border: 0; background: none; color: var(--muted);
-    font: inherit; font-size: 11.5px; font-weight: 500;
-    cursor: pointer; padding: 4px 6px; border-radius: 6px;
-    text-decoration: underline; text-underline-offset: 2px;
+  .tag-row .tag-chip {
+    font-size: 11.5px; padding: 4px 11px;
+    background: var(--paper-2); border-color: var(--line);
+    color: var(--muted);
   }
-  .tag-toggle:hover { color: var(--ink); }
-  .reset {
-    border: 0; background: transparent; color: var(--muted);
-    font-family: "JetBrains Mono", monospace; font-size: 11px;
-    cursor: pointer; padding: 6px 10px; border-radius: 6px;
-    margin-left: auto;
+  .tag-row .tag-chip:hover { color: var(--ink); border-color: var(--ink-2); }
+  .tag-row .tag-chip.active {
+    background: var(--accent); color: var(--ink); border-color: var(--accent);
+    font-weight: 600;
   }
-  .reset:hover { color: var(--ink); background: rgba(0,0,0,.04); }
+  .tag-row .tag-chip.active .badge {
+    background: rgba(0,0,0,.12); color: var(--ink);
+  }
 
   /* ── Grid ─────────────────────────────────────────── */
   main {
-    padding: 24px 40px 80px;
-    max-width: 1320px; margin: 0 auto;
+    padding: 28px 32px 96px;
+    max-width: 1360px; margin: 0 auto;
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
     gap: 18px;
   }
 
   .tile {
+    position: relative;
     background: var(--paper);
     border: 1px solid var(--line);
-    border-radius: 14px;
+    border-radius: var(--radius-l);
     overflow: hidden;
     cursor: pointer;
-    transition: transform .12s ease, box-shadow .15s ease, border-color .15s ease;
-    box-shadow: var(--shadow-card);
+    transition: transform .25s var(--ease), box-shadow .2s ease, border-color .15s;
+    box-shadow: var(--shadow-1);
     display: flex; flex-direction: column;
     text-align: left;
     font: inherit; color: inherit;
     padding: 0;
+    isolation: isolate;
   }
   .tile:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-3);
     border-color: var(--line-2);
   }
   .tile:focus-visible {
@@ -233,230 +333,380 @@
   }
   .tile .thumb {
     background:
-      linear-gradient(to bottom, rgba(255,255,255,0) 70%, rgba(20,15,5,.025)),
-      #fff;
-    height: 168px;
+      radial-gradient(circle at 50% 0%, var(--paper-2) 0%, var(--paper) 70%);
+    aspect-ratio: 16 / 10;
     display: flex; align-items: center; justify-content: center;
     overflow: hidden;
     border-bottom: 1px solid var(--line);
     position: relative;
+    padding: 16px;
   }
-  .tile .thumb svg { width: 100%; height: 100%; display: block; }
-  .tile .thumb.loading::after {
+  .tile .thumb svg {
+    width: 100%; height: 100%; display: block;
+    transition: transform .35s var(--ease);
+  }
+  .tile:hover .thumb svg { transform: scale(1.03); }
+
+  /* Skeleton shimmer for not-yet-rendered thumbnails */
+  .tile .thumb.loading svg { display: none; }
+  .tile .thumb.loading::before {
     content: '';
-    position: absolute; inset: 0;
+    position: absolute; inset: 18px;
+    border-radius: 8px;
     background:
-      radial-gradient(circle at 30% 50%, rgba(245,197,24,.10), transparent 40%),
-      radial-gradient(circle at 70% 50%, rgba(0,0,0,.04), transparent 50%);
-    animation: pulse 1.4s ease-in-out infinite;
+      linear-gradient(110deg,
+        rgba(0,0,0,.025) 0%, rgba(0,0,0,.025) 35%,
+        rgba(245,197,24,.10) 50%,
+        rgba(0,0,0,.025) 65%, rgba(0,0,0,.025) 100%);
+    background-size: 240% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
   }
-  @keyframes pulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+  @keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
   }
+
+  /* Open affordance — appears on hover */
+  .tile .open-hint {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(20,15,5,.85); color: #fff;
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    padding: 5px 9px; border-radius: 999px;
+    opacity: 0; transform: translateY(-4px);
+    transition: opacity .2s, transform .2s;
+    pointer-events: none;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(6px);
+  }
+  .tile:hover .open-hint, .tile:focus-visible .open-hint {
+    opacity: 1; transform: translateY(0);
+  }
+
   .tile .meta {
-    padding: 12px 14px 14px;
-    display: flex; flex-direction: column; gap: 6px;
+    padding: 14px 16px 16px;
+    display: flex; flex-direction: column; gap: 7px;
     flex: 1;
   }
-  .tile .row1 {
-    display: flex; align-items: center; gap: 8px;
+  .tile .cat {
     font-family: "JetBrains Mono", monospace; font-size: 10px;
-    color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase;
-  }
-  .tile .row1 .cat {
-    color: var(--ink-2); font-weight: 600;
-  }
-  .tile .row1 .dot {
-    width: 3px; height: 3px; border-radius: 50%; background: var(--line-2);
+    color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase;
+    font-weight: 600;
   }
   .tile .name {
-    font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
-    margin: 0; line-height: 1.25;
+    font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em;
+    margin: 0; line-height: 1.25; color: var(--ink);
+  }
+  .tile .desc {
+    margin: 0; font-size: 12.5px; color: var(--muted);
+    line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
   }
   .tile .tags {
-    display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;
+    display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;
   }
   .tile .tags .pill {
     font-family: "JetBrains Mono", monospace; font-size: 9.5px;
     color: var(--muted); background: var(--paper-2);
     border: 1px solid var(--line);
     padding: 2px 7px; border-radius: 999px;
+    font-weight: 500;
   }
   .tile .tags .pill.match {
-    color: var(--ink); background: rgba(245,197,24,.22);
-    border-color: rgba(245,197,24,.45);
+    color: var(--ink);
+    background: var(--accent-soft);
+    border-color: rgba(245,197,24,.5);
+  }
+  .tile .tags .pill.more {
+    background: transparent; border-color: transparent; color: var(--muted-2);
   }
 
-  /* ── Empty & status states ───────────────────────── */
-  .empty, .status {
+  /* Skeleton tiles during initial load */
+  .skel {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: var(--radius-l); overflow: hidden;
+    box-shadow: var(--shadow-1);
+    display: flex; flex-direction: column;
+  }
+  .skel .thumb {
+    aspect-ratio: 16 / 10;
+    position: relative;
+    background:
+      linear-gradient(110deg,
+        var(--paper-2) 0%, var(--paper-2) 35%,
+        var(--accent-soft) 50%,
+        var(--paper-2) 65%, var(--paper-2) 100%);
+    background-size: 240% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+    border-bottom: 1px solid var(--line);
+  }
+  .skel .meta {
+    padding: 14px 16px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .skel .b1, .skel .b2, .skel .b3 {
+    height: 10px; border-radius: 4px; background: var(--bg-2);
+    background-size: 240% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+    background-image: linear-gradient(110deg,
+      var(--bg-2) 0%, var(--bg-2) 35%,
+      var(--accent-soft) 50%,
+      var(--bg-2) 65%, var(--bg-2) 100%);
+  }
+  .skel .b1 { width: 40%; height: 8px; }
+  .skel .b2 { width: 75%; height: 14px; margin-top: 2px; }
+  .skel .b3 { width: 60%; height: 10px; }
+
+  /* ── Empty / status states ────────────────────────── */
+  .empty {
     grid-column: 1 / -1;
     text-align: center;
-    padding: 60px 24px;
+    padding: 80px 24px;
     color: var(--muted);
   }
-  .empty h3 { margin: 0 0 6px; color: var(--ink); font-size: 17px; font-weight: 600; }
-  .empty p { margin: 0 0 16px; font-size: 14px; }
+  .empty .icon {
+    width: 48px; height: 48px; margin: 0 auto 16px;
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted-2);
+  }
+  .empty h3 {
+    margin: 0 0 6px; color: var(--ink); font-size: 18px; font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .empty p { margin: 0 0 20px; font-size: 14px; max-width: 380px; margin-left: auto; margin-right: auto; }
   .empty .btn {
-    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
-    font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--ink); background: var(--ink); color: var(--paper);
+    font: inherit; font-size: 13px; padding: 9px 16px;
+    border-radius: var(--radius-s); cursor: pointer;
+    transition: background .12s;
   }
-  .empty .btn:hover { border-color: var(--ink); }
+  .empty .btn:hover { background: #000; }
 
-  /* ── Modal ───────────────────────────────────────── */
-  .modal-backdrop {
+  /* ── Drawer ───────────────────────────────────────── */
+  .drawer-backdrop {
     position: fixed; inset: 0; z-index: 100;
-    background: rgba(20,15,5,.45);
+    background: rgba(20,15,5,.42);
     backdrop-filter: blur(4px);
-    display: none;
-    align-items: flex-start; justify-content: center;
-    overflow-y: auto;
-    padding: 40px 20px;
-    animation: fadeIn .15s ease;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s var(--ease);
   }
-  .modal-backdrop.open { display: flex; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
 
-  .modal {
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(720px, 62vw);
     background: var(--paper);
-    border-radius: 16px;
-    width: 100%; max-width: 1100px;
-    box-shadow: var(--shadow-modal);
+    z-index: 101;
+    transform: translateX(100%);
+    transition: transform .35s var(--ease);
+    box-shadow: var(--shadow-drawer);
+    display: flex; flex-direction: column;
     overflow: hidden;
-    animation: pop .18s cubic-bezier(.2,.9,.3,1.1);
   }
-  @keyframes pop {
-    from { opacity: 0; transform: translateY(8px) scale(0.985); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  .modal-head {
-    padding: 18px 22px 14px;
+  .drawer.open { transform: translateX(0); }
+  .drawer-head {
+    padding: 22px 26px 18px;
     border-bottom: 1px solid var(--line);
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 10px;
-    align-items: center;
+    gap: 14px;
+    align-items: start;
+    flex-shrink: 0;
   }
-  .modal-head .crumb {
+  .drawer-meta { min-width: 0; }
+  .drawer-crumb {
     font-family: "JetBrains Mono", monospace; font-size: 10.5px;
     letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   }
-  .modal-head .crumb .cat { color: var(--ink-2); font-weight: 600; }
-  .modal-head h2 {
-    margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.015em;
-    line-height: 1.2;
+  .drawer-crumb .cat { color: var(--accent-2); font-weight: 700; }
+  .drawer-crumb .sep { color: var(--line-2); }
+  .drawer-crumb .tag { color: var(--muted); }
+  .drawer h2 {
+    margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.018em;
+    line-height: 1.2; color: var(--ink);
   }
-  .modal-head p.desc {
-    margin: 6px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.5;
+  .drawer h2 em {
+    font-family: "Instrument Serif", serif;
+    font-style: italic; font-weight: 400; color: var(--ink-2);
   }
-  .modal-head .actions {
-    display: flex; align-items: flex-start; gap: 6px;
+  .drawer .desc {
+    margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55;
   }
   .icon-btn {
     border: 1px solid var(--line); background: var(--paper); color: var(--ink-2);
     width: 36px; height: 36px; border-radius: 10px;
     cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-    font-size: 18px; line-height: 1; padding: 0;
+    line-height: 1; padding: 0;
     transition: all .12s;
+    flex-shrink: 0;
   }
-  .icon-btn:hover { border-color: var(--ink); color: var(--ink); }
-  .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .icon-btn:hover { border-color: var(--ink); color: var(--ink); background: var(--bg-2); }
+  .icon-btn svg { width: 16px; height: 16px; }
 
-  .modal-canvas {
-    background: #fff;
-    padding: 12px;
-    height: 460px;
+  .drawer-body {
+    flex: 1; overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .drawer-canvas {
+    background:
+      linear-gradient(to bottom, var(--paper) 0%, var(--paper-2) 100%);
+    padding: 18px;
+    height: 440px; flex-shrink: 0;
     position: relative;
     border-bottom: 1px solid var(--line);
   }
-  .modal-canvas .fd-host { width: 100%; height: 100%; }
-  .modal-source-head {
-    padding: 12px 18px;
-    background: #fafaf6;
+  .drawer-canvas .fd-host { width: 100%; height: 100%; }
+  .drawer-source-head {
+    padding: 12px 20px;
+    background: var(--bg-2);
     border-bottom: 1px solid var(--line);
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    flex-shrink: 0;
   }
-  .modal-source-head .lbl {
+  .drawer-source-head .lbl {
     font-family: "JetBrains Mono", monospace; font-size: 10.5px;
     color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
     margin-right: 8px;
   }
-  .modal-source-head .src-tab {
-    border: 1px solid var(--line); background: #fff; color: var(--ink);
+  .src-tab {
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink-2);
     font-family: "JetBrains Mono", monospace; font-size: 11px;
-    padding: 5px 11px; border-radius: 6px; cursor: pointer; transition: all .15s;
+    padding: 5px 11px; border-radius: 6px; cursor: pointer; transition: all .12s;
   }
-  .modal-source-head .src-tab:hover { border-color: var(--accent); }
-  .modal-source-head .src-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .modal-source-head .src-spacer { flex: 1; }
-  .modal-source-head .src-copy, .modal-source-head .src-github {
-    border: 1px solid var(--line); background: #fff;
+  .src-tab:hover { border-color: var(--ink-2); color: var(--ink); }
+  .src-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .src-spacer { flex: 1; }
+  .src-copy, .src-github {
+    border: 1px solid var(--line); background: var(--paper);
     font-family: "JetBrains Mono", monospace; font-size: 11px;
     padding: 5px 11px; border-radius: 6px; cursor: pointer; color: var(--muted);
     text-decoration: none;
     display: inline-flex; align-items: center; gap: 5px;
-  }
-  .modal-source-head .src-copy:hover, .modal-source-head .src-github:hover {
-    color: var(--ink); border-color: var(--ink);
-  }
-  .modal-source {
-    background: #141210; color: #f1efe6; overflow: auto;
-    max-height: 380px;
-  }
-  .modal-source pre {
-    margin: 0; padding: 16px 20px;
-    font-family: "JetBrains Mono", monospace; font-size: 12.5px; line-height: 1.6;
-    white-space: pre;
-  }
-  .modal-source .key { color: #f5c518; }
-  .modal-source .str { color: #9eccff; }
-  .modal-source .num { color: #c0c0a8; }
-  .modal-source .cmt { color: #6f6a5d; font-style: italic; }
-
-  .modal-nav {
-    position: fixed;
-    top: 50%; transform: translateY(-50%);
-    width: 44px; height: 44px; border-radius: 50%;
-    background: rgba(255,255,255,.9);
-    backdrop-filter: blur(6px);
-    border: 1px solid var(--line);
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; color: var(--ink-2);
-    z-index: 101;
     transition: all .12s;
   }
-  .modal-nav:hover { background: #fff; color: var(--ink); border-color: var(--ink); }
-  .modal-nav:disabled { opacity: .3; cursor: not-allowed; }
-  .modal-nav.prev { left: 24px; }
-  .modal-nav.next { right: 24px; }
+  .src-copy:hover, .src-github:hover {
+    color: var(--ink); border-color: var(--ink-2); background: var(--bg-2);
+  }
+  .src-copy.copied { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .drawer-source {
+    background: #14110d; color: #f1efe6;
+    flex: 1; min-height: 200px;
+    overflow: auto;
+  }
+  .drawer-source pre {
+    margin: 0; padding: 18px 22px;
+    font-family: "JetBrains Mono", monospace; font-size: 12.5px; line-height: 1.65;
+    white-space: pre;
+  }
+  .drawer-source .key { color: #f5c518; }
+  .drawer-source .str { color: #9eccff; }
+  .drawer-source .num { color: #c0c0a8; }
+  .drawer-source .cmt { color: #6f6a5d; font-style: italic; }
+
+  .drawer-foot {
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+    background: var(--paper-2);
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+  .drawer-nav {
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink-2);
+    font: inherit; font-size: 12.5px; font-weight: 500;
+    padding: 8px 14px; border-radius: var(--radius-s); cursor: pointer;
+    transition: all .12s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .drawer-nav:hover:not(:disabled) {
+    border-color: var(--ink); color: var(--ink); background: var(--bg-2);
+  }
+  .drawer-nav:disabled { opacity: .35; cursor: not-allowed; }
+  .drawer-pos {
+    margin: 0 auto;
+    font-family: "JetBrains Mono", monospace; font-size: 11.5px;
+    color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .drawer-pos strong { color: var(--ink); font-weight: 600; }
 
   /* ── Footer ───────────────────────────────────────── */
-  footer {
-    padding: 40px 40px 60px;
+  footer.site {
+    padding: 40px 32px 56px;
     border-top: 1px solid var(--line);
     font-family: "JetBrains Mono", monospace; font-size: 12px;
     color: var(--muted);
     display: flex; gap: 18px; flex-wrap: wrap;
     align-items: center; justify-content: space-between;
-    max-width: 1320px; margin: 0 auto;
+    max-width: 1360px; margin: 0 auto;
   }
-  footer .links { display: flex; gap: 16px; }
-  footer a { text-decoration: none; color: inherit; }
-  footer a:hover { color: var(--ink); }
+  footer.site .links { display: flex; gap: 16px; }
+  footer.site a { text-decoration: none; color: inherit; transition: color .12s; }
+  footer.site a:hover { color: var(--ink); }
+
+  /* ── Tablet ──────────────────────────────────────── */
+  @media (max-width: 1024px) {
+    .drawer { width: min(620px, 75vw); }
+  }
 
   /* ── Mobile ──────────────────────────────────────── */
   @media (max-width: 720px) {
     .nav { padding: 12px 18px; }
     .nav .links a { padding: 6px 8px; font-size: 12.5px; }
-    header.page { padding: 32px 18px 8px; }
-    header.page h1 { font-size: 30px; }
-    .filterbar-inner { padding: 12px 18px 10px; }
-    main { padding: 20px 18px 60px; }
-    .modal-backdrop { padding: 12px; }
-    .modal-canvas { height: 320px; }
-    .modal-nav { display: none; }
+    .nav .links a.cta { padding: 6px 10px; }
+    header.page { padding: 36px 18px 12px; }
+    header.page p.lede { font-size: 15px; }
+    .filterbar-inner { padding: 12px 18px 10px; gap: 10px; }
+    .row-search { gap: 8px; }
+    .search input { height: 42px; font-size: 14px; }
+    .count { padding: 0 10px; height: 42px; font-size: 11px; }
+    .reset { padding: 0 8px; font-size: 12px; height: 42px; }
+    .search kbd { display: none; }
+    .style-group { margin-left: 0; width: 100%; overflow-x: auto; }
+    .style-group::-webkit-scrollbar { display: none; }
+    .row-chips { gap: 10px; }
+    main { padding: 22px 16px 80px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .tile .meta { padding: 12px 14px 14px; }
+    .tile .name { font-size: 14.5px; }
+    footer.site { padding: 32px 18px 48px; flex-direction: column; align-items: flex-start; gap: 12px; }
+
+    /* Drawer becomes a full-screen bottom sheet */
+    .drawer {
+      width: 100%; top: auto; bottom: 0;
+      max-height: 92dvh; height: 92dvh;
+      border-radius: 18px 18px 0 0;
+      transform: translateY(100%);
+    }
+    .drawer.open { transform: translateY(0); }
+    .drawer-head { padding: 16px 18px 14px; }
+    .drawer h2 { font-size: 20px; }
+    .drawer-canvas { height: 320px; padding: 12px; }
+    .drawer-source-head { padding: 10px 14px; }
+    .drawer-foot { padding: 12px 14px; }
+    .drawer-nav { font-size: 12px; padding: 7px 10px; }
+    /* Pill at the top of bottom-sheet (grab handle) */
+    .drawer::before {
+      content: ''; display: block;
+      width: 40px; height: 4px; border-radius: 999px;
+      background: var(--line-2);
+      margin: 8px auto 0;
+    }
+  }
+
+  /* Small phones */
+  @media (max-width: 380px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      transition-duration: .01ms !important;
+    }
   }
 </style>
 </head>
@@ -476,48 +726,62 @@
 </nav>
 
 <header class="page">
-  <div class="eyebrow">Showcase</div>
-  <h1>A growing gallery, <em>one DSL.</em></h1>
+  <div class="eyebrow">Gallery</div>
+  <h1>Browse the gallery, <em>copy the DSL.</em></h1>
   <p class="lede">
-    Every example is a single <code>.flow</code> file in this repo — open one to see the rendered diagram
-    and copy the DSL into your project. Use the search bar and tag pills to find what you need.
+    Every example below is a single <code>.flow</code> file in this repo. Open one to inspect the
+    interactive diagram and grab the source. Use search, categories, and tags to find what fits your problem.
   </p>
 </header>
 
 <div class="filterbar">
   <div class="filterbar-inner">
-    <div class="filter-row">
+    <!-- Row 1: search + count + reset -->
+    <div class="row-search">
       <div class="search">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input id="q" type="search" placeholder="Search examples — name, tag, kind, kafka, oauth…" autocomplete="off" spellcheck="false"/>
+        <input id="q" type="search" placeholder="Search examples by name, tag, or content…" autocomplete="off" spellcheck="false" aria-label="Search examples"/>
         <button class="clear" id="q-clear" title="Clear search" aria-label="Clear search">×</button>
+        <kbd>/</kbd>
       </div>
-      <div class="count" id="count">…</div>
-      <button class="reset" id="reset" title="Reset filters">Reset</button>
+      <div class="count" id="count" aria-live="polite"><strong>…</strong></div>
+      <button class="reset" id="reset" title="Reset all filters" disabled>Reset</button>
     </div>
-    <div class="filter-row" id="cat-row">
-      <span class="lbl">Category</span>
+
+    <!-- Row 2: category + style switcher -->
+    <div class="row-chips">
+      <div class="chip-group" id="cat-row">
+        <span class="lbl">Category</span>
+      </div>
+      <div class="style-group" id="style-row" role="tablist" aria-label="Render style"></div>
     </div>
-    <div class="filter-row" id="style-row">
-      <span class="lbl">Style</span>
-    </div>
-    <div class="filter-row" style="align-items: flex-start;">
-      <span class="lbl" style="padding-top: 6px;">Tags</span>
-      <div class="tag-row" id="tag-row" style="flex: 1;"></div>
-      <button class="tag-toggle" id="tag-toggle" style="display: none;">Show all</button>
+
+    <!-- Row 3: tags (collapsible) -->
+    <div class="row-tags">
+      <button class="tags-toggle" id="tags-toggle" aria-expanded="false">
+        Tags <span class="caret">▾</span>
+        <span class="tags-active-count" id="tags-active-count" style="display: none;">0</span>
+      </button>
+      <div class="tag-row" id="tag-row"></div>
     </div>
   </div>
 </div>
 
 <main>
-  <div class="grid" id="grid">
-    <div class="status">Loading examples…</div>
+  <div class="grid" id="grid" aria-busy="true">
+    <!-- Skeleton placeholders -->
+    <div class="skel"><div class="thumb"></div><div class="meta"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div></div>
+    <div class="skel"><div class="thumb"></div><div class="meta"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div></div>
+    <div class="skel"><div class="thumb"></div><div class="meta"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div></div>
+    <div class="skel"><div class="thumb"></div><div class="meta"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div></div>
+    <div class="skel"><div class="thumb"></div><div class="meta"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div></div>
+    <div class="skel"><div class="thumb"></div><div class="meta"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div></div>
   </div>
 </main>
 
-<footer>
+<footer class="site">
   <div>© 2026 Flow · MIT License · v0.1</div>
   <div class="links">
     <a href="./index.html">Home</a>
@@ -528,34 +792,38 @@
   </div>
 </footer>
 
-<!-- Modal scaffold (single instance reused) -->
-<div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
-  <button class="modal-nav prev" id="modal-prev" aria-label="Previous example">‹</button>
-  <div class="modal" id="modal">
-    <div class="modal-head">
-      <div>
-        <div class="crumb"><span class="cat" id="modal-cat"></span> <span id="modal-tags"></span></div>
-        <h2 id="modal-title">Example name</h2>
-        <p class="desc" id="modal-desc"></p>
-      </div>
-      <div class="actions">
-        <button class="icon-btn" id="modal-close" title="Close (Esc)" aria-label="Close">×</button>
-      </div>
+<!-- Drawer (one instance, content swapped) -->
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <div class="drawer-head">
+    <div class="drawer-meta">
+      <div class="drawer-crumb" id="drawer-crumb"></div>
+      <h2 id="drawer-title">—</h2>
+      <p class="desc" id="drawer-desc"></p>
     </div>
-    <div class="modal-canvas"><div class="fd-host" id="modal-stage"></div></div>
-    <div class="modal-source-head">
+    <button class="icon-btn" id="drawer-close" title="Close (Esc)" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-canvas"><div class="fd-host" id="drawer-stage"></div></div>
+    <div class="drawer-source-head">
       <span class="lbl">Source</span>
       <button class="src-tab active" data-mode="dsl"  title="The original DSL from the .flow file">DSL</button>
       <button class="src-tab" data-mode="full" title="Full DSL with auto-layout coordinates expanded">Full DSL</button>
       <button class="src-tab" data-mode="json">JSON</button>
       <span class="src-spacer"></span>
-      <a class="src-github" id="modal-github" target="_blank" rel="noopener" title="View .flow file on GitHub">⌥ View on GitHub</a>
-      <button class="src-copy" id="modal-copy">Copy</button>
+      <a class="src-github" id="drawer-github" target="_blank" rel="noopener" title="View .flow file on GitHub">↗ GitHub</a>
+      <button class="src-copy" id="drawer-copy">Copy</button>
     </div>
-    <div class="modal-source"><pre id="modal-pre"></pre></div>
+    <div class="drawer-source"><pre id="drawer-pre"></pre></div>
   </div>
-  <button class="modal-nav next" id="modal-next" aria-label="Next example">›</button>
-</div>
+  <div class="drawer-foot">
+    <button class="drawer-nav" id="drawer-prev" aria-label="Previous example">← Previous</button>
+    <span class="drawer-pos" id="drawer-pos"></span>
+    <button class="drawer-nav" id="drawer-next" aria-label="Next example">Next →</button>
+  </div>
+</aside>
 
 <script>
   // Scroll-aware nav.
@@ -567,7 +835,7 @@
     update();
   })();
 </script>
-<script src="./dist/flow.standalone.js?v=3"></script>
+<script src="./dist/flow.standalone.js?v=4"></script>
 <script>
 (function () {
   'use strict';
@@ -601,12 +869,6 @@
   const EXAMPLES_BASE = './examples/';
 
   // ── Front-matter + DSL parser ──────────────────────────
-  // Parses a .flow file:
-  //   ---
-  //   name: Foo
-  //   tags: [a, b, c]
-  //   ---
-  //   <dsl body>
   function parseFlowFile(text) {
     const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
     if (!m) return { meta: {}, dsl: text };
@@ -629,19 +891,19 @@
 
   // ── State ──────────────────────────────────────────────
   const state = {
-    examples: [],           // [{ id, file, name, category, tags, description, dsl, graph }]
+    examples: [],
     activeStyle: 'sleek',
     activeCategory: 'All',
-    activeTags: new Set(),  // OR-filter
+    activeTags: new Set(),
     query: '',
-    filtered: [],           // current filtered list (in render order)
-    modalIndex: -1,         // index into `filtered`
-    tilesByFile: new Map(), // file -> tile element (for thumbnail re-render)
+    filtered: [],
+    drawerIndex: -1,
+    tilesByFile: new Map(),
   };
 
   // ── Source rendering helpers ───────────────────────────
   function escapeHTML(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
   function highlightDSL(text) {
     return escapeHTML(text)
@@ -667,7 +929,8 @@
       const r = await fetch(EXAMPLES_BASE + 'index.json', { cache: 'no-cache' });
       manifest = await r.json();
     } catch (e) {
-      grid.innerHTML = '<div class="empty"><h3>Could not load examples manifest</h3><p><code>examples/index.json</code> failed to fetch — are you running this off a static server?</p></div>';
+      grid.innerHTML = '<div class="empty"><h3>Could not load manifest</h3><p>The <code>examples/index.json</code> file failed to fetch — are you serving via a static server?</p></div>';
+      grid.removeAttribute('aria-busy');
       return;
     }
     const files = manifest.files || [];
@@ -681,8 +944,7 @@
         const id = file.replace(/\.flow$/, '');
         const tags = Array.isArray(meta.tags) ? meta.tags : (meta.tags ? [meta.tags] : []);
         return {
-          id,
-          file,
+          id, file,
           name: meta.name || id,
           category: meta.category || 'Other',
           tags,
@@ -697,6 +959,8 @@
     }));
 
     state.examples = results.filter(Boolean);
+    grid.removeAttribute('aria-busy');
+
     if (!state.examples.length) {
       grid.innerHTML = '<div class="empty"><h3>No examples found</h3><p>The manifest listed files but none could be loaded.</p></div>';
       return;
@@ -705,12 +969,12 @@
     buildFilters();
     applyURL();
     applyFilters();
-    setupModal();
+    setupDrawer();
+    setupKeyboardShortcuts();
   }
 
   // ── Filter UI ──────────────────────────────────────────
   function buildFilters() {
-    // Categories (unique, sorted by count desc)
     const catCount = new Map();
     const tagCount = new Map();
     state.examples.forEach(ex => {
@@ -718,7 +982,6 @@
       ex.tags.forEach(t => tagCount.set(t, (tagCount.get(t) || 0) + 1));
     });
 
-    // Categories row
     const catRow = document.getElementById('cat-row');
     const catList = ['All', ...Array.from(catCount.keys()).sort((a, b) => catCount.get(b) - catCount.get(a))];
     catList.forEach(cat => {
@@ -726,56 +989,66 @@
       b.className = 'chip' + (cat === state.activeCategory ? ' active' : '');
       b.dataset.cat = cat;
       const count = cat === 'All' ? state.examples.length : catCount.get(cat);
-      b.innerHTML = cat + ' <span class="badge">' + count + '</span>';
+      b.innerHTML = escapeHTML(cat) + ' <span class="badge">' + count + '</span>';
       b.onclick = () => {
         state.activeCategory = cat;
         catRow.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
-        applyFilters();
-        syncURL();
+        applyFilters(); syncURL();
       };
       catRow.appendChild(b);
     });
 
-    // Style row
     const styleRow = document.getElementById('style-row');
     STYLES.forEach(id => {
       const b = document.createElement('button');
       b.className = 'chip style-chip' + (id === state.activeStyle ? ' active' : '');
       b.dataset.style = id;
       b.textContent = id;
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', id === state.activeStyle ? 'true' : 'false');
       b.onclick = () => {
         state.activeStyle = id;
-        styleRow.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.style === id));
+        styleRow.querySelectorAll('.chip').forEach(c => {
+          const on = c.dataset.style === id;
+          c.classList.toggle('active', on);
+          c.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
         rerenderThumbs();
       };
       styleRow.appendChild(b);
     });
 
-    // Tag row
     const tagRow = document.getElementById('tag-row');
-    const tagToggle = document.getElementById('tag-toggle');
+    const tagToggle = document.getElementById('tags-toggle');
     const tagList = Array.from(tagCount.keys()).sort((a, b) => tagCount.get(b) - tagCount.get(a));
     tagList.forEach(t => {
       const b = document.createElement('button');
       b.className = 'chip tag-chip';
       b.dataset.tag = t;
-      b.innerHTML = t + ' <span class="badge">' + tagCount.get(t) + '</span>';
+      b.innerHTML = escapeHTML(t) + ' <span class="badge">' + tagCount.get(t) + '</span>';
       b.onclick = () => {
         if (state.activeTags.has(t)) state.activeTags.delete(t);
         else state.activeTags.add(t);
         b.classList.toggle('active', state.activeTags.has(t));
-        applyFilters();
-        syncURL();
+        updateTagActiveCount();
+        applyFilters(); syncURL();
       };
       tagRow.appendChild(b);
     });
-    if (tagList.length > 12) {
-      tagToggle.style.display = '';
-      tagToggle.textContent = 'Show all (' + tagList.length + ')';
-      tagToggle.onclick = () => {
-        const expanded = tagRow.classList.toggle('expanded');
-        tagToggle.textContent = expanded ? 'Show less' : 'Show all (' + tagList.length + ')';
-      };
+    tagToggle.onclick = () => {
+      const expanded = tagRow.classList.toggle('expanded');
+      tagToggle.classList.toggle('expanded', expanded);
+      tagToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+  }
+
+  function updateTagActiveCount() {
+    const el = document.getElementById('tags-active-count');
+    if (state.activeTags.size > 0) {
+      el.style.display = '';
+      el.textContent = state.activeTags.size;
+    } else {
+      el.style.display = 'none';
     }
   }
 
@@ -783,21 +1056,27 @@
   const searchInput = document.getElementById('q');
   const searchEl = searchInput.parentElement;
   const clearBtn = document.getElementById('q-clear');
+  const resetBtn = document.getElementById('reset');
   searchInput.addEventListener('input', () => {
     state.query = searchInput.value.trim().toLowerCase();
     searchEl.classList.toggle('has-value', !!state.query);
-    applyFilters();
-    syncURL();
+    applyFilters(); syncURL();
   });
   clearBtn.addEventListener('click', () => {
     searchInput.value = '';
     state.query = '';
     searchEl.classList.remove('has-value');
-    applyFilters();
-    syncURL();
+    applyFilters(); syncURL();
     searchInput.focus();
   });
-  document.getElementById('reset').addEventListener('click', resetFilters);
+  resetBtn.addEventListener('click', resetFilters);
+
+  function isAnyFilterActive() {
+    return !!state.query || state.activeCategory !== 'All' || state.activeTags.size > 0;
+  }
+  function refreshResetButton() {
+    resetBtn.disabled = !isAnyFilterActive();
+  }
 
   function resetFilters() {
     state.query = '';
@@ -807,8 +1086,8 @@
     searchEl.classList.remove('has-value');
     document.querySelectorAll('#cat-row .chip').forEach(c => c.classList.toggle('active', c.dataset.cat === 'All'));
     document.querySelectorAll('#tag-row .chip').forEach(c => c.classList.remove('active'));
-    applyFilters();
-    syncURL();
+    updateTagActiveCount();
+    applyFilters(); syncURL();
   }
 
   // ── Filtering ──────────────────────────────────────────
@@ -827,11 +1106,16 @@
   }
 
   function applyFilters() {
+    document.querySelectorAll('#cat-row .chip').forEach(c => c.classList.toggle('active', c.dataset.cat === state.activeCategory));
+    document.querySelectorAll('#tag-row .chip').forEach(c => c.classList.toggle('active', state.activeTags.has(c.dataset.tag)));
     state.filtered = state.examples.filter(matches);
     renderGrid();
-    document.getElementById('count').textContent =
-      state.filtered.length + (state.filtered.length === 1 ? ' example' : ' examples') +
-      (state.filtered.length !== state.examples.length ? ' of ' + state.examples.length : '');
+    const countEl = document.getElementById('count');
+    const n = state.filtered.length;
+    const tot = state.examples.length;
+    countEl.innerHTML = '<strong>' + n + '</strong> ' + (n === 1 ? 'example' : 'examples') +
+      (n !== tot ? ' of ' + tot : '');
+    refreshResetButton();
   }
 
   // ── Grid render ────────────────────────────────────────
@@ -842,7 +1126,11 @@
     if (!state.filtered.length) {
       const empty = document.createElement('div');
       empty.className = 'empty';
-      empty.innerHTML = '<h3>No matches</h3><p>Try a different search term, clear some tag filters, or pick another category.</p><button class="btn" id="empty-reset">Reset filters</button>';
+      empty.innerHTML =
+        '<div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>' +
+        '<h3>No matches</h3>' +
+        '<p>Try a different search term, clear a tag, or pick another category.</p>' +
+        '<button class="btn" id="empty-reset">Reset filters</button>';
       grid.appendChild(empty);
       document.getElementById('empty-reset').onclick = resetFilters;
       return;
@@ -856,7 +1144,7 @@
           observer.unobserve(tile);
         }
       });
-    }, { rootMargin: '200px' });
+    }, { rootMargin: '300px' });
 
     state.filtered.forEach((ex, i) => {
       const tile = document.createElement('button');
@@ -865,23 +1153,23 @@
       tile.dataset.index = String(i);
       tile.setAttribute('aria-label', 'Open ' + ex.name);
 
-      const thumb = document.createElement('div');
-      thumb.className = 'thumb loading';
-      tile.appendChild(thumb);
-
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      const tagHTML = ex.tags.slice(0, 4).map(t => {
+      const tagsRendered = ex.tags.slice(0, 3).map(t => {
         const cls = state.activeTags.has(t) ? 'pill match' : 'pill';
         return '<span class="' + cls + '">' + escapeHTML(t) + '</span>';
       }).join('');
-      meta.innerHTML =
-        '<div class="row1"><span class="cat">' + escapeHTML(ex.category) + '</span></div>' +
-        '<h3 class="name">' + escapeHTML(ex.name) + '</h3>' +
-        '<div class="tags">' + tagHTML + '</div>';
-      tile.appendChild(meta);
+      const more = ex.tags.length > 3 ? '<span class="pill more">+' + (ex.tags.length - 3) + '</span>' : '';
 
-      tile.addEventListener('click', () => openModal(i));
+      tile.innerHTML =
+        '<div class="thumb loading"></div>' +
+        '<span class="open-hint">Open ↗</span>' +
+        '<div class="meta">' +
+          '<span class="cat">' + escapeHTML(ex.category) + '</span>' +
+          '<h3 class="name">' + escapeHTML(ex.name) + '</h3>' +
+          (ex.description ? '<p class="desc">' + escapeHTML(ex.description) + '</p>' : '') +
+          (ex.tags.length ? '<div class="tags">' + tagsRendered + more + '</div>' : '') +
+        '</div>';
+
+      tile.addEventListener('click', () => openDrawer(i));
       state.tilesByFile.set(ex.file, tile);
       grid.appendChild(tile);
       observer.observe(tile);
@@ -894,139 +1182,169 @@
     if (!ex) return;
     const styleName = (ex.graph && ex.graph.style) ? ex.graph.style : state.activeStyle;
     const thumb = tile.querySelector('.thumb');
-    thumb.classList.remove('loading');
-    thumb.innerHTML = FD.renderSVG(ex.graph, { styleName });
+    try {
+      thumb.innerHTML = FD.renderSVG(ex.graph, { styleName });
+      thumb.classList.remove('loading');
+    } catch (e) {
+      thumb.classList.remove('loading');
+      thumb.innerHTML = '<div style="color: var(--muted); font-size: 11px; font-family: monospace; padding: 16px;">render error</div>';
+    }
   }
 
   function rerenderThumbs() {
     state.tilesByFile.forEach((tile) => {
       const thumb = tile.querySelector('.thumb');
-      // Only re-render thumbs already rendered (skip the lazy loading placeholders)
       if (!thumb.classList.contains('loading')) renderThumb(tile);
     });
   }
 
-  // ── Modal ──────────────────────────────────────────────
-  const backdrop = document.getElementById('modal-backdrop');
-  const modalCat = document.getElementById('modal-cat');
-  const modalTags = document.getElementById('modal-tags');
-  const modalTitle = document.getElementById('modal-title');
-  const modalDesc = document.getElementById('modal-desc');
-  const modalStage = document.getElementById('modal-stage');
-  const modalGithub = document.getElementById('modal-github');
-  const modalCopy = document.getElementById('modal-copy');
-  const modalPre = document.getElementById('modal-pre');
-  const modalPrev = document.getElementById('modal-prev');
-  const modalNext = document.getElementById('modal-next');
-  let modalVp = null;
-  let modalMode = 'dsl';
+  // ── Drawer ─────────────────────────────────────────────
+  const backdrop = document.getElementById('drawer-backdrop');
+  const drawer = document.getElementById('drawer');
+  const drawerCrumb = document.getElementById('drawer-crumb');
+  const drawerTitle = document.getElementById('drawer-title');
+  const drawerDesc = document.getElementById('drawer-desc');
+  const drawerStage = document.getElementById('drawer-stage');
+  const drawerGithub = document.getElementById('drawer-github');
+  const drawerCopy = document.getElementById('drawer-copy');
+  const drawerPre = document.getElementById('drawer-pre');
+  const drawerPrev = document.getElementById('drawer-prev');
+  const drawerNext = document.getElementById('drawer-next');
+  const drawerPos = document.getElementById('drawer-pos');
+  let drawerVp = null;
+  let drawerMode = 'dsl';
 
-  function setupModal() {
-    document.getElementById('modal-close').onclick = closeModal;
-    backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) closeModal();
-    });
-    modalPrev.onclick = () => openModal(state.modalIndex - 1);
-    modalNext.onclick = () => openModal(state.modalIndex + 1);
+  function setupDrawer() {
+    document.getElementById('drawer-close').onclick = closeDrawer;
+    backdrop.addEventListener('click', closeDrawer);
+    drawerPrev.onclick = () => openDrawer(state.drawerIndex - 1);
+    drawerNext.onclick = () => openDrawer(state.drawerIndex + 1);
 
-    document.querySelectorAll('.modal-source-head .src-tab').forEach(b => {
+    document.querySelectorAll('.src-tab').forEach(b => {
       b.onclick = () => {
-        document.querySelectorAll('.modal-source-head .src-tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.src-tab').forEach(x => x.classList.remove('active'));
         b.classList.add('active');
-        modalMode = b.dataset.mode;
-        refreshModalSource();
+        drawerMode = b.dataset.mode;
+        refreshSource();
       };
     });
-    modalCopy.onclick = () => {
+    drawerCopy.onclick = () => {
       const text = currentSourceText();
       if (!text) return;
-      const orig = modalCopy.textContent;
       navigator.clipboard.writeText(text).then(() => {
-        modalCopy.textContent = 'Copied!';
-        setTimeout(() => { modalCopy.textContent = orig; }, 1200);
+        drawerCopy.classList.add('copied');
+        const orig = drawerCopy.textContent;
+        drawerCopy.textContent = 'Copied!';
+        setTimeout(() => {
+          drawerCopy.textContent = orig;
+          drawerCopy.classList.remove('copied');
+        }, 1200);
       });
     };
-
-    addEventListener('keydown', (e) => {
-      if (!backdrop.classList.contains('open')) return;
-      if (e.key === 'Escape') closeModal();
-      else if (e.key === 'ArrowRight') openModal(state.modalIndex + 1);
-      else if (e.key === 'ArrowLeft') openModal(state.modalIndex - 1);
-    });
   }
 
-  function openModal(i) {
+  function openDrawer(i) {
     if (!state.filtered.length) return;
-    // Wrap around
     if (i < 0) i = state.filtered.length - 1;
     if (i >= state.filtered.length) i = 0;
-    state.modalIndex = i;
+    state.drawerIndex = i;
     const ex = state.filtered[i];
 
-    modalCat.textContent = ex.category;
-    modalTags.innerHTML = ex.tags.length ? '· ' + ex.tags.map(escapeHTML).join(', ') : '';
-    modalTitle.textContent = ex.name;
-    modalDesc.textContent = ex.description;
-    modalGithub.href = REPO_BLOB_BASE + ex.file;
+    // Crumb: CAT · tag · tag · tag (first 3)
+    const tagHTML = ex.tags.slice(0, 3).map(t => '<span class="tag">' + escapeHTML(t) + '</span>').join(' <span class="sep">·</span> ');
+    drawerCrumb.innerHTML =
+      '<span class="cat">' + escapeHTML(ex.category) + '</span>' +
+      (ex.tags.length ? ' <span class="sep">·</span> ' + tagHTML : '');
+    drawerTitle.textContent = ex.name;
+    drawerDesc.textContent = ex.description || '';
+    drawerGithub.href = REPO_BLOB_BASE + ex.file;
+    drawerPos.innerHTML = '<strong>' + (i + 1) + '</strong> / ' + state.filtered.length;
+    drawerPrev.disabled = state.filtered.length < 2;
+    drawerNext.disabled = state.filtered.length < 2;
 
-    if (modalVp) { modalVp.destroy(); modalVp = null; }
-    modalStage.innerHTML = '';
+    if (drawerVp) { drawerVp.destroy(); drawerVp = null; }
+    drawerStage.innerHTML = '';
     const freshGraph = FD.parseDSL(ex.dsl);
     const styleName = (freshGraph && freshGraph.style) ? freshGraph.style : state.activeStyle;
-    modalVp = FD.mount(modalStage, {
+    drawerVp = FD.mount(drawerStage, {
       graph: freshGraph,
       styleName,
       fileName: 'flow-' + ex.id,
     });
 
-    refreshModalSource();
+    refreshSource();
 
-    backdrop.hidden = false;
-    backdrop.classList.add('open');
-    document.body.style.overflow = 'hidden';
-
-    modalPrev.disabled = state.filtered.length < 2;
-    modalNext.disabled = state.filtered.length < 2;
+    drawer.hidden = false;
+    requestAnimationFrame(() => {
+      backdrop.classList.add('open');
+      drawer.classList.add('open');
+      document.body.classList.add('drawer-open');
+    });
 
     syncURL();
   }
 
-  function closeModal() {
+  function closeDrawer() {
     backdrop.classList.remove('open');
-    backdrop.hidden = true;
-    document.body.style.overflow = '';
-    if (modalVp) { modalVp.destroy(); modalVp = null; }
-    state.modalIndex = -1;
+    drawer.classList.remove('open');
+    document.body.classList.remove('drawer-open');
+    setTimeout(() => {
+      drawer.hidden = true;
+      if (drawerVp) { drawerVp.destroy(); drawerVp = null; }
+      drawerStage.innerHTML = '';
+    }, 350);
+    state.drawerIndex = -1;
     syncURL();
   }
 
   function currentSourceText() {
-    if (state.modalIndex < 0) return '';
-    const ex = state.filtered[state.modalIndex];
+    if (state.drawerIndex < 0) return '';
+    const ex = state.filtered[state.drawerIndex];
+    if (drawerMode === 'dsl')  return ex.dsl;
     const graph = FD.parseDSL(ex.dsl);
-    if (modalMode === 'dsl')  return ex.dsl;
-    if (modalMode === 'full') return FD.graphToDSL ? FD.graphToDSL(graph) : ex.dsl;
+    if (drawerMode === 'full') return FD.graphToDSL ? FD.graphToDSL(graph) : ex.dsl;
     return JSON.stringify(compactGraph(graph), null, 2);
   }
 
-  function refreshModalSource() {
+  function refreshSource() {
     const text = currentSourceText();
-    const hl = modalMode === 'json' ? highlightJSON : highlightDSL;
-    modalPre.innerHTML = hl(text);
+    const hl = drawerMode === 'json' ? highlightJSON : highlightDSL;
+    drawerPre.innerHTML = hl(text);
   }
 
-  // ── URL state (deep links) ─────────────────────────────
+  // ── Keyboard shortcuts ────────────────────────────────
+  function setupKeyboardShortcuts() {
+    addEventListener('keydown', (e) => {
+      // Focus search with "/" when not already in an input
+      if (e.key === '/' && !drawer.classList.contains('open')) {
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+        return;
+      }
+      if (drawer.classList.contains('open')) {
+        if (e.key === 'Escape') closeDrawer();
+        else if (e.key === 'ArrowRight') openDrawer(state.drawerIndex + 1);
+        else if (e.key === 'ArrowLeft') openDrawer(state.drawerIndex - 1);
+      } else {
+        if (e.key === 'Escape' && isAnyFilterActive()) resetFilters();
+      }
+    });
+  }
+
+  // ── URL state ─────────────────────────────────────────
   function syncURL() {
     const params = new URLSearchParams();
     if (state.query) params.set('q', state.query);
     if (state.activeCategory !== 'All') params.set('cat', state.activeCategory);
     if (state.activeTags.size) params.set('tags', Array.from(state.activeTags).join(','));
-    if (state.modalIndex >= 0 && state.filtered[state.modalIndex]) {
-      params.set('ex', state.filtered[state.modalIndex].id);
+    if (state.drawerIndex >= 0 && state.filtered[state.drawerIndex]) {
+      params.set('ex', state.filtered[state.drawerIndex].id);
     }
     const qs = params.toString();
-    const newURL = location.pathname + (qs ? '?' + qs : '');
-    history.replaceState(null, '', newURL);
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
   }
 
   function applyURL() {
@@ -1041,30 +1359,28 @@
     if (cat) state.activeCategory = cat;
     const tags = params.get('tags');
     if (tags) tags.split(',').filter(Boolean).forEach(t => state.activeTags.add(t));
+    updateTagActiveCount();
+    // If any tags pre-active, expand the tag row.
+    if (state.activeTags.size) {
+      const tagRow = document.getElementById('tag-row');
+      const tagToggle = document.getElementById('tags-toggle');
+      tagRow.classList.add('expanded');
+      tagToggle.classList.add('expanded');
+      tagToggle.setAttribute('aria-expanded', 'true');
+    }
   }
 
-  // After examples + filters are built, honor ?ex=... by opening the modal.
-  function maybeOpenInitialModal() {
+  // After filters apply, honor ?ex=… by opening that example.
+  function maybeOpenInitialDrawer() {
     const params = new URLSearchParams(location.search);
     const exId = params.get('ex');
     if (!exId) return;
     const i = state.filtered.findIndex(e => e.id === exId);
-    if (i >= 0) openModal(i);
+    if (i >= 0) openDrawer(i);
   }
 
-  // Patch applyFilters to honor URL → category/tag chips on first paint.
-  const _originalApply = applyFilters;
-  applyFilters = function () {
-    document.querySelectorAll('#cat-row .chip').forEach(c => c.classList.toggle('active', c.dataset.cat === state.activeCategory));
-    document.querySelectorAll('#tag-row .chip').forEach(c => c.classList.toggle('active', state.activeTags.has(c.dataset.tag)));
-    _originalApply();
-  };
-
-  // ── Boot ───────────────────────────────────────────────
-  loadAll().then(() => {
-    // Open deep-linked example only after initial render.
-    maybeOpenInitialModal();
-  });
+  // ── Boot ──────────────────────────────────────────────
+  loadAll().then(maybeOpenInitialDrawer);
 })();
 </script>
 
