@@ -105,6 +105,14 @@ export default [
   // already use React (Confluence, wikis, static HTML, Notion embeds).
   // For React/Vue apps, use the ESM package (index.mjs) or the Vue subpath
   // instead — React is a peer dep there and only one copy ever exists.
+  //
+  // Double-load resilience: the `intro` lives inside the IIFE function
+  // body. If a previous copy of the bundle has already published
+  // `window.RLFlow.__loaded`, we return it immediately. Rollup's
+  // `var RLFlow = (function (exports) { ... }({}))` wrapper then assigns
+  // the existing window.RLFlow back to itself — so function identity is
+  // preserved across duplicate <script> tags and any user-registered
+  // types/layouts on the first load stay live.
   {
     input: 'src/standalone-entry.js',
     output: {
@@ -112,6 +120,25 @@ export default [
       format: 'iife',
       name: 'RLFlow',
       sourcemap: false,
+      intro:
+        'if (typeof window !== "undefined" && window.RLFlow && window.RLFlow.__loaded) {' +
+          'if (!window.RLFlow.__warned) {' +
+            'var __rlfv = window.RLFlow.version || "?";' +
+            'var __rlfh = "' + pkg.version + '";' +
+            'console.warn(__rlfv === __rlfh' +
+              ' ? "[RLFlow] standalone bundle loaded more than once (v" + __rlfv + "); the first copy stays in effect."' +
+              ' : "[RLFlow] standalone bundle loaded twice with different versions (existing v" + __rlfv + ", second v" + __rlfh + "); the first copy stays in effect. Consolidate your <script> tags.");' +
+            'window.RLFlow.__warned = true;' +
+          '}' +
+          'return window.RLFlow;' +
+        '}',
+      // Belt-and-braces global assignment. Rollup's IIFE wrapper does
+      // `var RLFlow = (function (exports) {...}({}))` which assigns to
+      // `window.RLFlow` only in environments where top-level `var` lands
+      // on the global object (browsers). In a Node `eval()` context that
+      // doesn't happen — our test harness relies on the explicit
+      // assignment, and so do `<script type="module">` consumers.
+      outro: 'if (typeof window !== "undefined") window.RLFlow = exports;',
     },
     plugins: [...sharedPlugins, minifyPlugin],
   },

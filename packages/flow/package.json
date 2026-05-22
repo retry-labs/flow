@@ -64,7 +64,8 @@
     "test:features": "node scripts/features-test.cjs",
     "test:layouts": "node scripts/layouts-test.cjs",
     "test:sequence": "node scripts/sequence-test.cjs",
-    "test": "npm run test:smoke && npm run test:anchor && npm run test:dsl && npm run test:showcase && npm run test:viewport && npm run test:mount && npm run test:player && npm run test:features && npm run test:layouts && npm run test:sequence && npm run test:react && npm run test:vue"
+    "test:double-load": "node scripts/double-load-test.cjs",
+    "test": "npm run test:smoke && npm run test:anchor && npm run test:dsl && npm run test:showcase && npm run test:viewport && npm run test:mount && npm run test:player && npm run test:features && npm run test:layouts && npm run test:sequence && npm run test:double-load && npm run test:react && npm run test:vue"
   },
   "keywords": [
     "diagram",

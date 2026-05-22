@@ -9194,6 +9194,15 @@
   let stylesInjected = false;
   function injectStyles() {
     if (stylesInjected || typeof document === 'undefined') return;
+    // DOM-aware: if a previous copy of the bundle (or an SSR'd page)
+    // already injected the style block, don't add another. Each loaded
+    // copy of the bundle has its own module-scoped `stylesInjected`
+    // flag, so the DOM probe is what makes injection idempotent across
+    // duplicate <script> tags.
+    if (document.querySelector('style[data-flow-viewport]')) {
+      stylesInjected = true;
+      return;
+    }
     const s = document.createElement('style');
     s.setAttribute('data-flow-viewport', '');
     s.textContent = STYLE_BLOCK;
@@ -9229,7 +9238,15 @@
     }
     const container = typeof target === 'string' ? document.querySelector(target) : target;
     if (!container || container.nodeType !== 1) {
-      throw new Error('rl-flow mount() needs a valid DOM element or selector');
+      throw new Error(typeof target === 'string' ? `rl-flow mount(): no element matched selector "${target}"` : 'rl-flow mount(): target must be a DOM element or CSS selector');
+    }
+    // Re-mounting onto a container with a live viewport leaks the
+    // previous instance's document-level listeners (e.g. fullscreenchange)
+    // and stacks DOM. Tear the previous one down cleanly first.
+    if (container.__rlflowViewport) {
+      try {
+        container.__rlflowViewport.destroy();
+      } catch (_) {/* swallow */}
     }
     injectStyles();
     const state = {
@@ -9769,6 +9786,7 @@
         stopTimer();
         if (state._cleanupFs) state._cleanupFs();
         if (host.parentNode) host.parentNode.removeChild(host);
+        if (container.__rlflowViewport === api) container.__rlflowViewport = null;
       },
       get host() {
         return host;
@@ -9787,6 +9805,7 @@
     if (isAdvanced()) applySpeedUI();
     render();
     if (state.autoplay && hasPlayer()) startTimer();
+    container.__rlflowViewport = api;
     return api;
   }
 

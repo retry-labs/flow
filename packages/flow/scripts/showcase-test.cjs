@@ -1,9 +1,13 @@
-// Showcase DSL test.
-// Parses website/showcase.html, extracts every `dsl: [...].join('\n')`
-// block, and verifies each one:
+// Showcase examples test.
+// Reads website/examples/index.json, then for each listed .flow file
+// validates the DSL body:
 //   1. parses through FD.parseDSL without errors,
 //   2. produces at least one node,
 //   3. renders through FD.renderSVG without throwing, yielding valid SVG.
+//
+// The .flow files use a YAML-style front-matter block (---...---) followed
+// by the DSL body — same format the showcase page parses at runtime.
+//
 // Run with:  node scripts/showcase-test.cjs
 
 const fs = require('fs');
@@ -23,39 +27,39 @@ if (!FD || typeof FD.parseDSL !== 'function' || typeof FD.renderSVG !== 'functio
   process.exit(1);
 }
 
-// ── Extract every DSL example from showcase.html ────────────────────
-const htmlPath = path.join(__dirname, '..', '..', '..', 'website', 'showcase.html');
-const html = fs.readFileSync(htmlPath, 'utf8');
+// ── Read the manifest + each .flow file ────────────────────────────
+const examplesDir = path.join(__dirname, '..', '..', '..', 'website', 'examples');
+const manifestPath = path.join(examplesDir, 'index.json');
 
-// Matches blocks of the shape:
-//   { id: 'foo',
-//     ...
-//     dsl: [
-//       'line',
-//       'line',
-//     ].join('\n'),
-//     ... },
-const blockRe = /id:\s*'([^']+)',[\s\S]*?dsl:\s*\[([\s\S]*?)\]\.join\('\\n'\)/g;
-
-const examples = [];
-let m;
-while ((m = blockRe.exec(html)) !== null) {
-  const id = m[1];
-  const inner = m[2];
-  // Pull each 'quoted string' entry out of the array literal. Treats \' as
-  // an escaped quote (not needed today but kept defensively).
-  const lines = [];
-  const strRe = /'((?:\\'|[^'])*)'/g;
-  let sm;
-  while ((sm = strRe.exec(inner)) !== null) {
-    lines.push(sm[1].replace(/\\'/g, "'"));
-  }
-  examples.push({ id, dsl: lines.join('\n') });
+if (!fs.existsSync(manifestPath)) {
+  console.error('FAIL: missing manifest at ' + manifestPath);
+  process.exit(1);
 }
 
-if (examples.length === 0) {
-  console.error('FAIL: found no showcase DSL blocks in ' + htmlPath);
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const files = manifest.files || [];
+
+if (!files.length) {
+  console.error('FAIL: manifest lists no files');
   process.exit(1);
+}
+
+// Same front-matter parser shape as showcase.html. Splits off the
+// `---\n...\n---\n` block and returns the DSL body. (Front-matter
+// fields aren't needed for the parse/render check.)
+function extractDSL(text) {
+  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  return m ? m[2] : text;
+}
+
+const examples = [];
+for (const file of files) {
+  const p = path.join(examplesDir, file);
+  if (!fs.existsSync(p)) {
+    console.error('FAIL: manifest references missing file ' + file);
+    process.exit(1);
+  }
+  examples.push({ id: file.replace(/\.flow$/, ''), dsl: extractDSL(fs.readFileSync(p, 'utf8')) });
 }
 
 // ── Verify each one ─────────────────────────────────────────────────
@@ -74,7 +78,7 @@ for (const ex of examples) {
       throw new Error('renderSVG did not return valid SVG');
     }
     console.log(
-      '  OK  ' + ex.id.padEnd(12) +
+      '  OK  ' + ex.id.padEnd(28) +
       ' nodes=' + String(g.nodes.length).padStart(2) +
       '  edges=' + String((g.edges || []).length).padStart(2) +
       '  style=' + styleName
@@ -92,4 +96,4 @@ if (fail) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('OK: every showcase DSL parses + renders cleanly');
+console.log('OK: every showcase example parses + renders cleanly');
